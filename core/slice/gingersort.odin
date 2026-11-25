@@ -7,7 +7,7 @@ import "base:intrinsics"
 // NOTE(bill, 2026-11-25): gingersort is the sort behind every procedure in this package.
 // It is stable, sorts in place, and needs no allocator.
 // Its only scratch space is a stack buffer of at most GINGER_SWAP_BYTES.
-// Small inputs use a smaller local buffer instead.
+// Small inputs use a smaller local buffer instead, and large inputs of small elements a buffer of GINGER_LARGE items.
 // With cheap comparisons, fewer than 8 items go straight to the sorting networks.
 // Otherwise the smallest inputs are sorted by insertion, with a higher cut-off where moves cost more.
 // Small inputs and small partitions are sorted with branchless sorting networks and parity merges, then merged through the buffer.
@@ -67,6 +67,7 @@ GINGER_SWAP_BYTES      :: 16 * 1024
 GINGER_OUT             :: 96
 GINGER_BLOCK           :: 16
 GINGER_SMALL           :: 96
+GINGER_LARGE           :: 1024
 GINGER_SMALL_BYTES     :: 2048
 GINGER_INSERTION_SMALL :: 8
 GINGER_INSERTION_LARGE :: 32
@@ -103,7 +104,18 @@ gingersort :: proc(data: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 			return
 		}
 	}
+	when size_of(E)*GINGER_LARGE <= GINGER_SWAP_BYTES {
+		if n > GINGER_LARGE {
+			ginger_large_buffered_sort(data, call, KIND)
+			return
+		}
+	}
 	ginger_buffered_sort(data, call, KIND)
+}
+
+ginger_large_buffered_sort :: #force_no_inline proc(data: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+	swap: [GINGER_LARGE]E = ---
+	ginger_analyze(data, swap[:], call, KIND)
 }
 
 ginger_buffered_sort :: #force_no_inline proc(data: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
