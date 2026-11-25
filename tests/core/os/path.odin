@@ -129,6 +129,34 @@ test_is_absolute_path :: proc(t: ^testing.T) {
 	testing.expect(t, !os.is_absolute_path("home"))
 }
 
+when ODIN_OS == .WASI {
+	@(test)
+	test_get_absolute_path_wasi :: proc(t: ^testing.T) {
+		Test_Case :: struct {
+			path, expected: string,
+		}
+
+		test_cases := [?]Test_Case {
+			{``,              `/`},
+			{`.`,             `/`},
+			{`..`,            `/`},
+			{`../..`,         `/`},
+			{`a`,             `/a`},
+			{`a/b/../c`,      `/a/c`},
+			{`a//b/./`,       `/a/b`},
+			{`/`,             `/`},
+			{`//x/./y/`,      `/x/y`},
+			{`/../x`,         `/x`},
+			{`/no/such/あ/..`, `/no/such`},
+		}
+
+		for tc in test_cases {
+			abs, err := os.get_absolute_path(tc.path, context.temp_allocator)
+			testing.expectf(t, abs == tc.expected && err == nil, "expected get_absolute_path(%q) -> %q; got: %q, %v", tc.path, tc.expected, abs, err)
+		}
+	}
+}
+
 @(test)
 test_get_relative_path :: proc(t: ^testing.T) {
 	Test_Case :: struct {

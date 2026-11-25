@@ -39,7 +39,9 @@ NORMAL_PACKAGES="
 	math/linalg/hlsl
 	math/noise
 	mem
+	odin
 	os
+	path/filepath
 	reflect
 	runtime
 	slice

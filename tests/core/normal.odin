@@ -48,6 +48,7 @@ download_assets :: proc "contextless" () {
 @(require) import "net"
 @(require) import "odin"
 @(require) import "os"
+@(require) import "path/filepath"
 @(require) import "reflect"
 @(require) import "runtime"
 @(require) import "slice"

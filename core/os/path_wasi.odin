@@ -178,5 +178,10 @@ _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err
 }
 
 _get_absolute_path :: proc(path: string, allocator: runtime.Allocator) -> (absolute_path: string, err: Error) {
-	return "", .Unsupported
+	if _is_absolute_path(path) {
+		return clean_path(path, allocator)
+	}
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+	wd := _get_working_directory(temp_allocator) or_return
+	return join_path({wd, path}, allocator)
 }
