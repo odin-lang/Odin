@@ -338,17 +338,16 @@ rd_valtype_vec :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Valu
 }
 
 @(private, require_results)
-rd_limits :: proc "contextless" (r: ^Reader) -> (min: u64, max: Maybe(u64), flags: Limits_Flags, err: Parse_Error) {
+rd_limits :: proc "contextless" (r: ^Reader, table: bool) -> (min: u64, max: Maybe(u64), flags: Limits_Flags, err: Parse_Error) {
 	raw := rd_byte(r) or_return
-	if raw > 0x07 {
+	flags = transmute(Limits_Flags)raw
+	if raw > 0x07 || (table && .Shared in flags) {
 		err = .BAD_LIMITS
 		return
 	}
-	flags = transmute(Limits_Flags)raw
-	bits: uint = 64 if .Address_64 in flags else 32
-	min = rd_uleb(r, bits) or_return
+	min = rd_uleb(r) or_return
 	if .Has_Max in flags {
-		max = rd_uleb(r, bits) or_return
+		max = rd_uleb(r) or_return
 	}
 	return
 }
@@ -363,7 +362,7 @@ check_limits_section :: proc "contextless" (r: ^Reader, table: bool) -> Parse_Er
 				return .BAD_VALTYPE
 			}
 		}
-		_, _, _ = rd_limits(r) or_return
+		_, _, _ = rd_limits(r, table) or_return
 	}
 	return nil
 }
@@ -519,9 +518,9 @@ parse_imports :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Impor
 			if !value_type_is_ref(rt) {
 				return out, .BAD_VALTYPE
 			}
-			_, _, _ = rd_limits(r) or_return
+			_, _, _ = rd_limits(r, true) or_return
 		case .MEMORY:
-			_, _, _ = rd_limits(r) or_return
+			_, _, _ = rd_limits(r, false) or_return
 		case .GLOBAL:
 			_ = rd_valtype(r) or_return // valtype
 			if (rd_byte(r) or_return) > 1 { // mutability
