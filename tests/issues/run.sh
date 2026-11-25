@@ -417,8 +417,10 @@ $ODIN build ../test_issue_8554 -build-mode:obj $COMMON
 
 $ODIN build ../test_issue_bounds_check_report -build-mode:obj -no-entry-point -o:none -out:bounds_check_report.o -export-bounds-checks-file:bounds_check_report_none.json $COMMON
 $ODIN build ../test_issue_bounds_check_report -build-mode:obj -no-entry-point -o:speed -out:bounds_check_report.o -export-bounds-checks-file:bounds_check_report_speed.json $COMMON
-if [[ $(grep -c "test_issue_bounds_check_report.odin" bounds_check_report_none.json) -eq 3 &&
-      $(grep -c "test_issue_bounds_check_report.odin" bounds_check_report_speed.json) -eq 2 ]]; then
+if [[ $(grep -c "test_issue_bounds_check_report.odin" bounds_check_report_none.json) -eq 4 &&
+      $(grep -c "test_issue_bounds_check_report.odin" bounds_check_report_speed.json) -eq 4 &&
+      $(grep "test_issue_bounds_check_report.odin" bounds_check_report_speed.json | grep -c "element") -eq 0 &&
+      $(grep "test_issue_bounds_check_report.odin" bounds_check_report_speed.json | grep -c "buffer") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"

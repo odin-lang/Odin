@@ -3670,6 +3670,9 @@ gb_internal String lb_bounds_check_kind(String const &name) {
 		{str_lit("runtime::slice_handle_error"),               str_lit("slice")},
 		{str_lit("runtime::multi_pointer_slice_expr_error"),   str_lit("slice")},
 		{str_lit("runtime::multi_pointer_slice_handle_error"), str_lit("slice")},
+		{str_lit("runtime::make_slice_error"),                 str_lit("make")},
+		{str_lit("runtime::make_dynamic_array_error"),         str_lit("make")},
+		{str_lit("runtime::make_map_expr_error"),              str_lit("make")},
 	};
 	for (Handler const &h : handlers) {
 		if (string_starts_with(name, h.prefix)) {
@@ -3963,6 +3966,15 @@ gb_internal i32 lb_const_i32_at(Array<lbConstLeaf> const &leaves, i64 offset) {
 	return cast(i32)LLVMConstIntGetSExtValue(value);
 }
 
+// An argument passed by pointer, or as a value
+gb_internal void lb_const_leaves_of_argument(lbConstEval const &ev, LLVMValueRef arg, Array<lbConstLeaf> *leaves) {
+	if (LLVMGetTypeKind(LLVMTypeOf(arg)) == LLVMPointerTypeKind) {
+		lb_const_leaves_of_memory(ev, arg, 0, leaves, 0);
+	} else {
+		lb_const_leaves_of_value(ev, arg, 0, leaves, 0);
+	}
+}
+
 gb_internal bool lb_location_from_leaves(Array<lbConstLeaf> const &leaves, lbBoundsCheckSite *site) {
 	i32 line = lb_const_i32_at(leaves, type_offset_of(t_source_code_location, 1));
 	if (line == 0) {
@@ -3974,7 +3986,7 @@ gb_internal bool lb_location_from_leaves(Array<lbConstLeaf> const &leaves, lbBou
 	return true;
 }
 
-// NOTE(bill): An error handler reports the location from a `Source_Code_Location` it makes on the stack.
+// NOTE(bill): An error handler reports the location from a `Source_Code_Location` it makes on the stack, or passes on to `print_caller_location`.
 // Its parameters stand for the call's arguments.
 // That still works once LLVM has moved constants into the handler and dropped those parameters.
 gb_internal bool lb_bounds_check_location_from_handler(LLVMTargetDataRef td, LLVMValueRef call, LLVMValueRef handler, lbBoundsCheckSite *site) {
@@ -4006,24 +4018,40 @@ gb_internal bool lb_bounds_check_location_from_handler(LLVMTargetDataRef td, LLV
 			return true;
 		}
 	}
+
+	for (LLVMBasicBlockRef block = entry; block != nullptr; block = LLVMGetNextBasicBlock(block)) {
+		for (LLVMValueRef inst = LLVMGetFirstInstruction(block); inst != nullptr; inst = LLVMGetNextInstruction(inst)) {
+			if (!LLVMIsACallInst(inst)) {
+				continue;
+			}
+			if (lb_value_name(LLVMGetCalledValue(inst)) != "runtime::print_caller_location") {
+				continue;
+			}
+
+			auto leaves = array_make<lbConstLeaf>(temporary_allocator(), 0, 8);
+			lb_const_leaves_of_argument(ev, LLVMGetOperand(inst, 0), &leaves);
+			if (lb_location_from_leaves(leaves, site)) {
+				return true;
+			}
+		}
+	}
 	return false;
 }
 
 // NOTE(bill): Every target passes the file as one argument, by pointer or as a value, followed by the line and column.
 // They are read as the fields of a `Source_Code_Location`, which the `_loc` procedures take instead.
 gb_internal void lb_bounds_check_location_from_call(LLVMTargetDataRef td, LLVMValueRef call, bool takes_location, lbBoundsCheckSite *site) {
-	if (LLVMGetNumArgOperands(call) < 3) {
+	unsigned arg_count = LLVMGetNumArgOperands(call);
+	if (arg_count == 0) {
+		return;
+	}
+	if (!takes_location && arg_count < 3) {
 		return;
 	}
 
 	lbConstEval ev = {td, nullptr};
 	auto leaves = array_make<lbConstLeaf>(temporary_allocator(), 0, 8);
-	LLVMValueRef first = LLVMGetOperand(call, 0);
-	if (LLVMGetTypeKind(LLVMTypeOf(first)) == LLVMPointerTypeKind) {
-		lb_const_leaves_of_memory(ev, first, 0, &leaves, 0);
-	} else {
-		lb_const_leaves_of_value(ev, first, 0, &leaves, 0);
-	}
+	lb_const_leaves_of_argument(ev, LLVMGetOperand(call, 0), &leaves);
 
 	if (!takes_location) {
 		lb_const_leaves_of_value(ev, LLVMGetOperand(call, 1), type_offset_of(t_source_code_location, 1), &leaves, 0);
@@ -4040,9 +4068,7 @@ gb_internal void lb_collect_bounds_checks(lbModule *m, Array<lbBoundsCheckSite> 
 			continue;
 		}
 		String procedure = lb_value_name(proc);
-		if (lb_bounds_check_kind(procedure).len > 0) {
-			continue;
-		}
+		bool in_check_procedure = lb_bounds_check_kind(procedure).len > 0;
 
 		for (LLVMBasicBlockRef block = LLVMGetFirstBasicBlock(proc); block != nullptr; block = LLVMGetNextBasicBlock(block)) {
 			for (LLVMValueRef inst = LLVMGetFirstInstruction(block); inst != nullptr; inst = LLVMGetNextInstruction(inst)) {
@@ -4067,8 +4093,20 @@ gb_internal void lb_collect_bounds_checks(lbModule *m, Array<lbBoundsCheckSite> 
 				TEMPORARY_ALLOCATOR_GUARD();
 				bool found = lb_bounds_check_location_from_handler(td, inst, callee, &site);
 				if (!found) {
-					bool takes_location = string_ends_with(callee_name, str_lit("_loc"));
+					// NOTE(bill): The `_loc` check procedures, and the error handlers within them, take a `Source_Code_Location`.
+					String check_procedure = callee_name;
+					isize nested = string_index_byte(callee_name, '.');
+					if (nested >= 0) {
+						check_procedure = substring(callee_name, 0, nested);
+					}
+					bool takes_location = string_ends_with(check_procedure, str_lit("_loc"));
 					lb_bounds_check_location_from_call(td, inst, takes_location, &site);
+				}
+
+				// NOTE(bill): A check procedure passes its own location on to its error handler, which is the same check.
+				// Only the checks of its own, with locations of their own, count.
+				if (in_check_procedure && site.line == 0) {
+					continue;
 				}
 				array_add(sites, site);
 			}
