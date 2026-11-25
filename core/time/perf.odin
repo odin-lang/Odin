@@ -93,7 +93,11 @@ when ODIN_ARCH == .amd64 {
 	}
 }
 
-when ODIN_OS != .Darwin && ODIN_OS != .Linux && ODIN_OS != .FreeBSD {
+when ODIN_OS == .WASI || ODIN_OS == .JS || ODIN_OS == .Orca {
+	_get_tsc_frequency :: proc "contextless" () -> (u64, bool) {
+		return 1_000_000_000, true
+	}
+} else when ODIN_OS != .Darwin && ODIN_OS != .Linux && ODIN_OS != .FreeBSD {
 	_get_tsc_frequency :: proc "contextless" () -> (u64, bool) {
 		return 0, false
 	}
@@ -105,10 +109,15 @@ Check if the CPU has invariant TSC.
 This procedure checks if the CPU contains an invariant TSC (Time stamp counter).
 Invariant TSC is a feature of modern processors that allows them to run their
 TSC at a fixed frequency, independent of ACPI state, and CPU frequency.
+
+On wasi, js and Orca, `read_cycle_counter` reads a monotonic clock in nanoseconds,
+which runs at a fixed rate, so this procedure returns true there.
 */
 @(require_results)
 has_invariant_tsc :: proc "contextless" () -> bool {
-	when ODIN_ARCH == .amd64 {
+	when ODIN_OS == .WASI || ODIN_OS == .JS || ODIN_OS == .Orca {
+		return true
+	} else when ODIN_ARCH == .amd64 {
 		return x86_has_invariant_tsc()
 	} else when ODIN_ARCH == .arm64 {
 		return true
@@ -125,6 +134,9 @@ doesn't have an invariant TSC, this procedure returns with an error. Otherwise
 an attempt is made to fetch the TSC frequency from the OS. If this fails,
 the frequency is obtained by sleeping for the specified amount of time and
 dividing the readings from TSC by the duration of the sleep.
+
+On wasi, js and Orca, it returns 1 GHz, the rate of the nanosecond clock that
+`read_cycle_counter` reads there.
 
 The duration of sleep can be controlled by `fallback_sleep` parameter.
 */

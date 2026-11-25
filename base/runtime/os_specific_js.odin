@@ -31,6 +31,13 @@ _rand_bytes :: proc "contextless" (dst: []byte) {
 	}
 }
 
+_read_cycle_counter :: proc "contextless" () -> i64 {
+	foreign odin_env {
+		tick_now :: proc "contextless" () -> f64 ---
+	}
+	return i64(tick_now() * 1e6)
+}
+
 _exit :: proc "contextless" (code: int) -> ! {
 	trap()
 }

@@ -6089,6 +6089,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		break;
 
 	case BuiltinProc_read_cycle_counter:
+		if (build_context.metrics.os == TargetOs_wasi || build_context.metrics.os == TargetOs_js || build_context.metrics.os == TargetOs_orca) {
+			add_package_dependency(c, "runtime", "_read_cycle_counter");
+		}
 		operand->mode = Addressing_Value;
 		operand->type = t_i64;
 		break;

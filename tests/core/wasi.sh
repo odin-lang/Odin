@@ -3,7 +3,7 @@ set -eu
 
 cd "$(dirname "$0")/../.."
 ROOT="$(pwd -P)"
-FLAGS="-build-mode:test -target:wasi_wasm32 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:ODIN_TEST_RANDOM_SEED=$(date +%s)"
+FLAGS="-build-mode:test -target:wasi_wasm32 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true"
 
 NORMAL_PACKAGES="
 	bytes

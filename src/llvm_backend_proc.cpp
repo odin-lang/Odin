@@ -4192,6 +4192,8 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("mrs $0, cntvct_el0"), str_lit("=r"), has_side_effects);
 				GB_ASSERT(the_asm != nullptr);
 				res.value = LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
+			} else if (build_context.metrics.os == TargetOs_wasi || build_context.metrics.os == TargetOs_js || build_context.metrics.os == TargetOs_orca) {
+				res.value = lb_emit_runtime_call(p, "_read_cycle_counter", {}).value;
 			#if LLVM_VERSION_MAJOR > 19 || (LLVM_VERSION_MAJOR == 19 && LLVM_VERSION_MINOR >= 1)
 			} else if (build_context.metrics.arch == TargetArch_riscv64 && build_context.metrics.os == TargetOs_linux) {
 				// Linux in it's infinite wisdom decided that `rdcycle` should not be

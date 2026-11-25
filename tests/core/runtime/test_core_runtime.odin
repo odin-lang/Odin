@@ -8,6 +8,7 @@ import "core:mem/virtual"
 import "base:runtime"
 import "core:slice"
 import "core:testing"
+@(require) import "core:time"
 
 // Tests that having space for the allocation, but not for the allocation and alignment
 // is handled correctly.
@@ -115,6 +116,31 @@ when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 			testing.expectf(t, grow_err == .Out_Of_Memory && grown == nil, "resize(64 -> %v) = %v bytes, %v", size, len(grown), grow_err)
 		}
 		runtime.mem_free(raw_data(data), a)
+	}
+}
+
+@(test)
+test_read_cycle_counter :: proc(t: ^testing.T) {
+	start := intrinsics.read_cycle_counter()
+	now   := start
+	for _ in 0..<1_000_000 {
+		now = intrinsics.read_cycle_counter()
+		if now != start {
+			break
+		}
+	}
+	testing.expectf(t, now > start, "read_cycle_counter stayed at %v", start)
+
+	when ODIN_OS == .WASI {
+		tick_start  := time.tick_now()
+		cycle_start := intrinsics.read_cycle_counter()
+		time.sleep(20 * time.Millisecond)
+		cycles := time.Duration(intrinsics.read_cycle_counter() - cycle_start)
+		ticks  := time.tick_since(tick_start)
+		testing.expectf(t, cycles >= 20 * time.Millisecond && abs(cycles - ticks) < 5 * time.Millisecond, "read_cycle_counter advanced %v over a %v sleep", cycles, ticks)
+
+		hz, hz_ok := time.tsc_frequency()
+		testing.expectf(t, hz_ok && hz == 1_000_000_000, "tsc_frequency returned %v, %v", hz, hz_ok)
 	}
 }
 
