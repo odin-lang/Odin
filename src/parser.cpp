@@ -2068,6 +2068,33 @@ gb_internal Ast *        parse_do_body(AstFile *f, Token const &token, char cons
 gb_internal Ast *        parse_block_stmt(AstFile *f, b32 is_when);
 
 
+// NOTE(bill): The passes that recurse over the AST overflow the 1 MiB stacks of the worker threads on deeply nested code.
+// The parser measures the depth of the AST rather than its own recursion.
+// Chains such as `a + b + c` and `x.y.z` are built in a loop.
+// The elements of a compound literal count one level further in: building them takes about twice the stack of other nodes.
+#define PARSER_MAX_NESTING_DEPTH 100
+
+gb_internal void parse_check_nesting(i32 depth, Token const &token) {
+	if (depth <= PARSER_MAX_NESTING_DEPTH) {
+		return;
+	}
+	syntax_error(token, "Code nested too deeply: the limit is %d levels. Break it apart into smaller pieces", PARSER_MAX_NESTING_DEPTH);
+	exit_with_errors();
+}
+
+gb_internal void parse_nesting_push(AstFile *f) {
+	f->nesting_depth += 1;
+	if (f->nesting_peak < f->nesting_depth) {
+		f->nesting_peak = f->nesting_depth;
+	}
+	parse_check_nesting(f->nesting_depth, f->curr_token);
+}
+
+gb_internal void parse_nesting_pop(AstFile *f) {
+	f->nesting_depth -= 1;
+}
+
+
 
 gb_internal Ast *parse_ident(AstFile *f, bool allow_poly_names=false) {
 	Token token = f->curr_token;
@@ -2207,7 +2234,9 @@ gb_internal Ast *parse_literal_value(AstFile *f, Ast *type) {
 	isize expr_level = f->expr_level;
 	f->expr_level = 0;
 	if (f->curr_token.kind != Token_CloseBrace) {
+		parse_nesting_push(f);
 		elems = parse_element_list(f);
+		parse_nesting_pop(f);
 	}
 	f->expr_level = expr_level;
 	Token close = expect_closing(f, Token_CloseBrace, str_lit("compound literal"));
@@ -3948,8 +3977,15 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 		operand = ast_bad_expr(f, begin, f->curr_token);
 	}
 
+	// NOTE(bill): Each step wraps the operand in a new node.
+	// Everything parsed so far moves one level down.
+	i32 chain_peak = f->nesting_peak;
+
 	bool loop = true;
 	while (loop) {
+		Ast *prev_operand = operand;
+		f->nesting_peak = f->nesting_depth;
+
 		switch (f->curr_token.kind) {
 		case Token_OpenParen:
 			parse_check_or_return(operand, "call expression");
@@ -4120,14 +4156,23 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			break;
 		}
 
+		if (operand != prev_operand) {
+			chain_peak = gb_max(chain_peak+1, f->nesting_peak);
+			parse_check_nesting(chain_peak, ast_token(operand));
+		}
+
 		lhs = false; // NOTE(bill): 'tis not lhs anymore
 	}
 
+	f->nesting_peak = chain_peak;
 	return operand;
 }
 
 
 gb_internal Ast *parse_unary_expr(AstFile *f, bool lhs) {
+	parse_nesting_push(f);
+	defer (parse_nesting_pop(f));
+
 	switch (f->curr_token.kind) {
 	case Token_transmute:
 	case Token_cast: {
@@ -4177,7 +4222,14 @@ gb_internal Ast *parse_unary_expr(AstFile *f, bool lhs) {
 	}
 	}
 
-	return parse_atom_expr(f, parse_operand(f, lhs), lhs);
+	i32 outer_peak = f->nesting_peak;
+	f->nesting_peak = f->nesting_depth;
+
+	Ast *operand = parse_operand(f, lhs);
+	Ast *expr    = parse_atom_expr(f, operand, lhs);
+
+	f->nesting_peak = gb_max(outer_peak, f->nesting_peak);
+	return expr;
 }
 
 gb_internal bool is_ast_range(Ast *expr) {
@@ -4242,7 +4294,14 @@ gb_internal i32 token_precedence(AstFile *f, TokenKind t) {
 }
 
 gb_internal Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
+	i32 outer_peak = f->nesting_peak;
+	f->nesting_peak = f->nesting_depth;
+
 	Ast *expr = parse_unary_expr(f, lhs);
+
+	// NOTE(bill): Each operator makes a new node above everything parsed so far.
+	// That moves it all one level down.
+	i32 chain_peak = f->nesting_peak;
 	for (;;) {
 		Token op = f->curr_token;
 		i32 op_prec = token_precedence(f, op.kind);
@@ -4263,6 +4322,9 @@ gb_internal Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 			break;
 		}
 		expect_operator(f); // NOTE(bill): error checks too
+
+		f->nesting_depth += 1;
+		f->nesting_peak = f->nesting_depth;
 
 		if (op.kind == Token_Question) {
 			Ast *cond = expr;
@@ -4298,9 +4360,15 @@ gb_internal Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 			}
 		}
 
+		f->nesting_depth -= 1;
+
+		chain_peak = gb_max(chain_peak+1, f->nesting_peak);
+		parse_check_nesting(chain_peak, op);
+
 		lhs = false;
 	}
 	loop_end:;
+	f->nesting_peak = gb_max(outer_peak, chain_peak);
 	return expr;
 }
 
@@ -5360,9 +5428,17 @@ gb_internal Ast *parse_type_or_ident(AstFile *f) {
 	f->allow_type = true;
 	f->expr_level = -1;
 
+	parse_nesting_push(f);
+	defer (parse_nesting_pop(f));
+
+	i32 outer_peak = f->nesting_peak;
+	f->nesting_peak = f->nesting_depth;
+
 	bool lhs = true;
 	Ast *operand = parse_operand(f, lhs);
 	Ast *type = parse_atom_expr(f, operand, lhs);
+
+	f->nesting_peak = gb_max(outer_peak, f->nesting_peak);
 	return type;
 }
 
@@ -5378,7 +5454,9 @@ gb_internal Ast *parse_body(AstFile *f) {
 	f->expr_level = 0;
 	// f->allow_newline = false;
 	open = expect_token(f, Token_OpenBrace);
+	parse_nesting_push(f);
 	stmts = parse_stmt_list(f);
+	parse_nesting_pop(f);
 	close = expect_token(f, Token_CloseBrace);
 	f->expr_level = prev_expr_level;
 	f->allow_newline = prev_allow_newline;
@@ -5432,6 +5510,10 @@ gb_internal Ast *parse_if_stmt(AstFile *f) {
 	}
 
 	Ast *top_if_stmt = nullptr;
+
+	// NOTE(bill): Each `else if` is a level below the previous one.
+	i32 else_if_depth = 0;
+	defer (f->nesting_depth -= else_if_depth);
 
 	Ast *prev_if_stmt = nullptr;
 if_else_chain:;
@@ -5493,6 +5575,8 @@ if_else_chain:;
 			// we can just inline the tail-recursion manually with a simple loop like
 			// construct using a `goto`
 			prev_if_stmt = curr_if_stmt;
+			parse_nesting_push(f);
+			else_if_depth += 1;
 			goto if_else_chain;
 		case Token_OpenBrace:
 			else_stmt = parse_block_stmt(f, false);
@@ -5550,7 +5634,9 @@ gb_internal Ast *parse_when_stmt(AstFile *f) {
 		Token else_token = expect_token(f, Token_else);
 		switch (f->curr_token.kind) {
 		case Token_when:
+			parse_nesting_push(f);
 			else_stmt = parse_when_stmt(f);
+			parse_nesting_pop(f);
 			break;
 		case Token_OpenBrace:
 			else_stmt = parse_block_stmt(f, true);
@@ -5714,6 +5800,9 @@ range_skip:;
 
 
 gb_internal Ast *parse_case_clause(AstFile *f, bool is_type) {
+	parse_nesting_push(f);
+	defer (parse_nesting_pop(f));
+
 	Token token = f->curr_token;
 	Array<Ast *> list = {};
 	expect_token(f, Token_case);
@@ -5783,9 +5872,11 @@ gb_internal Ast *parse_switch_stmt(AstFile *f) {
 	skip_possible_newline(f);
 	open = expect_token(f, Token_OpenBrace);
 
+	parse_nesting_push(f);
 	while (f->curr_token.kind == Token_case) {
 		array_add(&list, parse_case_clause(f, is_type_switch));
 	}
+	parse_nesting_pop(f);
 
 	close = expect_token(f, Token_CloseBrace);
 
@@ -6081,6 +6172,9 @@ gb_internal Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
 }
 
 gb_internal Ast *parse_stmt(AstFile *f) {
+	parse_nesting_push(f);
+	defer (parse_nesting_pop(f));
+
 	Ast *s = nullptr;
 	Token token = f->curr_token;
 	switch (token.kind) {
@@ -6287,8 +6381,13 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 		return s;
 	} break;
 
-	case Token_OpenBrace:
-		return parse_block_stmt(f, false);
+	case Token_OpenBrace: {
+		// NOTE(bill): The block is both the statement and its body, and counts as one level.
+		f->nesting_depth -= 1;
+		Ast *block = parse_block_stmt(f, false);
+		f->nesting_depth += 1;
+		return block;
+	}
 
 	case Token_Semicolon:
 		s = ast_empty_stmt(f, token);
