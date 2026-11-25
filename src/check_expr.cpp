@@ -726,6 +726,22 @@ gb_internal bool poly_proc_lookup_operands_equal(Slice<PolyProcLookupOperand> co
 
 gb_internal bool check_proc_params_assignable(CheckerContext *c, Type *x, Type *y);
 
+// NOTE(bill): A polymorphic procedure or record that instantiates itself with a new type each time never finishes
+// 	`f :: proc(x: $T) { f([1]T{x}) }`.
+// Instantiations within core, vendor, examples, and tests nest at most 9 deep.
+enum { MAX_POLYMORPHIC_INSTANTIATION_DEPTH = 100 };
+
+gb_internal void check_polymorphic_instantiation_depth(isize depth, Token const &token, String const &name) {
+	if (depth <= MAX_POLYMORPHIC_INSTANTIATION_DEPTH) {
+		return;
+	}
+
+	// NOTE(bill): This stops the compiler and is reported even whilst errors are muted.
+	global_error_context.mute_depth = 0;
+	error(token, "Polymorphic instantiations are nested too deeply: the limit is %d levels. '%.*s' probably instantiates itself with a new type each time", MAX_POLYMORPHIC_INSTANTIATION_DEPTH, LIT(name));
+	exit_with_errors();
+}
+
 gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_entity, Type *type,
                                                         Array<Operand> const *param_operands, Ast *poly_def_node, PolyProcData *poly_proc_data) {
 	///////////////////////////////////////////////////////////////////////////////
@@ -985,6 +1001,15 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		}
 	}
 	rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
+
+	isize instantiation_depth = 1;
+	for (ProcInfo *pi = global_error_context.instantiations.proc; pi != nullptr; pi = pi->poly_parent) {
+		if (pi->generated_from_polymorphic) {
+			instantiation_depth += 1;
+		}
+	}
+	Token instantiation_token = poly_def_node != nullptr ? ast_token(poly_def_node) : base_entity->token;
+	check_polymorphic_instantiation_depth(instantiation_depth, instantiation_token, name);
 
 	// NOTE(bill): Clone a polymorphic procedure's body before taking `gen_procs`' exclusive lock so lookups of it don't wait on the clone
 	Ast *proc_lit = clone_ast(old_decl->proc_lit);
@@ -9366,6 +9391,13 @@ gb_internal Type *instantiate_polymorphic_record(CheckerContext *c, Type *origin
 		// reports or mutes them just as the first use did
 		failed_type = found_entity->type;
 	}
+
+	isize instantiation_depth = 1;
+	for (ErrorRecordInstantiation *r = global_error_context.instantiations.records; r != nullptr; r = r->prev) {
+		instantiation_depth += 1;
+	}
+	Token instantiation_token = call != nullptr ? ast_token(call) : original_type->Named.type_name->token;
+	check_polymorphic_instantiation_depth(instantiation_depth, instantiation_token, original_type->Named.name);
 
 	CheckerContext ctx = *c;
 
