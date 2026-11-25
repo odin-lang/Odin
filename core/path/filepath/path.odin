@@ -280,9 +280,8 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 }
 
 /*
-	Returns all but the last path element, usually the path's directory. Once the final element has been removed,
-	`dir` calls `clean` on the path and trailing separators are removed. If the path is empty or consists purely
-	of separators, then `"."` is returned.
+	Returns all but the last path element, usually the path's directory.
+	If the path is empty or consists purely of separators, then `"."` is returned.
 */
 dir :: os.dir
 
