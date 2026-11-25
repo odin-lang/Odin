@@ -43,9 +43,7 @@ Context :: struct {
 
 // init initializes a Context with a specific hash Algorithm and key.
 init :: proc(ctx: ^Context, algorithm: hash.Algorithm, key: []byte) {
-	if ctx._is_initialized {
-		reset(ctx)
-	}
+	crypto.zero_explicit(ctx, size_of(Context))
 
 	_init_hashes(ctx, algorithm, key)
 

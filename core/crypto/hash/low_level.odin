@@ -1,5 +1,6 @@
 package crypto_hash
 
+import "core:crypto"
 import "core:crypto/blake2b"
 import "core:crypto/blake2s"
 import "core:crypto/sha2"
@@ -151,9 +152,7 @@ _IMPL_IDS := [Algorithm]typeid {
 
 // init initializes a Context with a specific hash Algorithm.
 init :: proc(ctx: ^Context, algorithm: Algorithm) {
-	if ctx._impl != nil {
-		reset(ctx)
-	}
+	crypto.zero_explicit(ctx, size_of(Context))
 
 	// Directly specialize the union by setting the type ID (save a copy).
 	reflect.set_union_variant_typeid(
@@ -273,9 +272,7 @@ clone :: proc(ctx, other: ^Context) {
 	if ctx == other {
 		return
 	}
-	if ctx._impl != nil {
-		reset(ctx)
-	}
+	crypto.zero_explicit(ctx, size_of(Context))
 
 	ctx._algo = other._algo
 
