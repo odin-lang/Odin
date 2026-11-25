@@ -121,19 +121,20 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 	// Note(flysand): Open the process handle right away to prevent some race
 	// conditions. Once the handle is open, the process will be kept alive by
 	// the OS.
-	ph := win32.INVALID_HANDLE_VALUE
+	// `OpenProcess` returns NULL on failure, not `INVALID_HANDLE_VALUE`.
+	ph: win32.HANDLE
 	if selection & {.Command_Line, .Command_Args, .Environment, .Working_Dir, .Username} != {} {
 		ph = win32.OpenProcess(
 			win32.PROCESS_QUERY_LIMITED_INFORMATION | win32.PROCESS_VM_READ,
 			false,
 			u32(pid),
 		)
-		if ph == win32.INVALID_HANDLE_VALUE {
+		if ph == nil {
 			err = _get_platform_error()
 			return
 		}
 	}
-	defer if ph != win32.INVALID_HANDLE_VALUE {
+	defer if ph != nil {
 		win32.CloseHandle(ph)
 	}
 	snapshot_process: if selection & {.PPid, .Priority} != {} {
@@ -431,12 +432,16 @@ _process_open :: proc(pid: int, flags: Process_Open_Flags) -> (process: Process,
 	if .Mem_Write in flags {
 		dwDesiredAccess |= win32.PROCESS_VM_WRITE
 	}
-	handle := win32.OpenProcess(
-		dwDesiredAccess,
-		false,
-		u32(pid),
-	)
-	if handle == win32.INVALID_HANDLE_VALUE {
+	// `process_kill` and `process_terminate` need `PROCESS_TERMINATE`. A
+	// process the caller may query but not terminate, such as an elevated one,
+	// is still opened without it, and killing it then fails with
+	// `Permission_Denied`, as it does on the other platforms.
+	handle := win32.OpenProcess(dwDesiredAccess | win32.PROCESS_TERMINATE, false, u32(pid))
+	if handle == nil && win32.GetLastError() == win32.ERROR_ACCESS_DENIED {
+		handle = win32.OpenProcess(dwDesiredAccess, false, u32(pid))
+	}
+	// `OpenProcess` returns NULL on failure, not `INVALID_HANDLE_VALUE`.
+	if handle == nil {
 		err = _get_platform_error()
 	} else {
 		process = {pid = pid, handle = uintptr(handle)}
