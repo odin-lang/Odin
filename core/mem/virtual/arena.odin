@@ -400,6 +400,32 @@ arena_static_reset_to :: proc(arena: ^Arena, pos: uint, loc := #caller_location)
 	return false
 }
 
+// Decommits the current block's memory past `keep` bytes, or past what it has used if that is more, and returns how
+// much was decommitted. Nothing is decommitted while an `Arena_Temp` is active, nor from a Buffer arena, whose memory
+// is not its own. Memory past what is used is zeroed, so committing it again later gives the same zeroes back.
+@(no_sanitize_address)
+arena_trim :: proc(arena: ^Arena, keep: uint) -> (decommitted: uint) {
+	sync.mutex_guard(&arena.mutex)
+	arena_close(arena)
+	defer arena_open(arena)
+
+	block := arena.curr_block
+	if block == nil || arena.kind == .Buffer || arena.temp_count > 0 {
+		return
+	}
+	pmblock     := (^Platform_Memory_Block)(block)
+	base_offset := uint(uintptr(block.base) - uintptr(pmblock))
+	kept        := mem.align_forward_uint(base_offset + max(keep, block.used), uint(mem.PAGE_SIZE))
+	if kept >= pmblock.committed {
+		return
+	}
+	decommitted = pmblock.committed - kept
+	decommit(rawptr(uintptr(pmblock) + uintptr(kept)), decommitted)
+	pmblock.committed = kept
+	block.committed   = kept - base_offset
+	return
+}
+
 // Frees the last memory block of a Growing Arena
 @(no_sanitize_address)
 arena_growing_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_location) {
