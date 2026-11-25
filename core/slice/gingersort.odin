@@ -35,6 +35,7 @@ Sort_Kind :: enum {
 	Indices_Ordered,
 	Indices_Less,
 	Indices_Less_With_Data,
+	Shared,
 }
 
 Sort_Less_With_Data :: struct($E: typeid) {
@@ -63,6 +64,17 @@ Sort_Indices_Less_With_Data :: struct($E: typeid) {
 	user_data: rawptr,
 }
 
+// At -o:size, elements are sorted as a stand-in of the same size and alignment, through a small per-type comparison.
+// Every element type with that size and alignment then shares one body.
+Sort_Shared_Item :: struct($N: int, $W: typeid) {
+	words: [N]W,
+}
+
+Sort_Shared_Call :: struct($T: typeid) {
+	greater: proc(a, b: T, call: rawptr) -> bool,
+	call:    rawptr,
+}
+
 GINGER_SWAP_BYTES      :: 16 * 1024
 GINGER_OUT             :: 96
 GINGER_BLOCK           :: 16
@@ -72,7 +84,45 @@ GINGER_SMALL_BYTES     :: 2048
 GINGER_INSERTION_SMALL :: 8
 GINGER_INSERTION_LARGE :: 32
 
-gingersort :: proc(data: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+gingersort :: proc(data: []$E, call: $P, $KIND: Sort_Kind) {
+	when ODIN_OPTIMIZATION_MODE == .Size {
+		ginger_sort_shared(data, call, KIND)
+	} else {
+		ginger_sort_typed(data, call, KIND)
+	}
+}
+
+ginger_sort_shared :: proc(data: []$E, call: $P, $KIND: Sort_Kind) {
+	when size_of(E)%8 == 0 && align_of(E) == 8 && align_of(u64) == 8 {
+		W     :: u64
+		SHARE :: true
+	} else when size_of(E)%4 == 0 && align_of(E) == 4 && align_of(u32) == 4 {
+		W     :: u32
+		SHARE :: true
+	} else when size_of(E)%2 == 0 && align_of(E) == 2 && align_of(u16) == 2 {
+		W     :: u16
+		SHARE :: true
+	} else {
+		W     :: u8
+		SHARE :: align_of(E) == 1
+	}
+
+	when !SHARE {
+		ginger_sort_typed(data, call, KIND)
+	} else {
+		Item :: Sort_Shared_Item(size_of(E)/size_of(W), W)
+		#assert(size_of(Item) == size_of(E) && align_of(Item) == align_of(E))
+
+		greater :: proc(a, b: Item, call: rawptr) -> bool {
+			return ginger_greater(transmute(E)a, transmute(E)b, (^P)(call)^, KIND)
+		}
+
+		call := call
+		ginger_sort_typed(transmute([]Item)data, Sort_Shared_Call(Item){greater, &call}, .Shared)
+	}
+}
+
+ginger_sort_typed :: proc(data: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	n := len(data)
 	if n < 2 {
 		return
@@ -199,6 +249,8 @@ ginger_greater :: #force_inline proc(a, b: $E, call: $P, $KIND: Sort_Kind) -> bo
 		return call.less(call.data[b], call.data[a])
 	} else when KIND == .Indices_Less_With_Data {
 		return call.less(call.data[b], call.data[a], call.user_data)
+	} else when KIND == .Shared {
+		return call.greater(a, b, call.call)
 	} else {
 		#panic("unhandled Sort_Kind")
 	}
