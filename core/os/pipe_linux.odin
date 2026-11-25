@@ -29,6 +29,9 @@ _pipe_has_data :: proc(r: ^File) -> (ok: bool, err: Error) {
 		},
 	}
 	n, errno := linux.poll(poll_fds, 0)
+	for errno == .EINTR {
+		n, errno = linux.poll(poll_fds, 0)
+	}
 	if n != 1 || errno != nil {
 		return false, _get_platform_error(errno)
 	}

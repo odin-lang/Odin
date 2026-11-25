@@ -57,6 +57,9 @@ _pipe_has_data :: proc(r: ^File) -> (ok: bool, err: Error) {
 		},
 	}
 	n := posix.poll(raw_data(poll_fds), u32(len(poll_fds)), 0)
+	for n < 0 && posix.errno() == .EINTR {
+		n = posix.poll(raw_data(poll_fds), u32(len(poll_fds)), 0)
+	}
 	if n < 0 {
 		return false, _get_platform_error()
 	} else if n != 1 {
