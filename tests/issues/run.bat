@@ -270,6 +270,10 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% build "..\test_issue_wasi_wasm64p32_target" -target:wasi_wasm32 -build-mode:obj %COMMON% || exit /b
 %ODIN% build "..\test_issue_wasi_wasm64p32_target" -target:wasi_wasm64p32 -build-mode:obj %COMMON% || exit /b
 
+%ODIN% run "..\test_issue_8177" %COMMON% || exit /b
+%ODIN% build "..\test_issue_8177" -target:js_wasm64p32 -build-mode:obj %COMMON% || exit /b
+%ODIN% build "..\test_issue_8177" -target:wasi_wasm64p32 -build-mode:obj %COMMON% || exit /b
+
 @if "%ODIN_TESTS_NO_CLANG%" == "" (
 	clang -c "..\test_issue_sysv_abi\test_issue_sysv_abi.c" -o test_issue_sysv_abi_c.o || exit /b
 ) else (

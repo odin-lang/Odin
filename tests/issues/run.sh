@@ -742,6 +742,14 @@ if command -v wasmtime > /dev/null; then
 	done
 fi
 
+$ODIN run ../test_issue_8177 $COMMON
+$ODIN build ../test_issue_8177 -target:js_wasm64p32 -build-mode:obj $COMMON_CHECK
+$ODIN build ../test_issue_8177 -target:wasi_wasm64p32 -build-mode:obj $COMMON_CHECK
+if command -v wasmtime > /dev/null; then
+	$ODIN build ../test_issue_8177 -target:wasi_wasm64p32 $COMMON_CHECK
+	wasmtime run ./test_issue_8177.wasm
+fi
+
 # wasm32 C vectors, both sides without and with simd128; needs wasmtime and a clang that targets wasm32
 if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]] && command -v wasmtime > /dev/null; then
 	for simd in "" simd128; do
