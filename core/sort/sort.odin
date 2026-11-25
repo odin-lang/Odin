@@ -397,12 +397,12 @@ _stable_sort :: proc(it: Interface, a, b: int) {
 	}
 	for width := STABLE_SORT_BLOCK; width < n-keys; width *= 2 {
 		for lo := a+keys; lo+width < b; lo += 2*width {
-			_buffered_merge(it, lo, lo+width, min(lo+2*width, b), a, keys)
+			_merge(it, lo, lo+width, min(lo+2*width, b), a, keys)
 		}
 	}
 
 	_heap_sort(it, a, a+keys)
-	_rotation_merge(it, a, a+keys, b)
+	_merge(it, a, a+keys, b, a, 0)
 }
 
 @(private)
@@ -462,7 +462,7 @@ _collect_keys :: proc(it: Interface, a, b: int, want: int) -> (keys: int) {
 }
 
 @(private)
-_buffered_merge :: proc(it: Interface, a, mid, b: int, buffer, buffer_len: int) {
+_merge :: proc(it: Interface, a, mid, b: int, buffer, buffer_len: int) {
 	if a == mid || mid == b || !it->less(mid, mid-1) {
 		return
 	}
@@ -497,8 +497,8 @@ _buffered_merge :: proc(it: Interface, a, mid, b: int, buffer, buffer_len: int) 
 	rotate(it, cut1, mid, cut2)
 	new_mid := cut1 + cut2 - mid
 
-	_buffered_merge(it, lo, cut1, new_mid, buffer, buffer_len)
-	_buffered_merge(it, new_mid, cut2, hi, buffer, buffer_len)
+	_merge(it, lo, cut1, new_mid, buffer, buffer_len)
+	_merge(it, new_mid, cut2, hi, buffer, buffer_len)
 }
 
 @(private)
@@ -552,37 +552,6 @@ _merge_right_through_buffer :: proc(it: Interface, lo, mid, hi: int, buffer: int
 		p -= 1
 		o -= 1
 	}
-}
-
-@(private)
-_rotation_merge :: proc(it: Interface, lo, mid, hi: int) {
-	if lo == mid || mid == hi || !it->less(mid, mid-1) {
-		return
-	}
-
-	switch {
-	case mid-lo == 1:
-		rotate(it, lo, mid, _lower_bound(it, mid, hi, lo))
-		return
-	case hi-mid == 1:
-		rotate(it, _upper_bound(it, lo, mid, mid), mid, hi)
-		return
-	}
-
-	cut1, cut2: int
-	if mid-lo >= hi-mid {
-		cut1 = lo + (mid-lo)/2
-		cut2 = _lower_bound(it, mid, hi, cut1)
-	} else {
-		cut2 = mid + (hi-mid)/2
-		cut1 = _upper_bound(it, lo, mid, cut2)
-	}
-
-	rotate(it, cut1, mid, cut2)
-	new_mid := cut1 + cut2 - mid
-
-	_rotation_merge(it, lo, cut1, new_mid)
-	_rotation_merge(it, new_mid, cut2, hi)
 }
 
 @(private)

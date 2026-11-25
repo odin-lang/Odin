@@ -35,9 +35,7 @@ cmp_proc :: proc($E: typeid) -> (proc(E, E) -> Ordering) where ORD(E) {
 // sort sorts a slice
 // This sort is not guaranteed to be stable
 sort :: proc(data: $T/[]$E) where ORD(E) {
-	when size_of(E) != 0 {
-		gingersort(([]E)(data), struct{}{}, .Ordered)
-	}
+	gingersort(([]E)(data), struct{}{}, .Ordered)
 }
 
 
@@ -91,18 +89,8 @@ sort_from_permutation_indices :: proc(data: $T/[]$E, indices: []int) {
 // This sort is not guaranteed to be stable
 sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> (indices: []int) where ORD(E) {
 	indices = make([]int, len(data), allocator, loc)
-	when size_of(E) != 0 {
-		if n := len(data); n > 1 {
-			for _, idx in indices {
-				indices[idx] = idx
-			}
-
-			gingersort(indices, ([]E)(data), .Indices_Ordered)
-
-			sort_from_permutation_indices(data, indices)
-		}
-	}
-	return indices
+	ginger_sort_indices(([]E)(data), indices, ([]E)(data), .Indices_Ordered)
+	return
 }
 
 // sort_by sorts a slice with a given procedure to test whether two values are ordered "i < j"
@@ -113,56 +101,30 @@ sort_by :: proc{
 }
 
 sort_by_runtime :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
-	when size_of(E) != 0 {
-		gingersort(([]E)(data), less, .Less)
-	}
+	gingersort(([]E)(data), less, .Less)
 }
 
 sort_by_constant :: proc(data: $T/[]$E, $less: proc(i, j: E) -> bool) {
-	when size_of(E) != 0 {
-		Less :: distinct proc(i, j: E) -> bool
-		gingersort(([]E)(data), Less(less), .Less_Constant)
-	}
+	Less :: distinct proc(i, j: E) -> bool
+	gingersort(([]E)(data), Less(less), .Less_Constant)
 }
 
 sort_by_with_data :: proc(data: $T/[]$E, less: proc(i, j: E, user_data: rawptr) -> bool, user_data: rawptr) {
-	when size_of(E) != 0 {
-		gingersort(([]E)(data), Sort_Less_With_Data(E){less, user_data}, .Less_With_Data)
-	}
+	gingersort(([]E)(data), Sort_Less_With_Data(E){less, user_data}, .Less_With_Data)
 }
 
 // sort_by sorts a slice with a given procedure to test whether two values are ordered "i < j"
 // This sort is not guaranteed to be stable
 sort_by_with_indices :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool, allocator := context.allocator, loc := #caller_location) -> (indices : []int) {
 	indices = make([]int, len(data), allocator, loc)
-	when size_of(E) != 0 {
-		if n := len(data); n > 1 {
-			for _, idx in indices {
-				indices[idx] = idx
-			}
-
-			gingersort(indices, Sort_Indices_Less(E){less, ([]E)(data)}, .Indices_Less)
-
-			sort_from_permutation_indices(data, indices)
-		}
-	}
-	return indices
+	ginger_sort_indices(([]E)(data), indices, Sort_Indices_Less(E){less, ([]E)(data)}, .Indices_Less)
+	return
 }
 
 sort_by_with_indices_with_data :: proc(data: $T/[]$E, less: proc(i, j: E, user_data: rawptr) -> bool, user_data: rawptr, allocator := context.allocator, loc := #caller_location) -> (indices : []int) {
 	indices = make([]int, len(data), allocator, loc)
-	when size_of(E) != 0 {
-		if n := len(data); n > 1 {
-			for _, idx in indices {
-				indices[idx] = idx
-			}
-
-			gingersort(indices, Sort_Indices_Less_With_Data(E){less, ([]E)(data), user_data}, .Indices_Less_With_Data)
-
-			sort_from_permutation_indices(data, indices)
-		}
-	}
-	return indices
+	ginger_sort_indices(([]E)(data), indices, Sort_Indices_Less_With_Data(E){less, ([]E)(data), user_data}, .Indices_Less_With_Data)
+	return
 }
 
 sort_by_cmp :: proc{
@@ -171,30 +133,22 @@ sort_by_cmp :: proc{
 }
 
 sort_by_cmp_runtime :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
-	when size_of(E) != 0 {
-		gingersort(([]E)(data), cmp, .Cmp)
-	}
+	gingersort(([]E)(data), cmp, .Cmp)
 }
 
 sort_by_cmp_constant :: proc(data: $T/[]$E, $cmp: proc(i, j: E) -> Ordering) {
-	when size_of(E) != 0 {
-		Cmp :: distinct proc(i, j: E) -> Ordering
-		gingersort(([]E)(data), Cmp(cmp), .Cmp_Constant)
-	}
+	Cmp :: distinct proc(i, j: E) -> Ordering
+	gingersort(([]E)(data), Cmp(cmp), .Cmp_Constant)
 }
 
 
 sort_by_cmp_with_data :: proc(data: $T/[]$E, cmp: proc(i, j: E, user_data: rawptr) -> Ordering, user_data: rawptr) {
-	when size_of(E) != 0 {
-		gingersort(([]E)(data), Sort_Cmp_With_Data(E){cmp, user_data}, .Cmp_With_Data)
-	}
+	gingersort(([]E)(data), Sort_Cmp_With_Data(E){cmp, user_data}, .Cmp_With_Data)
 }
 
 
 sort_by_generic_cmp :: proc(data: $T/[]$E, cmp: Generic_Cmp, user_data: rawptr) {
-	when size_of(E) != 0 {
-		gingersort(([]E)(data), Sort_Generic_Cmp{cmp, user_data}, .Generic_Cmp)
-	}
+	gingersort(([]E)(data), Sort_Generic_Cmp{cmp, user_data}, .Generic_Cmp)
 }
 
 
@@ -297,9 +251,7 @@ is_sorted_cmp :: proc(array: $T/[]$E, cmp: proc(i, j: E) -> Ordering) -> bool {
 
 
 reverse_sort :: proc(data: $T/[]$E) where ORD(E) {
-	when size_of(E) != 0 {
-		gingersort(([]E)(data), struct{}{}, .Ordered_Reverse)
-	}
+	gingersort(([]E)(data), struct{}{}, .Ordered_Reverse)
 }
 
 
@@ -309,16 +261,12 @@ reverse_sort_by :: proc{
 }
 
 reverse_sort_by_runtime :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
-	when size_of(E) != 0 {
-		gingersort(([]E)(data), less, .Less_Reverse)
-	}
+	gingersort(([]E)(data), less, .Less_Reverse)
 }
 
 reverse_sort_by_constant :: proc(data: $T/[]$E, $less: proc(i, j: E) -> bool) {
-	when size_of(E) != 0 {
-		Less :: distinct proc(i, j: E) -> bool
-		gingersort(([]E)(data), Less(less), .Less_Reverse_Constant)
-	}
+	Less :: distinct proc(i, j: E) -> bool
+	gingersort(([]E)(data), Less(less), .Less_Reverse_Constant)
 }
 
 reverse_sort_by_cmp :: proc{
@@ -327,30 +275,22 @@ reverse_sort_by_cmp :: proc{
 }
 
 reverse_sort_by_cmp_runtime :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
-	when size_of(E) != 0 {
-		gingersort(([]E)(data), cmp, .Cmp_Reverse)
-	}
+	gingersort(([]E)(data), cmp, .Cmp_Reverse)
 }
 
 reverse_sort_by_cmp_constant :: proc(data: $T/[]$E, $cmp: proc(i, j: E) -> Ordering) {
-	when size_of(E) != 0 {
-		Cmp :: distinct proc(i, j: E) -> Ordering
-		gingersort(([]E)(data), Cmp(cmp), .Cmp_Reverse_Constant)
-	}
+	Cmp :: distinct proc(i, j: E) -> Ordering
+	gingersort(([]E)(data), Cmp(cmp), .Cmp_Reverse_Constant)
 }
 
 
 // TODO(bill): Should `sort_by_key` exist or is `sort_by` more than enough?
 sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
-	when size_of(E) != 0 {
-		gingersort(([]E)(data), key, .Key)
-	}
+	gingersort(([]E)(data), key, .Key)
 }
 
 reverse_sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
-	when size_of(E) != 0 {
-		gingersort(([]E)(data), key, .Key_Reverse)
-	}
+	gingersort(([]E)(data), key, .Key_Reverse)
 }
 
 @(require_results)

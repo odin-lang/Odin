@@ -5,18 +5,9 @@ import "base:builtin"
 import "base:intrinsics"
 
 // NOTE(bill, 2026-11-25): gingersort is the sort behind every procedure in this package.
-// It is stable, sorts in place, and needs no allocator.
-// Its only scratch space is a stack buffer of at most GINGER_SWAP_BYTES.
-// Small inputs use a smaller local buffer instead, and large inputs of small elements a buffer of GINGER_LARGE items.
-// With cheap comparisons, or a constant comparator on small elements, fewer than 8 items go straight to the sorting networks.
-// Otherwise the smallest inputs are sorted by insertion, with a higher cut-off where moves cost more or the comparator is called through a pointer.
-// Small inputs and small partitions are sorted with branchless sorting networks and parity merges, then merged through the buffer.
-// Larger inputs are checked for quarters that are already ordered or reversed.
-// The rest is partitioned stably around a sampled pivot, using rotations where a part does not fit the buffer.
-// Elements too large for 32 of them to fit in the buffer are sorted in blocks of GINGER_BLOCK by insertion and merged with rotations.
+// It is stable, sorts in place, and needs no allocator: its only scratch space is a stack buffer of at most GINGER_SWAP_BYTES.
+// Small runs are sorted with branchless networks and merged through the buffer, and larger inputs are partitioned stably around a sampled pivot.
 // A comparator that is not a strict weak order still leaves a permutation of the input.
-// `ginger_parity_merge` checks that its front and back cursors met, and copies its source over its output when they did not.
-// `ginger_cross_merge` merges from both ends only while both runs have 16 items left.
 
 ORD :: intrinsics.type_is_ordered
 
@@ -91,11 +82,22 @@ GINGER_INSERTION_HUGE  :: 64
 GINGER_NETWORK_BYTES   :: 16
 
 gingersort :: proc(data: []$E, call: $P, $KIND: Sort_Kind) {
-	when ODIN_OPTIMIZATION_MODE == .Size {
+	when size_of(E) == 0 {
+		return
+	} else when ODIN_OPTIMIZATION_MODE == .Size {
 		ginger_sort_shared(data, call, KIND)
 	} else {
 		ginger_sort_typed(data, call, KIND)
 	}
+}
+
+// Fills `indices` with the order that sorts `data`, then permutes `data` into it.
+ginger_sort_indices :: proc(data: []$E, indices: []int, call: $P, $KIND: Sort_Kind) {
+	for &index, i in indices {
+		index = i
+	}
+	gingersort(indices, call, KIND)
+	sort_from_permutation_indices(data, indices)
 }
 
 ginger_sort_shared :: proc(data: []$E, call: $P, $KIND: Sort_Kind) {
@@ -403,26 +405,14 @@ ginger_parity_merge :: proc(dest, from: []$E, left, right: int, call: $P, $KIND:
 	tpd := left + right - 1
 
 	if left < right {
-		if ginger_greater(from[ptl], from[ptr], call, KIND) {
-			dest[ptd] = from[ptr]
-			ptr += 1
-		} else {
-			dest[ptd] = from[ptl]
-			ptl += 1
-		}
+		take_left := !ginger_greater(from[ptl], from[ptr], call, KIND)
+		dest[ptd] = from[ptl] if take_left else from[ptr]
+		ptl += int(take_left)
+		ptr += int(!take_left)
 		ptd += 1
 	}
 
-	if ginger_greater(from[ptl], from[ptr], call, KIND) {
-		dest[ptd] = from[ptr]
-		ptr += 1
-	} else {
-		dest[ptd] = from[ptl]
-		ptl += 1
-	}
-	ptd += 1
-
-	for _ in 1..<left {
+	for _ in 0..<left {
 		take_left := !ginger_greater(from[ptl], from[ptr], call, KIND)
 		dest[ptd] = from[ptl] if take_left else from[ptr]
 		ptl += int(take_left)
@@ -434,14 +424,6 @@ ginger_parity_merge :: proc(dest, from: []$E, left, right: int, call: $P, $KIND:
 		tpr -= int(take_right)
 		tpl -= int(!take_right)
 		tpd -= 1
-	}
-
-	if ginger_greater(from[tpl], from[tpr], call, KIND) {
-		dest[tpd] = from[tpl]
-		tpl -= 1
-	} else {
-		dest[tpd] = from[tpr]
-		tpr -= 1
 	}
 
 	if ptl != tpl+1 || ptr != tpr+1 {
@@ -489,23 +471,16 @@ ginger_quad_swap_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bound
 // Returns true when the whole of `a` was one descending run, which is now sorted.
 @(require_results)
 ginger_quad_swap :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) -> bool #no_bounds_check {
-	State :: enum u8 {
-		Unordered,
-		Ordered,
-		Reversed,
-	}
-
 	n     := len(a)
 	count := n / 8
 	i     := 0
 	pts   := 0
-	state := State.Unordered
 
+	in_reversed_run := false
 	reversed_to_end := false
 
 	blocks: for {
-		switch state {
-		case .Unordered:
+		if !in_reversed_run {
 			if count == 0 {
 				break blocks
 			}
@@ -520,7 +495,7 @@ ginger_quad_swap :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) -> bool #no_bou
 				if !ginger_greater(a[i+1], a[i+2], call, KIND) &&
 				   !ginger_greater(a[i+3], a[i+4], call, KIND) &&
 				   !ginger_greater(a[i+5], a[i+6], call, KIND) {
-					state = .Ordered
+					i += 8
 					continue blocks
 				}
 				ginger_quad_swap_merge(a[i:i+8], s, call, KIND)
@@ -528,8 +503,8 @@ ginger_quad_swap :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) -> bool #no_bou
 			          ginger_greater(a[i+1], a[i+2], call, KIND) &&
 			          ginger_greater(a[i+3], a[i+4], call, KIND) &&
 			          ginger_greater(a[i+5], a[i+6], call, KIND) {
-				pts   = i
-				state = .Reversed
+				pts = i
+				in_reversed_run = true
 				continue blocks
 			} else {
 				ginger_swap_if(a, i,   v1)
@@ -539,117 +514,78 @@ ginger_quad_swap :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) -> bool #no_bou
 				ginger_quad_swap_merge(a[i:i+8], s, call, KIND)
 			}
 			i += 8
+			continue blocks
+		}
 
-		case .Ordered:
-			i += 8
-			if count == 0 {
+		i += 8
+		if count == 0 {
+			rest := n % 8
+
+			descending := true
+			for k := rest; k >= 1; k -= 1 {
+				if !ginger_greater(a[i+k-2], a[i+k-1], call, KIND) {
+					descending = false
+					break
+				}
+			}
+
+			if descending {
+				reverse(a[pts:i+rest])
+				if pts == 0 {
+					return true
+				}
+				reversed_to_end = true
 				break blocks
-			}
-			count -= 1
-
-			v1 := ginger_greater(a[i],   a[i+1], call, KIND)
-			v2 := ginger_greater(a[i+2], a[i+3], call, KIND)
-			v3 := ginger_greater(a[i+4], a[i+5], call, KIND)
-			v4 := ginger_greater(a[i+6], a[i+7], call, KIND)
-
-			if v1 || v2 || v3 || v4 {
-				if v1 && v2 && v3 && v4 &&
-				   ginger_greater(a[i+1], a[i+2], call, KIND) &&
-				   ginger_greater(a[i+3], a[i+4], call, KIND) &&
-				   ginger_greater(a[i+5], a[i+6], call, KIND) {
-					pts   = i
-					state = .Reversed
-					continue blocks
-				}
-				ginger_swap_if(a, i,   v1)
-				ginger_swap_if(a, i+2, v2)
-				ginger_swap_if(a, i+4, v3)
-				ginger_swap_if(a, i+6, v4)
-				ginger_quad_swap_merge(a[i:i+8], s, call, KIND)
-				i += 8
-				state = .Unordered
-				continue blocks
-			}
-
-			if !ginger_greater(a[i+1], a[i+2], call, KIND) &&
-			   !ginger_greater(a[i+3], a[i+4], call, KIND) &&
-			   !ginger_greater(a[i+5], a[i+6], call, KIND) {
-				continue blocks
-			}
-			ginger_quad_swap_merge(a[i:i+8], s, call, KIND)
-			i += 8
-			state = .Unordered
-
-		case .Reversed:
-			i += 8
-			if count == 0 {
-				rest := n % 8
-
-				descending := true
-				for k := rest; k >= 1; k -= 1 {
-					if !ginger_greater(a[i+k-2], a[i+k-1], call, KIND) {
-						descending = false
-						break
-					}
-				}
-
-				if descending {
-					reverse(a[pts:i+rest])
-					if pts == 0 {
-						return true
-					}
-					reversed_to_end = true
-					break blocks
-				}
-				reverse(a[pts:i])
-				break blocks
-			}
-			count -= 1
-
-			o1 := !ginger_greater(a[i],   a[i+1], call, KIND)
-			o2 := !ginger_greater(a[i+2], a[i+3], call, KIND)
-			o3 := !ginger_greater(a[i+4], a[i+5], call, KIND)
-			o4 := !ginger_greater(a[i+6], a[i+7], call, KIND)
-
-			if !(o1 || o2 || o3 || o4) {
-				if ginger_greater(a[i-1], a[i],   call, KIND) &&
-				   ginger_greater(a[i+1], a[i+2], call, KIND) &&
-				   ginger_greater(a[i+3], a[i+4], call, KIND) &&
-				   ginger_greater(a[i+5], a[i+6], call, KIND) {
-					continue blocks
-				}
 			}
 			reverse(a[pts:i])
+			break blocks
+		}
+		count -= 1
 
-			if o1 && o2 && o3 && o4 &&
-			   !ginger_greater(a[i+1], a[i+2], call, KIND) &&
-			   !ginger_greater(a[i+3], a[i+4], call, KIND) &&
-			   !ginger_greater(a[i+5], a[i+6], call, KIND) {
-				state = .Ordered
-				continue blocks
-			}
+		o1 := !ginger_greater(a[i],   a[i+1], call, KIND)
+		o2 := !ginger_greater(a[i+2], a[i+3], call, KIND)
+		o3 := !ginger_greater(a[i+4], a[i+5], call, KIND)
+		o4 := !ginger_greater(a[i+6], a[i+7], call, KIND)
 
-			if !(o1 || o2 || o3 || o4) &&
+		if !(o1 || o2 || o3 || o4) {
+			if ginger_greater(a[i-1], a[i],   call, KIND) &&
 			   ginger_greater(a[i+1], a[i+2], call, KIND) &&
 			   ginger_greater(a[i+3], a[i+4], call, KIND) &&
 			   ginger_greater(a[i+5], a[i+6], call, KIND) {
-				pts = i
 				continue blocks
 			}
-
-			ginger_swap_if(a, i,   !o1)
-			ginger_swap_if(a, i+2, !o2)
-			ginger_swap_if(a, i+4, !o3)
-			ginger_swap_if(a, i+6, !o4)
-
-			if ginger_greater(a[i+1], a[i+2], call, KIND) ||
-			   ginger_greater(a[i+3], a[i+4], call, KIND) ||
-			   ginger_greater(a[i+5], a[i+6], call, KIND) {
-				ginger_quad_swap_merge(a[i:i+8], s, call, KIND)
-			}
-			i += 8
-			state = .Unordered
 		}
+		reverse(a[pts:i])
+		in_reversed_run = false
+
+		if o1 && o2 && o3 && o4 &&
+		   !ginger_greater(a[i+1], a[i+2], call, KIND) &&
+		   !ginger_greater(a[i+3], a[i+4], call, KIND) &&
+		   !ginger_greater(a[i+5], a[i+6], call, KIND) {
+			i += 8
+			continue blocks
+		}
+
+		if !(o1 || o2 || o3 || o4) &&
+		   ginger_greater(a[i+1], a[i+2], call, KIND) &&
+		   ginger_greater(a[i+3], a[i+4], call, KIND) &&
+		   ginger_greater(a[i+5], a[i+6], call, KIND) {
+			pts = i
+			in_reversed_run = true
+			continue blocks
+		}
+
+		ginger_swap_if(a, i,   !o1)
+		ginger_swap_if(a, i+2, !o2)
+		ginger_swap_if(a, i+4, !o3)
+		ginger_swap_if(a, i+6, !o4)
+
+		if ginger_greater(a[i+1], a[i+2], call, KIND) ||
+		   ginger_greater(a[i+3], a[i+4], call, KIND) ||
+		   ginger_greater(a[i+5], a[i+6], call, KIND) {
+			ginger_quad_swap_merge(a[i:i+8], s, call, KIND)
+		}
+		i += 8
 	}
 
 	if !reversed_to_end {
@@ -760,17 +696,8 @@ ginger_cross_merge :: proc(dest, from: []$E, left, right: int, call: $P, $KIND: 
 		ptd += 1
 	}
 
-	for ptl <= tpl {
-		dest[ptd] = from[ptl]
-		ptl += 1
-		ptd += 1
-	}
-
-	for ptr <= tpr {
-		dest[ptd] = from[ptr]
-		ptr += 1
-		ptd += 1
-	}
+	copy(dest[ptd:], from[ptl:tpl+1])
+	copy(dest[ptd:], from[ptr:tpr+1])
 }
 
 ginger_quad_merge_block :: proc(a, s: []$E, block: int, call: $P, $KIND: Sort_Kind) #no_bounds_check {
@@ -888,11 +815,7 @@ ginger_partial_forward_merge :: proc(a, s: []$E, block: int, call: $P, $KIND: So
 		out += 1
 	}
 
-	for ptl <= tpl {
-		a[out] = s[ptl]
-		ptl += 1
-		out += 1
-	}
+	copy(a[out:], s[ptl:tpl+1])
 }
 
 ginger_partial_backward_merge :: proc(a, s: []$E, block: int, call: $P, $KIND: Sort_Kind) #no_bounds_check {
@@ -1022,11 +945,7 @@ ginger_partial_backward_merge :: proc(a, s: []$E, block: int, call: $P, $KIND: S
 		tpa -= 1
 	}
 
-	for tpr >= 0 {
-		a[tpa] = s[tpr]
-		tpa -= 1
-		tpr -= 1
-	}
+	copy(a[tpa-tpr:tpa+1], s[:tpr+1])
 }
 
 ginger_tail_merge :: proc(a, s: []$E, start_block: int, call: $P, $KIND: Sort_Kind) #no_bounds_check {
@@ -1035,13 +954,7 @@ ginger_tail_merge :: proc(a, s: []$E, start_block: int, call: $P, $KIND: Sort_Ki
 
 	for block < n && block <= len(s) {
 		for pta := 0; pta+block < n; pta += block*2 {
-			if pta+block*2 < n {
-				ginger_partial_backward_merge(a[pta:pta+block*2], s, block, call, KIND)
-				continue
-			}
-
-			ginger_partial_backward_merge(a[pta:n], s, block, call, KIND)
-			break
+			ginger_partial_backward_merge(a[pta:builtin.min(pta+block*2, n)], s, block, call, KIND)
 		}
 		block *= 2
 	}
@@ -1267,13 +1180,8 @@ ginger_rotate_merge :: proc(a, s: []$E, start_block: int, call: $P, $KIND: Sort_
 
 	for block < n {
 		for pta := 0; pta+block < n; pta += block*2 {
-			if pta+block*2 < n {
-				ginger_rotate_merge_block(a[pta:pta+block*2], s, block, block, call, KIND)
-				continue
-			}
-
-			ginger_rotate_merge_block(a[pta:n], s, block, n-pta-block, call, KIND)
-			break
+			end := builtin.min(pta+block*2, n)
+			ginger_rotate_merge_block(a[pta:end], s, block, end-pta-block, call, KIND)
 		}
 		block *= 2
 	}
@@ -1383,44 +1291,21 @@ ginger_median_of_cbrt :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) -> (pivot:
 	return
 }
 
-// Moves the items not greater than `pivot` to the front, keeping their order and that of the rest.
+// Moves the items not greater than `pivot` (less than it, when STRICT) to the front, keeping their order and that of the rest.
 @(require_results)
-ginger_default_partition :: proc(a, s: []$E, pivot: E, call: $P, $KIND: Sort_Kind) -> (count: int) #no_bounds_check {
+ginger_stable_partition :: proc(a, s: []$E, pivot: E, call: $P, $KIND: Sort_Kind, $STRICT: bool) -> (count: int) #no_bounds_check {
 	n := len(a)
 	if n > len(s) {
 		half  := n / 2
-		left  := ginger_default_partition(a[:half], s, pivot, call, KIND)
-		right := ginger_default_partition(a[half:], s, pivot, call, KIND)
+		left  := ginger_stable_partition(a[:half], s, pivot, call, KIND, STRICT)
+		right := ginger_stable_partition(a[half:], s, pivot, call, KIND, STRICT)
 		ginger_trinity_rotation(a[left:half+right], s, half-left)
 		return left + right
 	}
 
 	for k in 0..<n {
 		item := a[k]
-		keep := !ginger_greater(item, pivot, call, KIND)
-		a[count]   = item
-		s[k-count] = item
-		count += int(keep)
-	}
-	copy(a[count:n], s[:n-count])
-	return
-}
-
-// Moves the items less than `pivot` to the front, keeping their order and that of the rest.
-@(require_results)
-ginger_reverse_partition :: proc(a, s: []$E, pivot: E, call: $P, $KIND: Sort_Kind) -> (count: int) #no_bounds_check {
-	n := len(a)
-	if n > len(s) {
-		half  := n / 2
-		left  := ginger_reverse_partition(a[:half], s, pivot, call, KIND)
-		right := ginger_reverse_partition(a[half:], s, pivot, call, KIND)
-		ginger_trinity_rotation(a[left:half+right], s, half-left)
-		return left + right
-	}
-
-	for k in 0..<n {
-		item := a[k]
-		keep := ginger_greater(pivot, item, call, KIND)
+		keep := ginger_greater(pivot, item, call, KIND) if STRICT else !ginger_greater(item, pivot, call, KIND)
 		a[count]   = item
 		s[k-count] = item
 		count += int(keep)
@@ -1450,7 +1335,7 @@ ginger_partition :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_chec
 		}
 
 		if low_count != 0 && !ginger_greater(previous_pivot, pivot, call, KIND) {
-			low_count  = ginger_reverse_partition(a[:n], s, pivot, call, KIND)
+			low_count  = ginger_stable_partition(a[:n], s, pivot, call, KIND, STRICT=true)
 			high_count = n - low_count
 
 			if high_count <= low_count/16 || low_count <= GINGER_OUT {
@@ -1462,12 +1347,12 @@ ginger_partition :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_chec
 			continue
 		}
 
-		low_count  = ginger_default_partition(a[:n], s, pivot, call, KIND)
+		low_count  = ginger_stable_partition(a[:n], s, pivot, call, KIND, STRICT=false)
 		high_count = n - low_count
 
 		if low_count <= high_count/16 || high_count <= GINGER_OUT {
 			if high_count == 0 {
-				low_count  = ginger_reverse_partition(a[:low_count], s, pivot, call, KIND)
+				low_count  = ginger_stable_partition(a[:low_count], s, pivot, call, KIND, STRICT=true)
 				high_count = n - low_count
 
 				if high_count <= low_count/16 || low_count <= GINGER_OUT {
@@ -1496,273 +1381,133 @@ ginger_analyze :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check 
 	n := len(a)
 
 	half1 := n / 2
-	quad1 := half1 / 2
-	quad2 := half1 - quad1
 	half2 := n - half1
+	quad1 := half1 / 2
 	quad3 := half2 / 2
-	quad4 := half2 - quad3
 
-	pta := 0
-	ptb := quad1
-	ptc := half1
-	ptd := half1 + quad3
+	bounds := [5]int{0, quad1, half1, half1+quad3, n}
 
-	astreaks := 0
-	bstreaks := 0
-	cstreaks := 0
-	dstreaks := 0
+	balance: [4]int
+	streaks: [4]int
 
-	abalance := 0
-	bbalance := 0
-	cbalance := 0
-	dbalance := 0
-
+	i := 0
 	count := n
 	for /**/; count > 132; count -= 128 {
-		asum := 0
-		bsum := 0
-		csum := 0
-		dsum := 0
-
+		sum: [4]int
 		for _ in 0..<32 {
-			asum += int(ginger_greater(a[pta], a[pta+1], call, KIND))
-			bsum += int(ginger_greater(a[ptb], a[ptb+1], call, KIND))
-			csum += int(ginger_greater(a[ptc], a[ptc+1], call, KIND))
-			dsum += int(ginger_greater(a[ptd], a[ptd+1], call, KIND))
-			pta += 1
-			ptb += 1
-			ptc += 1
-			ptd += 1
+			// Unrolled with a quarter slice so LLVM carries q[i+1] into the next step's q[i].
+			#unroll for k in 0..<4 {
+				q := a[bounds[k]:]
+				sum[k] += int(ginger_greater(q[i], q[i+1], call, KIND))
+			}
+			i += 1
 		}
 
-		abalance += asum
-		bbalance += bsum
-		cbalance += csum
-		dbalance += dsum
+		any_streak := false
+		for k in 0..<4 {
+			balance[k] += sum[k]
+			if sum[k] == 0 || sum[k] == 32 {
+				streaks[k] += 1
+				any_streak = true
+			}
+		}
 
-		astreak := asum == 0 || asum == 32
-		bstreak := bsum == 0 || bsum == 32
-		cstreak := csum == 0 || csum == 32
-		dstreak := dsum == 0 || dsum == 32
-
-		astreaks += int(astreak)
-		bstreaks += int(bstreak)
-		cstreaks += int(cstreak)
-		dstreaks += int(dstreak)
-
-		if count > 516 && !(astreak || bstreak || cstreak || dstreak) {
-			abalance += 48
-			bbalance += 48
-			cbalance += 48
-			dbalance += 48
-			pta += 96
-			ptb += 96
-			ptc += 96
-			ptd += 96
+		if count > 516 && !any_streak {
+			for k in 0..<4 {
+				balance[k] += 48
+			}
+			i += 96
 			count -= 384
 		}
 	}
 
 	for /**/; count > 7; count -= 4 {
-		abalance += int(ginger_greater(a[pta], a[pta+1], call, KIND))
-		bbalance += int(ginger_greater(a[ptb], a[ptb+1], call, KIND))
-		cbalance += int(ginger_greater(a[ptc], a[ptc+1], call, KIND))
-		dbalance += int(ginger_greater(a[ptd], a[ptd+1], call, KIND))
-		pta += 1
-		ptb += 1
-		ptc += 1
-		ptd += 1
+		for k in 0..<4 {
+			balance[k] += int(ginger_greater(a[bounds[k]+i], a[bounds[k]+i+1], call, KIND))
+		}
+		i += 1
 	}
 
-	if quad1 < quad2 {
-		bbalance += int(ginger_greater(a[ptb], a[ptb+1], call, KIND))
-		ptb += 1
+	for k in 1..<4 {
+		if bounds[k+1]-bounds[k] > quad1 {
+			balance[k] += int(ginger_greater(a[bounds[k]+i], a[bounds[k]+i+1], call, KIND))
+		}
 	}
 
-	if quad1 < quad3 {
-		cbalance += int(ginger_greater(a[ptc], a[ptc+1], call, KIND))
-		ptc += 1
+	no_descents := balance == [4]int{}
+	if no_descents &&
+	   !ginger_greater(a[bounds[1]-1], a[bounds[1]], call, KIND) &&
+	   !ginger_greater(a[bounds[2]-1], a[bounds[2]], call, KIND) &&
+	   !ginger_greater(a[bounds[3]-1], a[bounds[3]], call, KIND) {
+		return
 	}
 
-	if quad1 < quad4 {
-		dbalance += int(ginger_greater(a[ptd], a[ptd+1], call, KIND))
-		ptd += 1
+	reversed: [4]bool
+	for k in 0..<4 {
+		reversed[k] = bounds[k+1]-bounds[k]-balance[k] == 1
 	}
 
-	if abalance+bbalance+cbalance+dbalance == 0 {
-		if !ginger_greater(a[pta], a[pta+1], call, KIND) &&
-		   !ginger_greater(a[ptb], a[ptb+1], call, KIND) &&
-		   !ginger_greater(a[ptc], a[ptc+1], call, KIND) {
+	for k := 0; k < 4; /**/ {
+		if !reversed[k] {
+			k += 1
+			continue
+		}
+
+		end := k + 1
+		for end < 4 && reversed[end] && ginger_greater(a[bounds[end]-1], a[bounds[end]], call, KIND) {
+			end += 1
+		}
+
+		reverse(a[bounds[k]:bounds[end]])
+		if k == 0 && end == 4 {
 			return
 		}
+		for j in k..<end {
+			balance[j] = 0
+		}
+		k = end
 	}
 
-	areversed := quad1-abalance == 1
-	breversed := quad2-bbalance == 1
-	creversed := quad3-cbalance == 1
-	dreversed := quad4-dbalance == 1
-
-	if areversed || breversed || creversed || dreversed {
-		span1 := areversed && breversed && ginger_greater(a[pta], a[pta+1], call, KIND)
-		span2 := breversed && creversed && ginger_greater(a[ptb], a[ptb+1], call, KIND)
-		span3 := creversed && dreversed && ginger_greater(a[ptc], a[ptc+1], call, KIND)
-
-		switch int(span1) | int(span2)*2 | int(span3)*4 {
-		case 0:
-		case 1:
-			reverse(a[0:ptb+1])
-			abalance = 0
-			bbalance = 0
-		case 2:
-			reverse(a[pta+1:ptc+1])
-			bbalance = 0
-			cbalance = 0
-		case 3:
-			reverse(a[0:ptc+1])
-			abalance = 0
-			bbalance = 0
-			cbalance = 0
-		case 4:
-			reverse(a[ptb+1:ptd+1])
-			cbalance = 0
-			dbalance = 0
-		case 5:
-			reverse(a[0:ptb+1])
-			reverse(a[ptb+1:ptd+1])
-			abalance = 0
-			bbalance = 0
-			cbalance = 0
-			dbalance = 0
-		case 6:
-			reverse(a[pta+1:ptd+1])
-			bbalance = 0
-			cbalance = 0
-			dbalance = 0
-		case 7:
-			reverse(a[0:ptd+1])
-			return
-		}
-
-		if areversed && abalance != 0 {
-			reverse(a[0:pta+1])
-			abalance = 0
-		}
-
-		if breversed && bbalance != 0 {
-			reverse(a[pta+1:ptb+1])
-			bbalance = 0
-		}
-
-		if creversed && cbalance != 0 {
-			reverse(a[ptb+1:ptc+1])
-			cbalance = 0
-		}
-
-		if dreversed && dbalance != 0 {
-			reverse(a[ptc+1:ptd+1])
-			dbalance = 0
-		}
+	ordered: [4]bool
+	for k in 0..<4 {
+		ordered[k] = streaks[k] > n/256
 	}
 
-	limit := n / 256
-	aordered := astreaks > limit
-	bordered := bstreaks > limit
-	cordered := cstreaks > limit
-	dordered := dstreaks > limit
-
-	quarter_a := a[0:quad1]
-	quarter_b := a[pta+1:pta+1+quad2]
-	quarter_c := a[ptb+1:ptb+1+quad3]
-	quarter_d := a[ptc+1:ptc+1+quad4]
-
-	switch int(aordered) | int(bordered)*2 | int(cordered)*4 | int(dordered)*8 {
-	case 0:
+	none_ordered := ordered == [4]bool{}
+	if none_ordered {
 		ginger_partition(a, s, call, KIND)
 		return
+	}
 
-	case 1:
-		if abalance != 0 {
-			ginger_quadsort(quarter_a, s, call, KIND)
-		}
-		ginger_partition(a[pta+1:pta+1+quad2+half2], s, call, KIND)
-
-	case 2:
-		ginger_partition(quarter_a, s, call, KIND)
-		if bbalance != 0 {
-			ginger_quadsort(quarter_b, s, call, KIND)
-		}
-		ginger_partition(a[ptb+1:ptb+1+half2], s, call, KIND)
-
-	case 3:
-		if abalance != 0 {
-			ginger_quadsort(quarter_a, s, call, KIND)
-		}
-		if bbalance != 0 {
-			ginger_quadsort(quarter_b, s, call, KIND)
-		}
-		ginger_partition(a[ptb+1:ptb+1+half2], s, call, KIND)
-
-	case 4:
-		ginger_partition(a[0:half1], s, call, KIND)
-		if cbalance != 0 {
-			ginger_quadsort(quarter_c, s, call, KIND)
-		}
-		ginger_partition(quarter_d, s, call, KIND)
-
-	case 8:
-		ginger_partition(a[0:half1+quad3], s, call, KIND)
-		if dbalance != 0 {
-			ginger_quadsort(quarter_d, s, call, KIND)
+	unordered_from := -1
+	for k in 0..=4 {
+		if k < 4 && !ordered[k] {
+			if unordered_from < 0 {
+				unordered_from = k
+			}
+			continue
 		}
 
-	case 9:
-		if abalance != 0 {
-			ginger_quadsort(quarter_a, s, call, KIND)
+		if unordered_from >= 0 {
+			ginger_partition(a[bounds[unordered_from]:bounds[k]], s, call, KIND)
+			unordered_from = -1
 		}
-		ginger_partition(a[pta+1:pta+1+quad2+quad3], s, call, KIND)
-		if dbalance != 0 {
-			ginger_quadsort(quarter_d, s, call, KIND)
-		}
-
-	case 12:
-		ginger_partition(a[0:half1], s, call, KIND)
-		if cbalance != 0 {
-			ginger_quadsort(quarter_c, s, call, KIND)
-		}
-		if dbalance != 0 {
-			ginger_quadsort(quarter_d, s, call, KIND)
-		}
-
-	case:
-		switch {
-		case !aordered:     ginger_partition(quarter_a, s, call, KIND)
-		case abalance != 0: ginger_quadsort (quarter_a, s, call, KIND)
-		}
-		switch {
-		case !bordered:     ginger_partition(quarter_b, s, call, KIND)
-		case bbalance != 0: ginger_quadsort (quarter_b, s, call, KIND)
-		}
-		switch {
-		case !cordered:     ginger_partition(quarter_c, s, call, KIND)
-		case cbalance != 0: ginger_quadsort (quarter_c, s, call, KIND)
-		}
-		switch {
-		case !dordered:     ginger_partition(quarter_d, s, call, KIND)
-		case dbalance != 0: ginger_quadsort (quarter_d, s, call, KIND)
+		if k < 4 && balance[k] != 0 {
+			ginger_quadsort(a[bounds[k]:bounds[k+1]], s, call, KIND)
 		}
 	}
 
 	switch {
-	case ginger_greater(a[pta], a[pta+1], call, KIND):
-		ginger_rotate_merge_block(a[0:half1], s, quad1, quad2, call, KIND)
-		if ginger_greater(a[ptc], a[ptc+1], call, KIND) {
-			ginger_rotate_merge_block(a[half1:n], s, quad3, quad4, call, KIND)
+	case ginger_greater(a[quad1-1], a[quad1], call, KIND):
+		ginger_rotate_merge_block(a[0:half1], s, quad1, half1-quad1, call, KIND)
+		if ginger_greater(a[half1+quad3-1], a[half1+quad3], call, KIND) {
+			ginger_rotate_merge_block(a[half1:n], s, quad3, half2-quad3, call, KIND)
 		}
 
-	case ginger_greater(a[ptc], a[ptc+1], call, KIND):
-		ginger_rotate_merge_block(a[half1:n], s, quad3, quad4, call, KIND)
+	case ginger_greater(a[half1+quad3-1], a[half1+quad3], call, KIND):
+		ginger_rotate_merge_block(a[half1:n], s, quad3, half2-quad3, call, KIND)
 
-	case !ginger_greater(a[ptb], a[ptb+1], call, KIND):
+	case !ginger_greater(a[half1-1], a[half1], call, KIND):
 		return
 	}
 
