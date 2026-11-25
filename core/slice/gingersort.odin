@@ -7,6 +7,9 @@ import "base:intrinsics"
 // NOTE(bill, 2026-11-25): gingersort is the sort behind every procedure in this package.
 // It is stable, sorts in place, and needs no allocator.
 // Its only scratch space is a stack buffer of at most GINGER_SWAP_BYTES.
+// Small inputs use a smaller local buffer instead.
+// With cheap comparisons, fewer than 8 items go straight to the sorting networks.
+// Otherwise the smallest inputs are sorted by insertion, with a higher cut-off where moves cost more.
 // Small inputs and small partitions are sorted with branchless sorting networks and parity merges, then merged through the buffer.
 // Larger inputs are checked for quarters that are already ordered or reversed.
 // The rest is partitioned stably around a sampled pivot, using rotations where a part does not fit the buffer.
@@ -60,11 +63,50 @@ Sort_Indices_Less_With_Data :: struct($E: typeid) {
 	user_data: rawptr,
 }
 
-GINGER_SWAP_BYTES :: 16 * 1024
-GINGER_OUT        :: 96
-GINGER_BLOCK      :: 16
+GINGER_SWAP_BYTES      :: 16 * 1024
+GINGER_OUT             :: 96
+GINGER_BLOCK           :: 16
+GINGER_SMALL           :: 96
+GINGER_SMALL_BYTES     :: 2048
+GINGER_INSERTION_SMALL :: 8
+GINGER_INSERTION_LARGE :: 32
 
 gingersort :: proc(data: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+	n := len(data)
+	if n < 2 {
+		return
+	}
+
+	when (KIND == .Ordered || KIND == .Ordered_Reverse) && !intrinsics.type_is_string(E) {
+		if n < 8 {
+			tiny: [7]E = ---
+			ginger_tiny_sort(data, tiny[:], call, KIND)
+			return
+		}
+	} else {
+		when size_of(E) <= 8 {
+			INSERTION_LIMIT :: GINGER_INSERTION_SMALL
+		} else {
+			INSERTION_LIMIT :: GINGER_INSERTION_LARGE
+		}
+
+		if n <= INSERTION_LIMIT {
+			ginger_insertion_sort(data, call, KIND)
+			return
+		}
+	}
+
+	when size_of(E)*GINGER_SMALL <= GINGER_SMALL_BYTES {
+		if n <= GINGER_SMALL {
+			small: [GINGER_SMALL]E = ---
+			ginger_quadsort(data, small[:], call, KIND)
+			return
+		}
+	}
+	ginger_buffered_sort(data, call, KIND)
+}
+
+ginger_buffered_sort :: #force_no_inline proc(data: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	when size_of(E)*512 <= GINGER_SWAP_BYTES {
 		SWAP_LEN :: 512
 	} else when size_of(E)*256 <= GINGER_SWAP_BYTES {
@@ -79,16 +121,11 @@ gingersort :: proc(data: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 		SWAP_LEN :: builtin.max(GINGER_SWAP_BYTES/size_of(E), 1)
 	}
 
-	n := len(data)
-	if n < 2 {
-		return
-	}
-
 	swap: [SWAP_LEN]E = ---
 	when SWAP_LEN < 32 {
 		ginger_large_element_sort(data, swap[:], call, KIND)
 	} else {
-		if n <= 132 {
+		if len(data) <= 132 {
 			ginger_quadsort(data, swap[:], call, KIND)
 		} else {
 			ginger_analyze(data, swap[:], call, KIND)
@@ -96,19 +133,22 @@ gingersort :: proc(data: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	}
 }
 
+ginger_insertion_sort :: proc(a: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+	for i in 1..<len(a) {
+		item := a[i]
+		j := i
+		for j > 0 && ginger_greater(a[j-1], item, call, KIND) {
+			a[j] = a[j-1]
+			j -= 1
+		}
+		a[j] = item
+	}
+}
+
 ginger_large_element_sort :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	n := len(a)
 	for lo := 0; lo < n; lo += GINGER_BLOCK {
-		block := a[lo:builtin.min(lo+GINGER_BLOCK, n)]
-		for i in 1..<len(block) {
-			item := block[i]
-			j := i
-			for j > 0 && ginger_greater(block[j-1], item, call, KIND) {
-				block[j] = block[j-1]
-				j -= 1
-			}
-			block[j] = item
-		}
+		ginger_insertion_sort(a[lo:builtin.min(lo+GINGER_BLOCK, n)], call, KIND)
 	}
 
 	if n > GINGER_BLOCK {
@@ -163,7 +203,7 @@ ginger_order_pair :: #force_inline proc(a: []$E, i: int, call: $P, $KIND: Sort_K
 	ginger_swap_if(a, i, ginger_greater(a[i], a[i+1], call, KIND))
 }
 
-ginger_parity_swap_four :: proc(a: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+ginger_parity_swap_four :: #force_inline proc(a: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	ginger_order_pair(a, 0, call, KIND)
 	ginger_order_pair(a, 2, call, KIND)
 
@@ -176,7 +216,7 @@ ginger_parity_swap_four :: proc(a: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_
 	}
 }
 
-ginger_parity_swap_five :: proc(a: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+ginger_parity_swap_five :: #force_inline proc(a: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	ginger_order_pair(a, 0, call, KIND)
 	ginger_order_pair(a, 2, call, KIND)
 
@@ -196,7 +236,7 @@ ginger_parity_swap_five :: proc(a: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_
 	}
 }
 
-ginger_parity_swap_six :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+ginger_parity_swap_six :: #force_inline proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	ginger_order_pair(a, 0, call, KIND)
 	ginger_order_pair(a, 1, call, KIND)
 	ginger_order_pair(a, 4, call, KIND)
@@ -221,7 +261,7 @@ ginger_parity_swap_six :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bound
 	ginger_parity_merge(a[:6], s[:6], 3, 3, call, KIND)
 }
 
-ginger_parity_swap_seven :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+ginger_parity_swap_seven :: #force_inline proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	ginger_order_pair(a, 0, call, KIND)
 	ginger_order_pair(a, 2, call, KIND)
 	ginger_order_pair(a, 4, call, KIND)
@@ -257,7 +297,7 @@ ginger_parity_swap_seven :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bou
 	ginger_parity_merge(a[:7], s[:7], 3, 4, call, KIND)
 }
 
-ginger_tiny_sort :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+ginger_tiny_sort :: #force_inline proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	switch len(a) {
 	case 2:
 		ginger_order_pair(a, 0, call, KIND)
@@ -1401,7 +1441,7 @@ ginger_analyze :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check 
 	dbalance := 0
 
 	count := n
-	for ; count > 132; count -= 128 {
+	for /**/; count > 132; count -= 128 {
 		asum := 0
 		bsum := 0
 		csum := 0
@@ -1446,7 +1486,7 @@ ginger_analyze :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check 
 		}
 	}
 
-	for ; count > 7; count -= 4 {
+	for /**/; count > 7; count -= 4 {
 		abalance += int(ginger_greater(a[pta], a[pta+1], call, KIND))
 		bbalance += int(ginger_greater(a[ptb], a[ptb+1], call, KIND))
 		cbalance += int(ginger_greater(a[ptc], a[ptc+1], call, KIND))
@@ -1618,20 +1658,20 @@ ginger_analyze :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check 
 
 	case:
 		switch {
-		case !aordered:      ginger_partition(quarter_a, s, call, KIND)
-		case abalance != 0:  ginger_quadsort(quarter_a, s, call, KIND)
+		case !aordered:     ginger_partition(quarter_a, s, call, KIND)
+		case abalance != 0: ginger_quadsort (quarter_a, s, call, KIND)
 		}
 		switch {
-		case !bordered:      ginger_partition(quarter_b, s, call, KIND)
-		case bbalance != 0:  ginger_quadsort(quarter_b, s, call, KIND)
+		case !bordered:     ginger_partition(quarter_b, s, call, KIND)
+		case bbalance != 0: ginger_quadsort (quarter_b, s, call, KIND)
 		}
 		switch {
-		case !cordered:      ginger_partition(quarter_c, s, call, KIND)
-		case cbalance != 0:  ginger_quadsort(quarter_c, s, call, KIND)
+		case !cordered:     ginger_partition(quarter_c, s, call, KIND)
+		case cbalance != 0: ginger_quadsort (quarter_c, s, call, KIND)
 		}
 		switch {
-		case !dordered:      ginger_partition(quarter_d, s, call, KIND)
-		case dbalance != 0:  ginger_quadsort(quarter_d, s, call, KIND)
+		case !dordered:     ginger_partition(quarter_d, s, call, KIND)
+		case dbalance != 0: ginger_quadsort (quarter_d, s, call, KIND)
 		}
 	}
 
