@@ -28,9 +28,7 @@ Interface :: struct {
 }
 
 /*
-Sorts the elements of an `Interface` in place.
-
-This sort is not guaranteed to be stable.
+Sorts the elements of an `Interface` in place, keeping equal elements in their original order.
 
 Inputs:
 - it: The `Interface` to sort.
@@ -52,16 +50,7 @@ Output:
 
 */
 sort :: proc(it: Interface) {
-	max_depth :: proc(n: int) -> int { // 2*ceil(log2(n+1))
-		depth: int
-		for i := n; i > 0; i >>= 1 {
-			depth += 1
-		}
-		return depth * 2
-	}
-
-	n := it->len()
-	_quick_sort(it, 0, n, max_depth(n))
+	_stable_sort(it, 0, it->len())
 }
 
 /*
@@ -161,9 +150,7 @@ reverse_interface :: proc(it: ^Interface) -> Interface {
 }
 
 /*
-Sorts the elements of an `Interface` in descending order, in place.
-
-This sort is not guaranteed to be stable.
+Sorts the elements of an `Interface` in descending order, in place, keeping equal elements in their original order.
 
 Inputs:
 - it: The `Interface` to sort.
@@ -188,6 +175,54 @@ reverse_sort :: proc(it: Interface) {
 	it := it
 	sort(reverse_interface(&it))
 }
+
+/*
+Sorts the elements of an `Interface` in place, keeping equal elements in their original order.
+
+Inputs:
+- it: The `Interface` to sort.
+
+Example:
+
+	import "core:fmt"
+	import "core:sort"
+
+	stable_sort_example :: proc() {
+		data := []int{5, 2, 8, 1, 9}
+		sort.stable_sort(sort.slice_interface(&data))
+		fmt.println(data)
+	}
+
+Output:
+
+	[1, 2, 5, 8, 9]
+
+*/
+stable_sort :: sort
+
+/*
+Sorts the elements of an `Interface` in descending order, in place, keeping equal elements in their original order.
+
+Inputs:
+- it: The `Interface` to sort.
+
+Example:
+
+	import "core:fmt"
+	import "core:sort"
+
+	reverse_stable_sort_example :: proc() {
+		data := []int{5, 2, 8, 1}
+		sort.reverse_stable_sort(sort.slice_interface(&data))
+		fmt.println(data)
+	}
+
+Output:
+
+	[8, 5, 2, 1]
+
+*/
+reverse_stable_sort :: reverse_sort
 
 /*
 Reports whether the elements of an `Interface` are in ascending order.
@@ -308,148 +343,276 @@ rotate :: proc(it: Interface, a, m, b: int) {
 
 
 @(private)
-_quick_sort :: proc(it: Interface, a, b, max_depth: int) {
-	median3 :: proc(it: Interface, m1, m0, m2: int) {
-		if it->less(m1, m0) {
-			it->swap(m1, m0)
-		}
-		if it->less(m2, m1) {
-			it->swap(m2, m1)
-			if it->less(m1, m0) {
-				it->swap(m1, m0)
-			}
-		}
-	}
-
-	do_pivot :: proc(it: Interface, lo, hi: int) -> (midlo, midhi: int) {
-		m := int(uint(lo+hi)>>1)
-		if hi-lo > 40 {
-			s := (hi-lo)/8
-			median3(it, lo, lo+s, lo+s*2)
-			median3(it, m, m-s, m+s)
-			median3(it, hi-1, hi-1-s, hi-1-s*2)
-		}
-		median3(it, lo, m, hi-1)
-
-		pivot := lo
-		a, c := lo+1, hi-1
-
-		for ; a < c && it->less(a, pivot); a += 1 {
-		}
-		b := a
-
+_heap_sort :: proc(it: Interface, a, b: int) {
+	sift_down :: proc(it: Interface, root, n, first: int) {
+		root := root
 		for {
-			for ; b < c && !it->less(pivot, b); b += 1 { // data[b] <= pivot
+			child := 2*root + 1
+			if child >= n {
+				return
 			}
-			for ; b < c && it->less(pivot, c-1); c -=1 { // data[c-1] > pivot
+			if child+1 < n && it->less(first+child, first+child+1) {
+				child += 1
 			}
-			if b >= c {
-				break
+			if !it->less(first+root, first+child) {
+				return
 			}
-
-			it->swap(b, c-1)
-			b += 1
-			c -= 1
-		}
-
-		protect := hi-c < 5
-		if !protect && hi-c < (hi-lo)/4 {
-			dups := 0
-			if !it->less(pivot, hi-1) {
-				it->swap(c, hi-1)
-				c += 1
-				dups += 1
-			}
-			if !it->less(b-1, pivot) {
-				b -= 1
-				dups += 1
-			}
-
-			if !it->less(m, pivot) {
-				it->swap(m, b-1)
-				b -= 1
-				dups += 1
-			}
-			protect = dups > 1
-		}
-		if protect {
-			for {
-				for ; a < b && !it->less(b-1, pivot); b -= 1 {
-				}
-				for ; a < b && it->less(a, pivot); a += 1 {
-				}
-				if a >= b {
-					break
-				}
-				it->swap(a, b-1)
-				a += 1
-				b -= 1
-			}
-		}
-		it->swap(pivot, b-1)
-		return b-1, c
-	}
-
-	heap_sort :: proc(it: Interface, a, b: int) {
-		sift_down :: proc(it: Interface, lo, hi, first: int) {
-			root := lo
-			for {
-				child := 2*root + 1
-				if child >= hi {
-					break
-				}
-				if child+1 < hi && it->less(first+child, first+child+1) {
-					child += 1
-				}
-				if !it->less(first+root, first+child) {
-					return
-				}
-				it->swap(first+root, first+child)
-				root = child
-			}
-		}
-
-
-		first, lo, hi := a, 0, b-a
-
-		for i := (hi-1)/2; i >= 0; i -= 1 {
-			sift_down(it, i, hi, first)
-		}
-
-		for i := hi-1; i >= 0; i -= 1 {
-			it->swap(first, first+i)
-			sift_down(it, lo, i, first)
+			it->swap(first+root, first+child)
+			root = child
 		}
 	}
 
-
-
-	a, b, max_depth := a, b, max_depth
-
-	for b-a > 12 { // only use shell sort for lengths <= 12
-		if max_depth == 0 {
-			heap_sort(it, a, b)
-			return
-		}
-		max_depth -= 1
-		mlo, mhi := do_pivot(it, a, b)
-		if mlo-a < b-mhi {
-			_quick_sort(it, a, mlo, max_depth)
-			a = mhi
-		} else {
-			_quick_sort(it, mhi, b, max_depth)
-			b = mlo
-		}
+	n := b - a
+	for i := (n-1)/2; i >= 0; i -= 1 {
+		sift_down(it, i, n, a)
 	}
-	if b-a > 1 {
-		// Shell short with gap 6
-		for i in a+6..<b {
-			if it->less(i, i-6) {
-				it->swap(i, i-6)
-			}
-		}
+	for i := n-1; i > 0; i -= 1 {
+		it->swap(a, a+i)
+		sift_down(it, 0, i, a)
+	}
+}
+
+// NOTE(bill, 2026-11-25): A stable merge sort that only compares and swaps.
+// It gathers items with distinct keys into a buffer inside the array, merges through it with swaps, and splits larger merges with rotations.
+@(private)
+_stable_sort :: proc(it: Interface, a, b: int) {
+	if _sorted_or_reversed(it, a, b) {
+		return
+	}
+
+	n := b - a
+	if n <= STABLE_SORT_INSERTION {
 		_insertion_sort(it, a, b)
+		return
 	}
+
+	root := 1
+	for root*root < n {
+		root += 1
+	}
+	keys := _collect_keys(it, a, b, 2*root)
+
+	for lo := a+keys; lo < b; lo += STABLE_SORT_BLOCK {
+		_insertion_sort(it, lo, min(lo+STABLE_SORT_BLOCK, b))
+	}
+	for width := STABLE_SORT_BLOCK; width < n-keys; width *= 2 {
+		for lo := a+keys; lo+width < b; lo += 2*width {
+			_buffered_merge(it, lo, lo+width, min(lo+2*width, b), a, keys)
+		}
+	}
+
+	_heap_sort(it, a, a+keys)
+	_rotation_merge(it, a, a+keys, b)
+}
+
+@(private)
+STABLE_SORT_INSERTION :: 32
+
+@(private)
+STABLE_SORT_BLOCK :: 8
+
+@(private)
+STABLE_SORT_KEY_SCAN :: 8
+
+@(private)
+_sorted_or_reversed :: proc(it: Interface, a, b: int) -> bool {
+	ascending  := true
+	descending := true
+	for i in a+1..<b {
+		if it->less(i, i-1) {
+			ascending = false
+		} else {
+			descending = false
+		}
+		if !(ascending || descending) {
+			return false
+		}
+	}
+
+	if descending {
+		for i, j := a, b-1; i < j; i, j = i+1, j-1 {
+			it->swap(i, j)
+		}
+	}
+	return true
+}
+
+@(private)
+_collect_keys :: proc(it: Interface, a, b: int, want: int) -> (keys: int) {
+	h     := a
+	limit := min(b, a + want*STABLE_SORT_KEY_SCAN)
+
+	keys = 1
+	for i := a+1; i < limit && keys < want; i += 1 {
+		r := _lower_bound(it, h, h+keys, i)
+		if r < h+keys && !it->less(i, r) {
+			continue
+		}
+
+		rotate(it, h, h+keys, i)
+		r += i - keys - h
+		h = i - keys
+
+		rotate(it, r, i, i+1)
+		keys += 1
+	}
+
+	rotate(it, a, h, h+keys)
+	return
+}
+
+@(private)
+_buffered_merge :: proc(it: Interface, a, mid, b: int, buffer, buffer_len: int) {
+	if a == mid || mid == b || !it->less(mid, mid-1) {
+		return
+	}
+
+	lo := _upper_bound(it, a, mid, mid)
+	hi := _lower_bound(it, mid, b, mid-1)
+
+	left  := mid - lo
+	right := hi - mid
+
+	switch {
+	case left <= buffer_len && left <= right:
+		_merge_left_through_buffer(it, lo, mid, hi, buffer)
+		return
+	case right <= buffer_len:
+		_merge_right_through_buffer(it, lo, mid, hi, buffer)
+		return
+	case left <= buffer_len:
+		_merge_left_through_buffer(it, lo, mid, hi, buffer)
+		return
+	}
+
+	cut1, cut2: int
+	if left >= right {
+		cut1 = lo + left/2
+		cut2 = _lower_bound(it, mid, hi, cut1)
+	} else {
+		cut2 = mid + right/2
+		cut1 = _upper_bound(it, lo, mid, cut2)
+	}
+
+	rotate(it, cut1, mid, cut2)
+	new_mid := cut1 + cut2 - mid
+
+	_buffered_merge(it, lo, cut1, new_mid, buffer, buffer_len)
+	_buffered_merge(it, new_mid, cut2, hi, buffer, buffer_len)
+}
+
+@(private)
+_merge_left_through_buffer :: proc(it: Interface, lo, mid, hi: int, buffer: int) {
+	left := mid - lo
+	swap_range(it, buffer, lo, left)
+
+	p   := buffer
+	end := buffer + left
+	q   := mid
+	o   := lo
+	for p < end && q < hi {
+		if it->less(q, p) {
+			it->swap(o, q)
+			q += 1
+		} else {
+			it->swap(o, p)
+			p += 1
+		}
+		o += 1
+	}
+
+	for p < end {
+		it->swap(o, p)
+		p += 1
+		o += 1
+	}
+}
+
+@(private)
+_merge_right_through_buffer :: proc(it: Interface, lo, mid, hi: int, buffer: int) {
+	right := hi - mid
+	swap_range(it, buffer, mid, right)
+
+	p := buffer + right - 1
+	q := mid - 1
+	o := hi - 1
+	for p >= buffer && q >= lo {
+		if it->less(p, q) {
+			it->swap(o, q)
+			q -= 1
+		} else {
+			it->swap(o, p)
+			p -= 1
+		}
+		o -= 1
+	}
+
+	for p >= buffer {
+		it->swap(o, p)
+		p -= 1
+		o -= 1
+	}
+}
+
+@(private)
+_rotation_merge :: proc(it: Interface, lo, mid, hi: int) {
+	if lo == mid || mid == hi || !it->less(mid, mid-1) {
+		return
+	}
+
+	switch {
+	case mid-lo == 1:
+		rotate(it, lo, mid, _lower_bound(it, mid, hi, lo))
+		return
+	case hi-mid == 1:
+		rotate(it, _upper_bound(it, lo, mid, mid), mid, hi)
+		return
+	}
+
+	cut1, cut2: int
+	if mid-lo >= hi-mid {
+		cut1 = lo + (mid-lo)/2
+		cut2 = _lower_bound(it, mid, hi, cut1)
+	} else {
+		cut2 = mid + (hi-mid)/2
+		cut1 = _upper_bound(it, lo, mid, cut2)
+	}
+
+	rotate(it, cut1, mid, cut2)
+	new_mid := cut1 + cut2 - mid
+
+	_rotation_merge(it, lo, cut1, new_mid)
+	_rotation_merge(it, new_mid, cut2, hi)
+}
+
+@(private)
+_lower_bound :: proc(it: Interface, a, b: int, key: int) -> int {
+	lo := a
+	hi := b
+	for lo < hi {
+		m := int(uint(lo+hi) >> 1)
+		if it->less(m, key) {
+			lo = m + 1
+		} else {
+			hi = m
+		}
+	}
+	return lo
+}
+
+@(private)
+_upper_bound :: proc(it: Interface, a, b: int, key: int) -> int {
+	lo := a
+	hi := b
+	for lo < hi {
+		m := int(uint(lo+hi) >> 1)
+		if it->less(key, m) {
+			hi = m
+		} else {
+			lo = m + 1
+		}
+	}
+	return lo
 }
 
 @(private)
