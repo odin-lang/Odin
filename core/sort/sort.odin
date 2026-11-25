@@ -5,7 +5,6 @@ import "core:mem"
 import "core:slice"
 import "base:intrinsics"
 
-_ :: intrinsics
 _ :: slice
 ORD :: intrinsics.type_is_ordered
 
@@ -376,12 +375,15 @@ _heap_sort :: proc(it: Interface, a, b: int) {
 // It gathers items with distinct keys into a buffer inside the array, merges through it with swaps, and splits larger merges with rotations.
 @(private)
 _stable_sort :: proc(it: Interface, a, b: int) {
+	INSERTION :: 32
+	BLOCK     :: 8
+
 	if _sorted_or_reversed(it, a, b) {
 		return
 	}
 
 	n := b - a
-	if n <= STABLE_SORT_INSERTION {
+	if n <= INSERTION {
 		_insertion_sort(it, a, b)
 		return
 	}
@@ -392,10 +394,10 @@ _stable_sort :: proc(it: Interface, a, b: int) {
 	}
 	keys := _collect_keys(it, a, b, 2*root)
 
-	for lo := a+keys; lo < b; lo += STABLE_SORT_BLOCK {
-		_insertion_sort(it, lo, min(lo+STABLE_SORT_BLOCK, b))
+	for lo := a+keys; lo < b; lo += BLOCK {
+		_insertion_sort(it, lo, min(lo+BLOCK, b))
 	}
-	for width := STABLE_SORT_BLOCK; width < n-keys; width *= 2 {
+	for width := BLOCK; width < n-keys; width *= 2 {
 		for lo := a+keys; lo+width < b; lo += 2*width {
 			_merge(it, lo, lo+width, min(lo+2*width, b), a, keys)
 		}
@@ -404,15 +406,6 @@ _stable_sort :: proc(it: Interface, a, b: int) {
 	_heap_sort(it, a, a+keys)
 	_merge(it, a, a+keys, b, a, 0)
 }
-
-@(private)
-STABLE_SORT_INSERTION :: 32
-
-@(private)
-STABLE_SORT_BLOCK :: 8
-
-@(private)
-STABLE_SORT_KEY_SCAN :: 8
 
 @(private)
 _sorted_or_reversed :: proc(it: Interface, a, b: int) -> bool {
@@ -439,8 +432,10 @@ _sorted_or_reversed :: proc(it: Interface, a, b: int) -> bool {
 
 @(private)
 _collect_keys :: proc(it: Interface, a, b: int, want: int) -> (keys: int) {
+	SCAN :: 8
+
 	h     := a
-	limit := min(b, a + want*STABLE_SORT_KEY_SCAN)
+	limit := min(b, a + want*SCAN)
 
 	keys = 1
 	for i := a+1; i < limit && keys < want; i += 1 {
@@ -479,9 +474,6 @@ _merge :: proc(it: Interface, a, mid, b: int, buffer, buffer_len: int) {
 		return
 	case right <= buffer_len:
 		_merge_right_through_buffer(it, lo, mid, hi, buffer)
-		return
-	case left <= buffer_len:
-		_merge_left_through_buffer(it, lo, mid, hi, buffer)
 		return
 	}
 
@@ -728,11 +720,6 @@ Output:
 */
 quick_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	assert(f != nil)
-	sort_by_int_cmp(array, f)
-}
-
-@(private)
-sort_by_int_cmp :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	less :: proc(a, b: T, user_data: rawptr) -> bool {
 		f := (proc(T, T) -> int)(user_data)
 		return f(a, b) < 0
@@ -767,14 +754,6 @@ quick_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	slice.sort(array)
 }
 
-_log2 :: proc(x: int) -> int {
-	res := 0
-	for n := x; n != 0; n >>= 1 {
-		res += 1
-	}
-	return res
-}
-
 /*
 Sorts a slice in place, ordered by the given comparator.
 It is the same sort as `slice.stable_sort_by`.
@@ -803,10 +782,7 @@ Output:
 	[1, 3, 5, 8]
 
 */
-merge_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
-	assert(f != nil)
-	sort_by_int_cmp(array, f)
-}
+merge_sort_proc :: quick_sort_proc
 
 /*
 Sorts a slice of ordered elements in place, in ascending order.
@@ -831,9 +807,7 @@ Output:
 	[1, 3, 5, 8]
 
 */
-merge_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
-	slice.sort(array)
-}
+merge_sort :: quick_sort
 
 /*
 Sorts a slice in place using heap sort, ordered by the given comparator.

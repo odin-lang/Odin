@@ -91,6 +91,16 @@ gingersort :: proc(data: []$E, call: $P, $KIND: Sort_Kind) {
 	}
 }
 
+@(require_results)
+ginger_is_sorted :: proc(a: []$E, call: $P, $KIND: Sort_Kind) -> bool {
+	for i := len(a)-1; i > 0; i -= 1 {
+		if ginger_greater(a[i-1], a[i], call, KIND) {
+			return false
+		}
+	}
+	return true
+}
+
 // Fills `indices` with the order that sorts `data`, then permutes `data` into it.
 ginger_sort_indices :: proc(data: []$E, indices: []int, call: $P, $KIND: Sort_Kind) {
 	for &index, i in indices {
@@ -165,7 +175,7 @@ ginger_sort_typed :: proc(data: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_che
 	when size_of(E)*GINGER_SMALL <= GINGER_SMALL_BYTES {
 		if n <= GINGER_SMALL {
 			small: [GINGER_SMALL]E = ---
-			ginger_quadsort(data, small[:], call, KIND)
+			ginger_tail_swap(data, small[:], call, KIND)
 			return
 		}
 	}
@@ -280,6 +290,14 @@ ginger_swap_if :: #force_inline proc(a: []$E, i: int, swap: bool) #no_bounds_che
 
 ginger_order_pair :: #force_inline proc(a: []$E, i: int, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	ginger_swap_if(a, i, ginger_greater(a[i], a[i+1], call, KIND))
+}
+
+ginger_reverse :: proc(a: []$E) #no_bounds_check {
+	for i, j := 0, len(a)-1; i < j; i, j = i+1, j-1 {
+		temp := a[i]
+		a[i] = a[j]
+		a[j] = temp
+	}
 }
 
 ginger_parity_swap_four :: #force_inline proc(a: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
@@ -530,14 +548,14 @@ ginger_quad_swap :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) -> bool #no_bou
 			}
 
 			if descending {
-				reverse(a[pts:i+rest])
+				ginger_reverse(a[pts:i+rest])
 				if pts == 0 {
 					return true
 				}
 				reversed_to_end = true
 				break blocks
 			}
-			reverse(a[pts:i])
+			ginger_reverse(a[pts:i])
 			break blocks
 		}
 		count -= 1
@@ -555,7 +573,7 @@ ginger_quad_swap :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) -> bool #no_bou
 				continue blocks
 			}
 		}
-		reverse(a[pts:i])
+		ginger_reverse(a[pts:i])
 		in_reversed_run = false
 
 		if o1 && o2 && o3 && o4 &&
@@ -818,6 +836,35 @@ ginger_partial_forward_merge :: proc(a, s: []$E, block: int, call: $P, $KIND: So
 	copy(a[out:], s[ptl:tpl+1])
 }
 
+// Moves the last two or three items of `a[:tpl+1]` and `s[:tpr+1]` to `a[:tpa+1]`, in order.
+@(require_results)
+ginger_backward_merge_step :: #force_inline proc(a, s: []$E, tpl, tpr, tpa: int, call: $P, $KIND: Sort_Kind) -> (int, int, int) #no_bounds_check {
+	if !ginger_greater(a[tpl], s[tpr-1], call, KIND) {
+		a[tpa]   = s[tpr]
+		a[tpa-1] = s[tpr-1]
+		return tpl, tpr-2, tpa-2
+	}
+
+	if ginger_greater(a[tpl-1], s[tpr], call, KIND) {
+		a[tpa]   = a[tpl]
+		a[tpa-1] = a[tpl-1]
+		return tpl-2, tpr, tpa-2
+	}
+
+	right_after := !ginger_greater(a[tpl], s[tpr], call, KIND)
+	right_item  := s[tpr]
+	left_item   := a[tpl]
+	a[tpa-1+int(right_after)]  = right_item
+	a[tpa-1+int(!right_after)] = left_item
+
+	if ginger_greater(a[tpl-1], s[tpr-1], call, KIND) {
+		a[tpa-2] = a[tpl-1]
+		return tpl-2, tpr-1, tpa-3
+	}
+	a[tpa-2] = s[tpr-1]
+	return tpl-1, tpr-2, tpa-3
+}
+
 ginger_partial_backward_merge :: proc(a, s: []$E, block: int, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	n := len(a)
 	if block == 0 || n == block {
@@ -864,74 +911,12 @@ ginger_partial_backward_merge :: proc(a, s: []$E, block: int, call: $P, $KIND: S
 		}
 
 		for _ in 0..<8 {
-			if !ginger_greater(a[tpl], s[tpr-1], call, KIND) {
-				a[tpa]   = s[tpr]
-				a[tpa-1] = s[tpr-1]
-				tpa -= 2
-				tpr -= 2
-			} else if ginger_greater(a[tpl-1], s[tpr], call, KIND) {
-				a[tpa]   = a[tpl]
-				a[tpa-1] = a[tpl-1]
-				tpa -= 2
-				tpl -= 2
-			} else {
-				right_after := !ginger_greater(a[tpl], s[tpr], call, KIND)
-				right_item  := s[tpr]
-				left_item   := a[tpl]
-				tpa -= 1
-				a[tpa+int(right_after)]  = right_item
-				a[tpa+int(!right_after)] = left_item
-				tpr -= 1
-				tpl -= 1
-				tpa -= 1
-
-				if ginger_greater(a[tpl], s[tpr], call, KIND) {
-					a[tpa] = a[tpl]
-					tpl -= 1
-				} else {
-					a[tpa] = s[tpr]
-					tpr -= 1
-				}
-				tpa -= 1
-			}
+			tpl, tpr, tpa = ginger_backward_merge_step(a, s, tpl, tpr, tpa, call, KIND)
 		}
 	}
 
 	for tpr > 1 && tpl > 1 {
-		if !ginger_greater(a[tpl], s[tpr-1], call, KIND) {
-			a[tpa]   = s[tpr]
-			a[tpa-1] = s[tpr-1]
-			tpa -= 2
-			tpr -= 2
-			continue
-		}
-
-		if ginger_greater(a[tpl-1], s[tpr], call, KIND) {
-			a[tpa]   = a[tpl]
-			a[tpa-1] = a[tpl-1]
-			tpa -= 2
-			tpl -= 2
-			continue
-		}
-
-		right_after := !ginger_greater(a[tpl], s[tpr], call, KIND)
-		right_item  := s[tpr]
-		left_item   := a[tpl]
-		tpa -= 1
-		a[tpa+int(right_after)]  = right_item
-		a[tpa+int(!right_after)] = left_item
-		tpr -= 1
-		tpl -= 1
-		tpa -= 1
-
-		if ginger_greater(a[tpl], s[tpr], call, KIND) {
-			a[tpa] = a[tpl]
-			tpl -= 1
-		} else {
-			a[tpa] = s[tpr]
-			tpr -= 1
-		}
-		tpa -= 1
+		tpl, tpr, tpa = ginger_backward_merge_step(a, s, tpl, tpr, tpa, call, KIND)
 	}
 
 	for tpr >= 0 && tpl >= 0 {
@@ -1019,14 +1004,7 @@ ginger_trinity_rotation :: proc(a, s: []$E, left: int) #no_bounds_check {
 			a[pta] = temp
 			pta += 1
 		}
-
-		for count := (ptd - pta) / 2; count > 0; count -= 1 {
-			temp := a[pta]
-			ptd -= 1
-			a[pta] = a[ptd]
-			pta += 1
-			a[ptd] = temp
-		}
+		ginger_reverse(a[pta:ptd])
 
 	case right < left:
 		if right <= swap_size {
@@ -1080,19 +1058,10 @@ ginger_trinity_rotation :: proc(a, s: []$E, left: int) #no_bounds_check {
 			pta += 1
 			a[ptd] = temp
 		}
-
-		for count := (ptd - pta) / 2; count > 0; count -= 1 {
-			temp := a[pta]
-			ptd -= 1
-			a[pta] = a[ptd]
-			pta += 1
-			a[ptd] = temp
-		}
+		ginger_reverse(a[pta:ptd])
 
 	case:
-		for k in 0..<left {
-			a[k], a[left+k] = a[left+k], a[k]
-		}
+		swap_with_slice(a[:left], a[left:])
 	}
 }
 
@@ -1188,7 +1157,7 @@ ginger_rotate_merge :: proc(a, s: []$E, start_block: int, call: $P, $KIND: Sort_
 }
 
 ginger_quadsort :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
-	if len(a) <= 96 && len(a) <= len(s) {
+	if len(a) <= GINGER_SMALL && len(a) <= len(s) {
 		ginger_tail_swap(a, s, call, KIND)
 		return
 	}
@@ -1317,10 +1286,8 @@ ginger_stable_partition :: proc(a, s: []$E, pivot: E, call: $P, $KIND: Sort_Kind
 ginger_partition :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	n := len(a)
 
-	low_count  := 0
-	high_count := 0
-
 	pivot, previous_pivot: E
+	has_previous := false
 
 	for {
 		if n <= 2048 {
@@ -1334,38 +1301,24 @@ ginger_partition :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_chec
 			}
 		}
 
-		if low_count != 0 && !ginger_greater(previous_pivot, pivot, call, KIND) {
-			low_count  = ginger_stable_partition(a[:n], s, pivot, call, KIND, STRICT=true)
-			high_count = n - low_count
-
-			if high_count <= low_count/16 || low_count <= GINGER_OUT {
-				ginger_quadsort(a[:low_count], s, call, KIND)
-				return
-			}
-			n = low_count
-			low_count = 0
-			continue
+		// A strict partition leaves only items equal to the pivot on the high side, which needs no sorting.
+		strict := has_previous && !ginger_greater(previous_pivot, pivot, call, KIND)
+		low_count := 0
+		if !strict {
+			low_count = ginger_stable_partition(a[:n], s, pivot, call, KIND, STRICT=false)
+			strict = low_count == n
 		}
+		if strict {
+			low_count = ginger_stable_partition(a[:n], s, pivot, call, KIND, STRICT=true)
+		}
+		high_count := n - low_count
 
-		low_count  = ginger_stable_partition(a[:n], s, pivot, call, KIND, STRICT=false)
-		high_count = n - low_count
-
-		if low_count <= high_count/16 || high_count <= GINGER_OUT {
-			if high_count == 0 {
-				low_count  = ginger_stable_partition(a[:low_count], s, pivot, call, KIND, STRICT=true)
-				high_count = n - low_count
-
-				if high_count <= low_count/16 || low_count <= GINGER_OUT {
-					ginger_quadsort(a[:low_count], s, call, KIND)
-					return
-				}
-				n = low_count
-				low_count = 0
-				continue
+		if !strict {
+			if low_count <= high_count/16 || high_count <= GINGER_OUT {
+				ginger_quadsort(a[low_count:n], s, call, KIND)
+			} else {
+				ginger_partition(a[low_count:n], s, call, KIND)
 			}
-			ginger_quadsort(a[low_count:n], s, call, KIND)
-		} else {
-			ginger_partition(a[low_count:n], s, call, KIND)
 		}
 
 		if high_count <= low_count/16 || low_count <= GINGER_OUT {
@@ -1374,6 +1327,7 @@ ginger_partition :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_chec
 		}
 		n = low_count
 		previous_pivot = pivot
+		has_previous = !strict
 	}
 }
 
@@ -1458,7 +1412,7 @@ ginger_analyze :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check 
 			end += 1
 		}
 
-		reverse(a[bounds[k]:bounds[end]])
+		ginger_reverse(a[bounds[k]:bounds[end]])
 		if k == 0 && end == 4 {
 			return
 		}

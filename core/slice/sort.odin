@@ -22,18 +22,12 @@ cmp :: proc(a, b: $E) -> Ordering where ORD(E) {
 @(require_results)
 cmp_proc :: proc($E: typeid) -> (proc(E, E) -> Ordering) where ORD(E) {
 	return proc(a, b: E) -> Ordering {
-		switch {
-		case a < b:
-			return .Less
-		case a > b:
-			return .Greater
-		}
-		return .Equal
+		return cmp(a, b)
 	}
 }
 
 // sort sorts a slice
-// This sort is not guaranteed to be stable
+// Equal elements keep their original order
 sort :: proc(data: $T/[]$E) where ORD(E) {
 	gingersort(([]E)(data), struct{}{}, .Ordered)
 }
@@ -44,9 +38,7 @@ sort_by_indices :: proc{ sort_by_indices_allocate, _sort_by_indices}
 sort_by_indices_allocate :: proc(data: $T/[]$E, indices: []int, allocator := context.allocator, loc := #caller_location) -> (sorted: T) {
 	assert(len(data) == len(indices))
 	sorted = non_zero_make(T, len(data), allocator, loc)
-	for v, i in indices {
-		sorted[i] = data[v]
-	}
+	_sort_by_indices(data, sorted, indices)
 	return
 }
 
@@ -60,12 +52,10 @@ _sort_by_indices :: proc(data, sorted: $T/[]$E, indices: []int) {
 
 sort_by_indices_overwrite :: proc(data: $T/[]$E, indices: []int) {
 	assert(len(data) == len(indices))
-	temp := non_zero_make([]E, len(data), context.allocator)
+	temp := non_zero_make(T, len(data), context.allocator)
 	defer delete(temp)
-	for v, i in indices {
-		temp[i] = data[v]
-	}
-	swap_with_slice(data, temp)
+	_sort_by_indices(data, temp, indices)
+	copy(data, temp)
 }
 
 sort_from_permutation_indices :: proc(data: $T/[]$E, indices: []int) {
@@ -85,8 +75,8 @@ sort_from_permutation_indices :: proc(data: $T/[]$E, indices: []int) {
 	}
 }
 
-// sort sorts a slice and returns a slice of the original indices
-// This sort is not guaranteed to be stable
+// sort_with_indices sorts a slice and returns a slice of the original indices
+// Equal elements keep their original order
 sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> (indices: []int) where ORD(E) {
 	indices = make([]int, len(data), allocator, loc)
 	ginger_sort_indices(([]E)(data), indices, ([]E)(data), .Indices_Ordered)
@@ -94,7 +84,7 @@ sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator, loc := 
 }
 
 // sort_by sorts a slice with a given procedure to test whether two values are ordered "i < j"
-// This sort is not guaranteed to be stable
+// Equal elements keep their original order
 sort_by :: proc{
 	sort_by_runtime,
 	sort_by_constant where ODIN_OPTIMIZATION_MODE >= .Speed,
@@ -113,8 +103,9 @@ sort_by_with_data :: proc(data: $T/[]$E, less: proc(i, j: E, user_data: rawptr) 
 	gingersort(([]E)(data), Sort_Less_With_Data(E){less, user_data}, .Less_With_Data)
 }
 
-// sort_by sorts a slice with a given procedure to test whether two values are ordered "i < j"
-// This sort is not guaranteed to be stable
+// sort_by_with_indices sorts a slice with a given procedure to test whether two values are ordered "i < j",
+// and returns a slice of the original indices
+// Equal elements keep their original order
 sort_by_with_indices :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool, allocator := context.allocator, loc := #caller_location) -> (indices : []int) {
 	indices = make([]int, len(data), allocator, loc)
 	ginger_sort_indices(([]E)(data), indices, Sort_Indices_Less(E){less, ([]E)(data)}, .Indices_Less)
@@ -218,34 +209,19 @@ stable_sort_by_cmp :: sort_by_cmp
 
 @(require_results)
 is_sorted :: proc(array: $T/[]$E) -> bool where ORD(E) {
-	for i := len(array)-1; i > 0; i -= 1 {
-		if array[i] < array[i-1] {
-			return false
-		}
-	}
-	return true
+	return ginger_is_sorted(([]E)(array), struct{}{}, .Ordered)
 }
 
 @(require_results)
 is_sorted_by :: proc(array: $T/[]$E, less: proc(i, j: E) -> bool) -> bool {
-	for i := len(array)-1; i > 0; i -= 1 {
-		if less(array[i], array[i-1]) {
-			return false
-		}
-	}
-	return true
+	return ginger_is_sorted(([]E)(array), less, .Less)
 }
 
 is_sorted_by_cmp :: is_sorted_cmp
 
 @(require_results)
 is_sorted_cmp :: proc(array: $T/[]$E, cmp: proc(i, j: E) -> Ordering) -> bool {
-	for i := len(array)-1; i > 0; i -= 1 {
-		if cmp(array[i], array[i-1]) == .Less {
-			return false
-		}
-	}
-	return true
+	return ginger_is_sorted(([]E)(array), cmp, .Cmp)
 }
 
 
@@ -295,10 +271,5 @@ reverse_sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
 
 @(require_results)
 is_sorted_by_key :: proc(array: $T/[]$E, key: proc(E) -> $K) -> bool where ORD(K) {
-	for i := len(array)-1; i > 0; i -= 1 {
-		if key(array[i]) < key(array[i-1]) {
-			return false
-		}
-	}
-	return true
+	return ginger_is_sorted(([]E)(array), key, .Key)
 }
