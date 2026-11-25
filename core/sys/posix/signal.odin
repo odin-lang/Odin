@@ -333,8 +333,7 @@ SS_Flag_Bits :: enum c.int {
 SS_Flags :: bit_set[SS_Flag_Bits; c.int]
 
 Sig :: enum c.int {
-	// Resulting set is the union of the current set and the signal set and the complement of
-	// the signal set pointed to by the argument.
+	// Resulting set is the union of the current set and the signal set.
 	BLOCK   = SIG_BLOCK,
 	// Resulting set is the intersection of the current set and the complement of the signal set
 	// pointed to by the argument.
