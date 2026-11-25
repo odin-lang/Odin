@@ -265,7 +265,7 @@ else
 fi
 
 ESCAPE_OUT=$($ODIN check ../test_issue_escape_cleared_stores -no-entry-point $COMMON_CHECK 2>&1 >/dev/null)
-if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 15 &&
+if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 28 &&
       $(grep -c "local variable 'y'" <<< "$ESCAPE_OUT") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
