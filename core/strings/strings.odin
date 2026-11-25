@@ -1601,6 +1601,20 @@ index_rune :: proc(s: string, r: rune) -> (res: int) {
 	return index(s, string(b[:w]))
 }
 
+// Same as `index_rune`, runs through the string in reverse
+@(require_results)
+last_index_rune :: proc(s: string, r: rune) -> (res: int) {
+	// TODO: Probably possible to search better based on needle rune utf8 width
+	for i := len(s); i > 0; {
+		c, size := utf8.decode_last_rune_in_string(s[:i])
+		i -= size
+		if c == r {
+			return i
+		}
+	}
+	return -1
+}
+
 @private PRIME_RABIN_KARP :: 16777619
 /*
 Returns the byte offset of the string `substr` in the string `s`, -1 when not found.
