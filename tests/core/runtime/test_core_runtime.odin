@@ -99,6 +99,25 @@ test_temp_allocator_returns_correct_size :: proc(t: ^testing.T) {
 	testing.expect(t, len(bytes) == 10)
 }
 
+when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	@(test)
+	test_wasm_allocator_out_of_memory :: proc(t: ^testing.T) {
+		a := runtime.default_wasm_allocator()
+		for size in ([?]int{-1, min(int), max(int)}) {
+			data, err := runtime.mem_alloc(size, 16, a)
+			testing.expectf(t, err == .Out_Of_Memory && data == nil, "alloc(%v) = %v bytes, %v", size, len(data), err)
+		}
+
+		data, err := runtime.mem_alloc(64, 16, a)
+		testing.expect_value(t, err, nil)
+		for size in ([?]int{-1, min(int)}) {
+			grown, grow_err := runtime.mem_resize(raw_data(data), 64, size, 16, a)
+			testing.expectf(t, grow_err == .Out_Of_Memory && grown == nil, "resize(64 -> %v) = %v bytes, %v", size, len(grown), grow_err)
+		}
+		runtime.mem_free(raw_data(data), a)
+	}
+}
+
 @(test)
 test_init_cap_map_dynarray :: proc(t: ^testing.T) {
 	m1 := make(map[int]string)
@@ -1623,8 +1642,8 @@ test_cstring_len :: proc(t: ^testing.T) {
 	}
 }
 
-// Two pages with only the first committed. Reading past it faults.
-// Some targets have no virtual memory (e.g. WASI): the pages are empty, `ok` is false, and nothing fails.
+// Two pages with only the first committed. Reading past it faults, except on wasm, where nothing
+// is protected and an overread goes unnoticed.
 @(private="file", require_results)
 guarded_pages :: proc(t: ^testing.T) -> (data: []byte, ok: bool) {
 	page := uint(mem.PAGE_SIZE)

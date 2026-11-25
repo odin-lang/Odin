@@ -33,7 +33,9 @@ arena_worker_below :: proc(w: ^Arena_Worker, n: int) -> int {
 }
 
 arena_worker_proc :: proc(w: ^Arena_Worker) {
-	sync.barrier_wait(w.barrier)
+	if w.barrier != nil {
+		sync.barrier_wait(w.barrier)
+	}
 	for &a, i in w.allocs {
 		size := 1 + arena_worker_below(w, 512)
 		if arena_worker_below(w, 64) == 0 {
@@ -88,7 +90,24 @@ arena_worker_proc :: proc(w: ^Arena_Worker) {
 }
 
 @(test)
+test_virtual_reserve_limits :: proc(t: ^testing.T) {
+	when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+		for size in ([?]uint{0, max(uint)}) {
+			data, err := virtual.reserve(size)
+			testing.expectf(t, err == .Out_Of_Memory && data == nil, "reserve(%v) = %v bytes, %v", size, len(data), err)
+		}
+	}
+	data, err := virtual.reserve(1)
+	testing.expect_value(t, err, nil)
+	testing.expect(t, raw_data(data) != nil)
+	virtual.release(raw_data(data), 1)
+}
+
+@(test)
 test_virtual_arena_threads :: proc(t: ^testing.T) {
+	when !thread.IS_SUPPORTED {
+		return
+	}
 	for kind in ([?]virtual.Arena_Kind{.Growing, .Static}) {
 		arena: virtual.Arena
 		switch kind {
@@ -151,12 +170,8 @@ test_virtual_arena_single_thread_flag :: proc(t: ^testing.T) {
 		arena.flags = {.Single_Thread}
 		defer virtual.arena_destroy(&arena)
 
-		barrier: sync.Barrier
-		sync.barrier_init(&barrier, 1)
-
 		w := Arena_Worker{
 			allocator = virtual.arena_allocator(&arena),
-			barrier   = &barrier,
 			rng       = t.seed | 1,
 			allocs    = make([]Arena_Thread_Alloc, ARENA_THREAD_ALLOCS),
 		}
@@ -200,6 +215,9 @@ arena_racer_proc :: proc(r: ^Arena_Racer) {
 
 @(test)
 test_virtual_arena_free_all_racing_allocations :: proc(t: ^testing.T) {
+	when !thread.IS_SUPPORTED {
+		return
+	}
 	arena: virtual.Arena
 	testing.expect_value(t, virtual.arena_init_growing(&arena, 256*mem.Kilobyte), nil)
 	defer virtual.arena_destroy(&arena)

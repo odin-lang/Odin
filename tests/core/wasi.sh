@@ -22,6 +22,7 @@ NORMAL_PACKAGES="
 	encoding/hxa
 	encoding/ini
 	encoding/json
+	encoding/json/differential
 	encoding/json/user_unmarshaler
 	encoding/pem
 	encoding/uuid
@@ -35,6 +36,7 @@ NORMAL_PACKAGES="
 	math/fixed
 	math/linalg/hlsl
 	math/noise
+	mem
 	reflect
 	runtime
 	slice
