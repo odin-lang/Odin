@@ -3073,7 +3073,7 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 			}
 
 			isize param_offset = return_by_pointer ? 1 : 0;
-			param_offset += ft->original_arg_count;
+			param_offset += lb_function_type_split_results_index(ft);
 			for_array(i, result_eps) {
 				lbValue result_ep = {};
 				result_ep.value = LLVMGetParam(p->value, cast(unsigned)(param_offset+i));

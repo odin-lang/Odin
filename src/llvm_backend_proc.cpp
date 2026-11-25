@@ -943,7 +943,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 						if (ft->multiple_return_original_type != nullptr) {
 							isize the_offset = -1;
 							if (i+1 < results->variables.count) {
-								the_offset = cast(isize)param_offset + ft->original_arg_count + i;
+								the_offset = cast(isize)param_offset + lb_function_type_split_results_index(ft) + i;
 							} else if (has_return_ptr) {
 								GB_ASSERT(i+1 == results->variables.count);
 								the_offset = 0;
@@ -1640,7 +1640,6 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 
 	lbValue result = {};
 
-	isize ignored_args = 0;
 	auto processed_args = array_make<lbValue>(permanent_allocator(), 0, args.count);
 
 	{
@@ -1663,7 +1662,6 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			lbArgType *arg = &ft->args[param_index];
 			if (arg->kind == lbArg_Ignore) {
 				param_index += 1;
-				ignored_args += 1;
 				continue;
 			}
 
@@ -1797,7 +1795,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			auto tuple_fix_values = slice_make<lbValue>(permanent_allocator(), ret_count);
 			auto tuple_geps = slice_make<lbValue>(permanent_allocator(), ret_count);
 
-			isize offset = ft->original_arg_count - ignored_args;
+			isize offset = lb_function_type_split_results_index(ft);
 			for (isize j = 0; j < ret_count-1; j++) {
 				lbValue ret_arg_ptr = processed_args[offset + j];
 				lbValue ret_arg = lb_emit_load(p, ret_arg_ptr);

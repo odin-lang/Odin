@@ -89,6 +89,19 @@ gb_internal gbAllocator lb_function_type_args_allocator(void) {
 	return heap_allocator();
 }
 
+// The LLVM parameter, after any hidden return pointer, of the first pointer a split multiple-value result goes through.
+// An ignored argument has no LLVM parameter and a padded one has two, so it is not `original_arg_count`.
+gb_internal isize lb_function_type_split_results_index(lbFunctionType *ft) {
+	isize index = 0;
+	for (isize i = 0; i < ft->original_arg_count; i++) {
+		lbArgType const &arg = ft->args[i];
+		if (arg.kind != lbArg_Ignore) {
+			index += arg.pad_type != nullptr ? 2 : 1;
+		}
+	}
+	return index;
+}
+
 
 gb_internal gb_inline i64 llvm_align_formula(i64 off, i64 a) {
 	return (off + a - 1) / a * a;
