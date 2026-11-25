@@ -36,18 +36,7 @@ cmp_proc :: proc($E: typeid) -> (proc(E, E) -> Ordering) where ORD(E) {
 // This sort is not guaranteed to be stable
 sort :: proc(data: $T/[]$E) where ORD(E) {
 	when size_of(E) != 0 {
-		if n := len(data); n > 1 {
-			raw := ([^]byte)(raw_data(data))
-			_smoothsort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
-				x, y := (^E)(lhs)^, (^E)(rhs)^
-				if x < y {
-					return .Less
-				} else if x > y {
-					return .Greater
-				}
-				return .Equal
-			}, nil)
-		}
+		gingersort(([]E)(data), struct{}{}, .Ordered)
 	}
 }
 
@@ -108,23 +97,10 @@ sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator, loc := 
 				indices[idx] = idx
 			}
 
-			raw := ([^]byte)(raw_data(indices))
-			_smoothsort(raw, uint(len(indices)), size_of(int), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
-				data := ([^]E)(user_data)
-
-				xi, yi := (^int)(lhs)^, (^int)(rhs)^
-				#no_bounds_check x, y := data[xi], data[yi]
-				if x < y {
-					return .Less
-				} else if x > y {
-					return .Greater
-				}
-				return .Equal
-			}, raw_data(data))
+			gingersort(indices, ([]E)(data), .Indices_Ordered)
 
 			sort_from_permutation_indices(data, indices)
 		}
-		return indices
 	}
 	return indices
 }
@@ -133,41 +109,13 @@ sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator, loc := 
 // This sort is not guaranteed to be stable
 sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 	when size_of(E) != 0 {
-		if n := len(data); n > 1 {
-			raw := ([^]byte)(raw_data(data))
-			_smoothsort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
-				x, y := (^E)(lhs)^, (^E)(rhs)^
-				less := (proc(E, E) -> bool)(user_data)
-				switch {
-				case less(x, y): return .Less
-				case less(y, x): return .Greater
-				}
-				return .Equal
-			}, rawptr(less))
-		}
+		gingersort(([]E)(data), less, .Less)
 	}
 }
 
 sort_by_with_data :: proc(data: $T/[]$E, less: proc(i, j: E, user_data: rawptr) -> bool, user_data: rawptr) {
 	when size_of(E) != 0 {
-		if n := len(data); n > 1 {
-			Context :: struct {
-				less:      proc(i, j: E, user_data: rawptr) -> bool,
-				user_data: rawptr,
-			}
-			ctx := &Context{less, user_data}
-
-			raw := ([^]byte)(raw_data(data))
-			_smoothsort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
-				x, y := (^E)(lhs)^, (^E)(rhs)^
-				ctx := (^Context)(user_data)
-				switch {
-				case ctx.less(x, y, ctx.user_data): return .Less
-				case ctx.less(y, x, ctx.user_data): return .Greater
-				}
-				return .Equal
-			}, ctx)
-		}
+		gingersort(([]E)(data), Sort_Less_With_Data(E){less, user_data}, .Less_With_Data)
 	}
 }
 
@@ -181,23 +129,7 @@ sort_by_with_indices :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool, allocat
 				indices[idx] = idx
 			}
 
-			Context :: struct{
-				less: proc(i, j: E) -> bool,
-				data: T,
-			}
-			ctx := &Context{less, data}
-
-			raw := ([^]byte)(raw_data(indices))
-			_smoothsort(raw, uint(len(indices)), size_of(int), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
-				ctx := (^Context)(user_data)
-				xi, yi := (^int)(lhs)^, (^int)(rhs)^
-				x, y := ctx.data[xi], ctx.data[yi]
-				switch {
-				case ctx.less(x, y): return .Less
-				case ctx.less(y, x): return .Greater
-				}
-				return .Equal
-			}, ctx)
+			gingersort(indices, Sort_Indices_Less(E){less, ([]E)(data)}, .Indices_Less)
 
 			sort_from_permutation_indices(data, indices)
 		}
@@ -213,24 +145,7 @@ sort_by_with_indices_with_data :: proc(data: $T/[]$E, less: proc(i, j: E, user_d
 				indices[idx] = idx
 			}
 
-			Context :: struct{
-				less: proc(i, j: E, user_data: rawptr) -> bool,
-				data: T,
-				user_data: rawptr,
-			}
-			ctx := &Context{less, data, user_data}
-
-			raw := ([^]byte)(raw_data(indices))
-			_smoothsort(raw, uint(len(indices)), size_of(int), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
-				ctx := (^Context)(user_data)
-				xi, yi := (^int)(lhs)^, (^int)(rhs)^
-				x, y := ctx.data[xi], ctx.data[yi]
-				switch {
-				case ctx.less(x, y, ctx.user_data): return .Less
-				case ctx.less(y, x, ctx.user_data): return .Greater
-				}
-				return .Equal
-			}, ctx)
+			gingersort(indices, Sort_Indices_Less_With_Data(E){less, ([]E)(data), user_data}, .Indices_Less_With_Data)
 
 			sort_from_permutation_indices(data, indices)
 		}
@@ -240,44 +155,21 @@ sort_by_with_indices_with_data :: proc(data: $T/[]$E, less: proc(i, j: E, user_d
 
 sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
 	when size_of(E) != 0 {
-		if n := len(data); n > 1 {
-			raw := ([^]byte)(raw_data(data))
-			_smoothsort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
-				x, y := (^E)(lhs)^, (^E)(rhs)^
-				cmp := cast(proc(E, E) -> Ordering)(user_data)
-				return cmp(x, y)
-			}, rawptr(cmp))
-		}
+		gingersort(([]E)(data), cmp, .Cmp)
 	}
 }
 
 
 sort_by_cmp_with_data :: proc(data: $T/[]$E, cmp: proc(i, j: E, user_data: rawptr) -> Ordering, user_data: rawptr) {
 	when size_of(E) != 0 {
-		if n := len(data); n > 1 {
-			Context :: struct{
-				cmp: proc(i, j: E, user_data: rawptr) -> Ordering,
-				user_data: rawptr,
-			}
-			ctx := &Context{cmp, user_data}
-
-			raw := ([^]byte)(raw_data(data))
-			_smoothsort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
-				x, y := (^E)(lhs)^, (^E)(rhs)^
-				ctx := (^Context)(user_data)
-				return ctx.cmp(x, y, ctx.user_data)
-			}, ctx)
-		}
+		gingersort(([]E)(data), Sort_Cmp_With_Data(E){cmp, user_data}, .Cmp_With_Data)
 	}
 }
 
 
 sort_by_generic_cmp :: proc(data: $T/[]$E, cmp: Generic_Cmp, user_data: rawptr) {
 	when size_of(E) != 0 {
-		if n := len(data); n > 1 {
-			raw := ([^]byte)(raw_data(data))
-			_smoothsort(raw, uint(len(data)), size_of(E), cmp, user_data)
-		}
+		gingersort(([]E)(data), Sort_Generic_Cmp{cmp, user_data}, .Generic_Cmp)
 	}
 }
 
@@ -287,9 +179,7 @@ Sorts a slice while maintaining the relative order of elements with the same key
 */
 stable_sort :: proc(data: $T/[]$E) where ORD(E) {
 	when size_of(E) != 0 {
-		if n := len(data); n > 1 {
-			_stable_sort_general(data, struct{}{}, .Ordered)
-		}
+		gingersort(([]E)(data), struct{}{}, .Ordered)
 	}
 }
 
@@ -322,9 +212,7 @@ Output:
 */
 stable_sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 	when size_of(E) != 0 {
-		if n := len(data); n > 1 {
-			_stable_sort_general(data, less, .Less)
-		}
+		gingersort(([]E)(data), less, .Less)
 	}
 }
 
@@ -358,9 +246,7 @@ Output:
 */
 stable_sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
 	when size_of(E) != 0 {
-		if n := len(data); n > 1 {
-			_stable_sort_general(data, cmp, .Cmp)
-		}
+		gingersort(([]E)(data), cmp, .Cmp)
 	}
 }
 
@@ -399,66 +285,36 @@ is_sorted_cmp :: proc(array: $T/[]$E, cmp: proc(i, j: E) -> Ordering) -> bool {
 
 
 reverse_sort :: proc(data: $T/[]$E) where ORD(E) {
-	sort_by(data, proc(i, j: E) -> bool {
-		return j < i
-	})
+	when size_of(E) != 0 {
+		gingersort(([]E)(data), struct{}{}, .Ordered_Reverse)
+	}
 }
 
 
 reverse_sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
-	sort_by_with_data(data, proc(i, j: E, user_data: rawptr) -> bool {
-		less := (proc(E, E) -> bool)(user_data)
-		return less(j, i)
-	}, rawptr(less))
+	when size_of(E) != 0 {
+		gingersort(([]E)(data), less, .Less_Reverse)
+	}
 }
 
 reverse_sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
-	sort_by_cmp_with_data(data, proc(i, j: E, user_data: rawptr) -> Ordering {
-		k := (proc(i, j: E) -> Ordering)(user_data)
-		return k(j, i)
-	}, rawptr(cmp))
+	when size_of(E) != 0 {
+		gingersort(([]E)(data), cmp, .Cmp_Reverse)
+	}
 }
 
 
 // TODO(bill): Should `sort_by_key` exist or is `sort_by` more than enough?
 sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
-	Context :: struct {
-		key: proc(E) -> K,
+	when size_of(E) != 0 {
+		gingersort(([]E)(data), key, .Key)
 	}
-	ctx := &Context{key}
-
-	sort_by_generic_cmp(data, proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
-		i, j := (^E)(lhs)^, (^E)(rhs)^
-
-		ctx := (^Context)(user_data)
-		a := ctx.key(i)
-		b := ctx.key(j)
-		switch {
-		case a < b: return .Less
-		case a > b: return .Greater
-		}
-		return .Equal
-	}, ctx)
 }
 
 reverse_sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
-	Context :: struct {
-		key: proc(E) -> K,
+	when size_of(E) != 0 {
+		gingersort(([]E)(data), key, .Key_Reverse)
 	}
-	ctx := &Context{key}
-
-	sort_by_generic_cmp(data, proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
-		i, j := (^E)(lhs)^, (^E)(rhs)^
-
-		ctx := (^Context)(user_data)
-		a := ctx.key(i)
-		b := ctx.key(j)
-		switch {
-		case a < b: return .Greater
-		case a > b: return .Less
-		}
-		return .Equal
-	}, ctx)
 }
 
 @(require_results)
