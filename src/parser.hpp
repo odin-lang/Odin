@@ -176,6 +176,9 @@ struct AstFile {
 	bool         allow_type;
 	bool         in_when_statement;
 
+	i32          nesting_depth; // the AST level of the node being parsed
+	i32          nesting_peak;  // the deepest AST level reached so far
+
 	isize total_file_decl_count;
 	isize delayed_decl_count;
 

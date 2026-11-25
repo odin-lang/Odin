@@ -109,6 +109,13 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_nesting_limit $COMMON_CHECK 2>&1 >/dev/null | grep -c "nested too deeply") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 $ODIN check ../test_issue_foreign_redeclaration -no-entry-point $COMMON_CHECK
 $ODIN check ../test_issue_foreign_import_attributes -no-entry-point $COMMON_CHECK
 
