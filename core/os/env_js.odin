@@ -13,8 +13,8 @@ build_env :: proc() -> (err: Error) {
 }
 
 @(require_results)
-_lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
-	return
+_lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, error: Error) {
+	return "", .Unsupported
 }
 
 _lookup_env_buf :: proc(buf: []u8, key: string) -> (value: string, error: Error) {
