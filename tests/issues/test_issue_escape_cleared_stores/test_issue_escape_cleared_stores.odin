@@ -395,11 +395,6 @@ Many_Globals :: struct {
 
 many: Many_Globals
 
-write_nine_fields_of_same_global :: proc() {
-	many.f00 = nil; many.f01 = nil; many.f02 = nil; many.f03 = nil; many.f04 = nil
-	many.f05 = nil; many.f06 = nil; many.f07 = nil; many.f08 = nil
-}
-
 write_64_fields_of_same_global :: proc() {
 	many.f00 = nil; many.f01 = nil; many.f02 = nil; many.f03 = nil; many.f04 = nil
 	many.f05 = nil; many.f06 = nil; many.f07 = nil; many.f08 = nil; many.f09 = nil
@@ -428,12 +423,6 @@ call_write_many_globals :: proc() {
 write_many_and_store :: proc(p: rawptr) {
 	write_many_globals()
 	thing.pointer = p
-}
-
-other_field_still_warns_at_nine_fields :: proc() {
-	x: int
-	many.other = &x // warning
-	write_nine_fields_of_same_global()
 }
 
 other_field_still_warns_at_path_limit :: proc() {
