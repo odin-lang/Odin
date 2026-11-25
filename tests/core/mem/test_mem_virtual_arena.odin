@@ -237,3 +237,86 @@ test_virtual_arena_free_all_racing_allocations :: proc(t: ^testing.T) {
 		testing.expect_value(t, count_byte(data, byte(i%255 + 1)), len(data))
 	}
 }
+
+@(test)
+test_virtual_arena_trim :: proc(t: ^testing.T) {
+	buffer := make([]byte, 16*mem.Megabyte)
+	defer delete(buffer)
+
+	for kind in virtual.Arena_Kind {
+		arena: virtual.Arena
+		err:   mem.Allocator_Error
+		switch kind {
+		case .Growing: err = virtual.arena_init_growing(&arena, 16*mem.Megabyte)
+		case .Static:  err = virtual.arena_init_static(&arena)
+		case .Buffer:  err = virtual.arena_init_buffer(&arena, buffer)
+		}
+		testing.expect_value(t, err, nil)
+		defer virtual.arena_destroy(&arena)
+		allocator := virtual.arena_allocator(&arena)
+
+		data, data_err := mem.alloc_bytes(4*mem.Megabyte, 16, allocator)
+		testing.expect_value(t, data_err, nil)
+		mem.set(raw_data(data), 0xAA, len(data))
+		virtual.arena_trim(&arena, 0)
+		testing.expectf(t, count_byte(data, 0xAA) == len(data), "%v arena: trimming lost memory in use", kind)
+
+		virtual.arena_free_all(&arena)
+		temp := virtual.arena_temp_begin(&arena)
+		testing.expectf(t, virtual.arena_trim(&arena, 0) == 0, "%v arena: trimmed while a temp was active", kind)
+		virtual.arena_temp_end(temp)
+
+		decommitted := virtual.arena_trim(&arena, 64*mem.Kilobyte)
+		if kind == .Buffer {
+			testing.expect_value(t, decommitted, 0)
+		} else {
+			committed := int(arena.curr_block.committed)
+			testing.expectf(t, decommitted > 0, "%v arena: nothing was decommitted", kind)
+			testing.expectf(t, committed >= 64*mem.Kilobyte && committed < 64*mem.Kilobyte + mem.PAGE_SIZE, "%v arena: %d committed after keeping 64 KiB", kind, committed)
+		}
+
+		again, again_err := mem.alloc_bytes(4*mem.Megabyte, 16, allocator)
+		testing.expect_value(t, again_err, nil)
+		testing.expectf(t, count_byte(again, 0) == len(again), "%v arena: memory committed again is not zero", kind)
+		mem.set(raw_data(again), 0x55, len(again))
+		testing.expectf(t, count_byte(again, 0x55) == len(again), "%v arena: memory committed again is not writable", kind)
+	}
+}
+
+@(test)
+test_virtual_arena_trim_racing_allocations :: proc(t: ^testing.T) {
+	for kind in ([]virtual.Arena_Kind{.Growing, .Static}) {
+		arena: virtual.Arena
+		testing.expect_value(t, init_virtual_arena(&arena, kind, nil), nil)
+		defer virtual.arena_destroy(&arena)
+		allocator := virtual.arena_allocator(&arena)
+
+		// The racers never write to their memory: it may be decommitted under them.
+		stop:    bool
+		racers:  [ARENA_RACERS]Arena_Racer
+		threads: [ARENA_RACERS]^thread.Thread
+		for &r, i in racers {
+			r.allocator = allocator
+			r.stop      = &stop
+			threads[i]  = thread.create_and_start_with_poly_data(&r, arena_racer_proc)
+		}
+		for _ in 0..<100 {
+			virtual.arena_free_all(&arena)
+			virtual.arena_trim(&arena, 0)
+		}
+		sync.atomic_store(&stop, true)
+		thread.join_multiple(..threads[:])
+		for r, i in racers {
+			thread.destroy(threads[i])
+			testing.expect_value(t, r.failures, 0)
+		}
+
+		virtual.arena_free_all(&arena)
+		virtual.arena_trim(&arena, 0)
+		data, err := mem.alloc_bytes(2*mem.Megabyte, 16, allocator)
+		testing.expect_value(t, err, nil)
+		testing.expectf(t, count_byte(data, 0) == len(data), "%v arena: memory committed again is not zero", kind)
+		mem.set(raw_data(data), 0x55, len(data))
+		testing.expectf(t, count_byte(data, 0x55) == len(data), "%v arena: memory committed again is not writable", kind)
+	}
+}
