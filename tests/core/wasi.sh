@@ -54,6 +54,7 @@ NORMAL_PACKAGES="
 	text/match
 	text/regex
 	text/scanner
+	time
 	unicode
 "
 
@@ -73,7 +74,7 @@ FAILED=""
 
 run_package() {
 	echo "tests/core/$1"
-	if ./odin build "tests/core/$1" $FLAGS $2 -out:"$TEMP/test.wasm" && wasmtime run --dir "$ROOT::$ROOT" --dir "$TEMP::/tmp" --dir "$TEMP::." "$TEMP/test.wasm"; then
+	if ./odin build "tests/core/$1" $FLAGS $2 -out:"$TEMP/test.wasm" && wasmtime run --dir "$ROOT::$ROOT" --dir /usr/share/zoneinfo::/usr/share/zoneinfo --dir "$TEMP::/tmp" --dir "$TEMP::." "$TEMP/test.wasm"; then
 		return 0
 	fi
 	FAILED="$FAILED $1"
