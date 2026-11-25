@@ -37,7 +37,13 @@ foreign wasi {
 
 	@(private ="file")
 	random_get :: proc(buf: [^]u8, buf_len: u32) -> u16 ---
+
+	@(private="file")
+	clock_time_get :: proc(id: u32, precision: u64, time: ^u64) -> u16 ---
 }
+
+@(private="file")
+CLOCK_MONOTONIC :: 1
 
 _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 	iov := ciovec_t{raw_data(data), u32(len(data))}
@@ -50,6 +56,14 @@ _rand_bytes :: proc "contextless" (dst: []byte) {
 	if errno := random_get(raw_data(dst), u32(len(dst))); errno != 0 {
 		panic_contextless("base/runtime: wasi.random_get failed")
 	}
+}
+
+_read_cycle_counter :: proc "contextless" () -> i64 {
+	ns: u64
+	if clock_time_get(CLOCK_MONOTONIC, 0, &ns) != 0 {
+		return 0
+	}
+	return i64(ns)
 }
 
 _wasi_setup_args :: proc() {
