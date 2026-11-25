@@ -328,6 +328,23 @@ gb_internal LLVMValueRef llvm_const_slice(lbModule *m, lbValue data, lbValue len
 
 	return llvm_const_slice_internal(m, data.value, len.value);
 }
+gb_internal LLVMValueRef llvm_const_slice_with_type(lbModule *m, Type *t, LLVMValueRef data, LLVMValueRef len) {
+	GB_ASSERT(is_type_slice(t));
+	if (build_context.metrics.ptr_size < build_context.metrics.int_size) {
+		LLVMValueRef values[3] = {
+			data,
+			LLVMConstNull(lb_type(m, t_u32)),
+			len,
+		};
+		return llvm_const_named_struct_internal(m, lb_type(m, t), values, 3);
+	} else {
+		LLVMValueRef values[2] = {
+			data,
+			len,
+		};
+		return llvm_const_named_struct_internal(m, lb_type(m, t), values, 2);
+	}
+}
 
 
 
@@ -1270,9 +1287,8 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				{
 					LLVMValueRef ptr = g.value;
 					LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
-					LLVMValueRef values[2] = {ptr, len};
 
-					res.value = llvm_const_named_struct(m, original_type, values, 2);
+					res.value = llvm_const_slice_with_type(m, original_type, ptr, len);
 					return res;
 				}
 			}
