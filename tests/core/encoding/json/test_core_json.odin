@@ -1458,7 +1458,9 @@ mjson_newline_before_colon :: proc(t: ^testing.T) {
 		v, e := json.parse(transmute([]u8)string("{\"r\"\n:5}"), spec = .SJSON, allocator = context.temp_allocator)
 		testing.expectf(t, e == nil, "issue input: got %v", e)
 		if obj, ok := v.(json.Object); ok {
-			testing.expect_value(t, obj["r"], json.Integer(5))
+			integer, is_integer := obj["r"].(json.Integer)
+			testing.expect(t, is_integer, "issue input: r is not an integer")
+			testing.expect_value(t, integer, json.Integer(5))
 		} else {
 			testing.expect(t, false, "issue input: not an object")
 		}
