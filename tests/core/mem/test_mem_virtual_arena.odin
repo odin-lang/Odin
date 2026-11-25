@@ -303,6 +303,9 @@ test_virtual_arena_trim :: proc(t: ^testing.T) {
 
 @(test)
 test_virtual_arena_trim_racing_allocations :: proc(t: ^testing.T) {
+	when !thread.IS_SUPPORTED {
+		return
+	}
 	for kind in ([]virtual.Arena_Kind{.Growing, .Static}) {
 		arena: virtual.Arena
 		testing.expect_value(t, init_virtual_arena(&arena, kind, nil), nil)
