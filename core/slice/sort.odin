@@ -201,11 +201,7 @@ sort_by_generic_cmp :: proc(data: $T/[]$E, cmp: Generic_Cmp, user_data: rawptr) 
 /*
 Sorts a slice while maintaining the relative order of elements with the same key. For an example see either `stable_sort_by` or `stable_sort_by_cmp`.
 */
-stable_sort :: proc(data: $T/[]$E) where ORD(E) {
-	when size_of(E) != 0 {
-		gingersort(([]E)(data), struct{}{}, .Ordered)
-	}
-}
+stable_sort :: sort
 
 /*
 Sorts a slice while maintaining the relative order of elements with the same key. Two items `i` and `j` are ordered if `less(i, j)` returns `true`.
@@ -234,23 +230,7 @@ Example:
 Output:
 	My name is Bill 
 */
-stable_sort_by :: proc{
-	stable_sort_by_runtime,
-	stable_sort_by_constant where ODIN_OPTIMIZATION_MODE >= .Speed,
-}
-
-stable_sort_by_runtime :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
-	when size_of(E) != 0 {
-		gingersort(([]E)(data), less, .Less)
-	}
-}
-
-stable_sort_by_constant :: proc(data: $T/[]$E, $less: proc(i, j: E) -> bool) {
-	when size_of(E) != 0 {
-		Less :: distinct proc(i, j: E) -> bool
-		gingersort(([]E)(data), Less(less), .Less)
-	}
-}
+stable_sort_by :: sort_by
 
 
 /*
@@ -280,23 +260,7 @@ Example:
 Output:
 	My name is Bill 
 */
-stable_sort_by_cmp :: proc{
-	stable_sort_by_cmp_runtime,
-	stable_sort_by_cmp_constant where ODIN_OPTIMIZATION_MODE >= .Speed,
-}
-
-stable_sort_by_cmp_runtime :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
-	when size_of(E) != 0 {
-		gingersort(([]E)(data), cmp, .Cmp)
-	}
-}
-
-stable_sort_by_cmp_constant :: proc(data: $T/[]$E, $cmp: proc(i, j: E) -> Ordering) {
-	when size_of(E) != 0 {
-		Cmp :: distinct proc(i, j: E) -> Ordering
-		gingersort(([]E)(data), Cmp(cmp), .Cmp)
-	}
-}
+stable_sort_by_cmp :: sort_by_cmp
 
 @(require_results)
 is_sorted :: proc(array: $T/[]$E) -> bool where ORD(E) {
