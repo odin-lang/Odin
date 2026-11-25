@@ -145,6 +145,29 @@ test_read_cycle_counter :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_overflow_mul_i128 :: proc(t: ^testing.T) {
+	Case :: struct {
+		a, b, product: i128,
+		overflow:      bool,
+	}
+	cases := [?]Case{
+		{0,                min(i128),     0,              false},
+		{-1,               -1,            1,              false},
+		{max(i128),        -1,            min(i128) + 1,  false},
+		{min(i128),        1,             min(i128),      false},
+		{min(i128),        -1,            min(i128),      true},
+		{max(i128),        2,             -2,             true},
+		{i128(1) << 63,    i128(1) << 63, i128(1) << 126, false},
+		{i128(1) << 64,    i128(1) << 63, min(i128),      true},
+		{-(i128(1) << 64), i128(1) << 63, min(i128),      false},
+	}
+	for c in cases {
+		product, overflow := intrinsics.overflow_mul(c.a, c.b)
+		testing.expectf(t, product == c.product && overflow == c.overflow, "overflow_mul(%v, %v) = %v, %v", c.a, c.b, product, overflow)
+	}
+}
+
+@(test)
 test_init_cap_map_dynarray :: proc(t: ^testing.T) {
 	m1 := make(map[int]string)
 	defer delete(m1)

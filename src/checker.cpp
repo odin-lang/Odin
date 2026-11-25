@@ -3513,6 +3513,8 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("__ashlti3"),
 		str_lit("__multi3"),
 		str_lit("__lshrti3"),
+		str_lit("__ashrti3"),
+		str_lit("__muloti4"),
 	);
 
 	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_rtti,
