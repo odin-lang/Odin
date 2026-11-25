@@ -107,9 +107,21 @@ sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator, loc := 
 
 // sort_by sorts a slice with a given procedure to test whether two values are ordered "i < j"
 // This sort is not guaranteed to be stable
-sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
+sort_by :: proc{
+	sort_by_runtime,
+	sort_by_constant where ODIN_OPTIMIZATION_MODE >= .Speed,
+}
+
+sort_by_runtime :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 	when size_of(E) != 0 {
 		gingersort(([]E)(data), less, .Less)
+	}
+}
+
+sort_by_constant :: proc(data: $T/[]$E, $less: proc(i, j: E) -> bool) {
+	when size_of(E) != 0 {
+		Less :: distinct proc(i, j: E) -> bool
+		gingersort(([]E)(data), Less(less), .Less)
 	}
 }
 
@@ -153,9 +165,21 @@ sort_by_with_indices_with_data :: proc(data: $T/[]$E, less: proc(i, j: E, user_d
 	return indices
 }
 
-sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
+sort_by_cmp :: proc{
+	sort_by_cmp_runtime,
+	sort_by_cmp_constant where ODIN_OPTIMIZATION_MODE >= .Speed,
+}
+
+sort_by_cmp_runtime :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
 	when size_of(E) != 0 {
 		gingersort(([]E)(data), cmp, .Cmp)
+	}
+}
+
+sort_by_cmp_constant :: proc(data: $T/[]$E, $cmp: proc(i, j: E) -> Ordering) {
+	when size_of(E) != 0 {
+		Cmp :: distinct proc(i, j: E) -> Ordering
+		gingersort(([]E)(data), Cmp(cmp), .Cmp)
 	}
 }
 
@@ -210,9 +234,21 @@ Example:
 Output:
 	My name is Bill 
 */
-stable_sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
+stable_sort_by :: proc{
+	stable_sort_by_runtime,
+	stable_sort_by_constant where ODIN_OPTIMIZATION_MODE >= .Speed,
+}
+
+stable_sort_by_runtime :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 	when size_of(E) != 0 {
 		gingersort(([]E)(data), less, .Less)
+	}
+}
+
+stable_sort_by_constant :: proc(data: $T/[]$E, $less: proc(i, j: E) -> bool) {
+	when size_of(E) != 0 {
+		Less :: distinct proc(i, j: E) -> bool
+		gingersort(([]E)(data), Less(less), .Less)
 	}
 }
 
@@ -244,9 +280,21 @@ Example:
 Output:
 	My name is Bill 
 */
-stable_sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
+stable_sort_by_cmp :: proc{
+	stable_sort_by_cmp_runtime,
+	stable_sort_by_cmp_constant where ODIN_OPTIMIZATION_MODE >= .Speed,
+}
+
+stable_sort_by_cmp_runtime :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
 	when size_of(E) != 0 {
 		gingersort(([]E)(data), cmp, .Cmp)
+	}
+}
+
+stable_sort_by_cmp_constant :: proc(data: $T/[]$E, $cmp: proc(i, j: E) -> Ordering) {
+	when size_of(E) != 0 {
+		Cmp :: distinct proc(i, j: E) -> Ordering
+		gingersort(([]E)(data), Cmp(cmp), .Cmp)
 	}
 }
 
@@ -291,15 +339,39 @@ reverse_sort :: proc(data: $T/[]$E) where ORD(E) {
 }
 
 
-reverse_sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
+reverse_sort_by :: proc{
+	reverse_sort_by_runtime,
+	reverse_sort_by_constant where ODIN_OPTIMIZATION_MODE >= .Speed,
+}
+
+reverse_sort_by_runtime :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 	when size_of(E) != 0 {
 		gingersort(([]E)(data), less, .Less_Reverse)
 	}
 }
 
-reverse_sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
+reverse_sort_by_constant :: proc(data: $T/[]$E, $less: proc(i, j: E) -> bool) {
+	when size_of(E) != 0 {
+		Less :: distinct proc(i, j: E) -> bool
+		gingersort(([]E)(data), Less(less), .Less_Reverse)
+	}
+}
+
+reverse_sort_by_cmp :: proc{
+	reverse_sort_by_cmp_runtime,
+	reverse_sort_by_cmp_constant where ODIN_OPTIMIZATION_MODE >= .Speed,
+}
+
+reverse_sort_by_cmp_runtime :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
 	when size_of(E) != 0 {
 		gingersort(([]E)(data), cmp, .Cmp_Reverse)
+	}
+}
+
+reverse_sort_by_cmp_constant :: proc(data: $T/[]$E, $cmp: proc(i, j: E) -> Ordering) {
+	when size_of(E) != 0 {
+		Cmp :: distinct proc(i, j: E) -> Ordering
+		gingersort(([]E)(data), Cmp(cmp), .Cmp_Reverse)
 	}
 }
 
