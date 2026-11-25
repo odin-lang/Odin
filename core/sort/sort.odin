@@ -2,9 +2,11 @@
 package sort
 
 import "core:mem"
+import "core:slice"
 import "base:intrinsics"
 
 _ :: intrinsics
+_ :: slice
 ORD :: intrinsics.type_is_ordered
 
 /*
@@ -284,6 +286,10 @@ Output:
 
 */
 rotate :: proc(it: Interface, a, m, b: int) {
+	if a == m || m == b {
+		return
+	}
+
 	i := m - a
 	j := b - m
 
@@ -292,8 +298,8 @@ rotate :: proc(it: Interface, a, m, b: int) {
 			swap_range(it, m-i, m, j)
 			i -= j
 		} else {
-			swap_range(it, m-i, m+j-1, i)
-			j -= 1
+			swap_range(it, m-i, m+j-i, i)
+			j -= i
 		}
 	}
 	swap_range(it, m-i, m, i)
@@ -561,7 +567,8 @@ bubble_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 }
 
 /*
-Sorts a slice in place using quick sort, ordered by the given comparator.
+Sorts a slice in place, ordered by the given comparator.
+It is the same sort as `slice.sort_by`.
 
 The comparator `f` is called with two elements and must return a negative
 number if the first is less than the second, `0` if they are equal, and a
@@ -589,35 +596,21 @@ Output:
 */
 quick_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	assert(f != nil)
-	a := array
-	n := len(a)
-	if n < 2 {
-		return
+	sort_by_int_cmp(array, f)
+}
+
+@(private)
+sort_by_int_cmp :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
+	less :: proc(a, b: T, user_data: rawptr) -> bool {
+		f := (proc(T, T) -> int)(user_data)
+		return f(a, b) < 0
 	}
-
-	p := a[n/2]
-	i, j := 0, n-1
-
-	loop: for {
-		for f(a[i], p) < 0 { i += 1 }
-		for f(p, a[j]) < 0 { j -= 1 }
-
-		if i >= j {
-			break loop
-		}
-
-		a[i], a[j] = a[j], a[i]
-		i += 1
-		j -= 1
-	}
-
-	quick_sort_proc(a[0:i], f)
-	quick_sort_proc(a[i:n], f)
+	slice.sort_by_with_data(array, less, rawptr(f))
 }
 
 /*
-Sorts a slice of ordered elements in place using quick sort, in ascending
-order.
+Sorts a slice of ordered elements in place, in ascending order.
+It is the same sort as `slice.sort`.
 
 Inputs:
 - array: The slice to sort.
@@ -639,30 +632,7 @@ Output:
 
 */
 quick_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
-	a := array
-	n := len(a)
-	if n < 2 {
-		return
-	}
-
-	p := a[n/2]
-	i, j := 0, n-1
-
-	loop: for {
-		for a[i] < p { i += 1 }
-		for p < a[j] { j -= 1 }
-
-		if i >= j {
-			break loop
-		}
-
-		a[i], a[j] = a[j], a[i]
-		i += 1
-		j -= 1
-	}
-
-	quick_sort(a[0:i])
-	quick_sort(a[i:n])
+	slice.sort(array)
 }
 
 _log2 :: proc(x: int) -> int {
@@ -674,7 +644,8 @@ _log2 :: proc(x: int) -> int {
 }
 
 /*
-Sorts a slice in place using merge sort, ordered by the given comparator.
+Sorts a slice in place, ordered by the given comparator.
+It is the same sort as `slice.stable_sort_by`.
 
 The comparator `f` is called with two elements and must return a negative
 number if the first is less than the second, `0` if they are equal, and a
@@ -701,49 +672,13 @@ Output:
 
 */
 merge_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
-	merge :: proc(a: A, start, mid, end: int, f: proc(T, T) -> int) {
-		s, m := start, mid
-
-		s2 := m + 1
-		if f(a[m], a[s2]) <= 0 {
-			return
-		}
-
-		for s <= m && s2 <= end {
-			if f(a[s], a[s2]) <= 0 {
-				s += 1
-			} else {
-				v := a[s2]
-				i := s2
-
-				for i != s {
-					a[i] = a[i-1]
-					i -= 1
-				}
-				a[s] = v
-
-				s  += 1
-				m  += 1
-				s2 += 1
-			}
-		}
-	}
-	internal_sort :: proc(a: A, l, r: int, f: proc(T, T) -> int) {
-		if l < r {
-			m := l + (r - l) / 2
-
-			internal_sort(a, l, m, f)
-			internal_sort(a, m+1, r, f)
-			merge(a, l, m, r, f)
-		}
-	}
-
-	internal_sort(array, 0, len(array)-1, f)
+	assert(f != nil)
+	sort_by_int_cmp(array, f)
 }
 
 /*
-Sorts a slice of ordered elements in place using merge sort, in ascending
-order.
+Sorts a slice of ordered elements in place, in ascending order.
+It is the same sort as `slice.stable_sort`.
 
 Inputs:
 - array: The slice to sort.
@@ -765,44 +700,7 @@ Output:
 
 */
 merge_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
-	merge :: proc(a: A, start, mid, end: int) {
-		s, m := start, mid
-
-		s2 := m + 1
-		if a[m] <= a[s2] {
-			return
-		}
-
-		for s <= m && s2 <= end {
-			if a[s] <= a[s2] {
-				s += 1
-			} else {
-				v := a[s2]
-				i := s2
-
-				for i != s {
-					a[i] = a[i-1]
-					i -= 1
-				}
-				a[s] = v
-
-				s  += 1
-				m  += 1
-				s2 += 1
-			}
-		}
-	}
-	internal_sort :: proc(a: A, l, r: int) {
-		if l < r {
-			m := l + (r - l) / 2
-
-			internal_sort(a, l, m)
-			internal_sort(a, m+1, r)
-			merge(a, l, m, r)
-		}
-	}
-
-	internal_sort(array, 0, len(array)-1)
+	slice.sort(array)
 }
 
 /*
