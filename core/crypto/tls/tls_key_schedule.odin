@@ -47,6 +47,8 @@ Ephemeral_Keys :: struct {
 
 @(require_results)
 init_ephemeral_keys :: proc(keys: ^Ephemeral_Keys, supported_groups: []Named_Group) -> bool {
+	clear_ephemeral_keys(keys)
+
 	did_generate: bool
 	for group in supported_groups {
 		switch group {
