@@ -4010,7 +4010,7 @@ gb_internal bool lb_bounds_check_location_from_handler(LLVMTargetDataRef td, LLV
 }
 
 // NOTE(bill): Every target passes the file as one argument, by pointer or as a value, followed by the line and column.
-// The `_loc` procedures take a `Source_Code_Location` instead.
+// They are read as the fields of a `Source_Code_Location`, which the `_loc` procedures take instead.
 gb_internal void lb_bounds_check_location_from_call(LLVMTargetDataRef td, LLVMValueRef call, bool takes_location, lbBoundsCheckSite *site) {
 	if (LLVMGetNumArgOperands(call) < 3) {
 		return;
@@ -4025,25 +4025,11 @@ gb_internal void lb_bounds_check_location_from_call(LLVMTargetDataRef td, LLVMVa
 		lb_const_leaves_of_value(ev, first, 0, &leaves, 0);
 	}
 
-	if (takes_location) {
-		lb_location_from_leaves(leaves, site);
-		return;
+	if (!takes_location) {
+		lb_const_leaves_of_value(ev, LLVMGetOperand(call, 1), type_offset_of(t_source_code_location, 1), &leaves, 0);
+		lb_const_leaves_of_value(ev, LLVMGetOperand(call, 2), type_offset_of(t_source_code_location, 2), &leaves, 0);
 	}
-	site->file = lb_const_string_at(leaves, 0);
-
-	LLVMValueRef line   = LLVMGetOperand(call, 1);
-	LLVMValueRef column = LLVMGetOperand(call, 2);
-	if (!LLVMIsAConstantInt(line)) {
-		return;
-	}
-	if (!LLVMIsAConstantInt(column)) {
-		return;
-	}
-	if (LLVMGetIntTypeWidth(LLVMTypeOf(line)) != 32) {
-		return;
-	}
-	site->line   = cast(i32)LLVMConstIntGetSExtValue(line);
-	site->column = cast(i32)LLVMConstIntGetSExtValue(column);
+	lb_location_from_leaves(leaves, site);
 }
 
 gb_internal void lb_collect_bounds_checks(lbModule *m, Array<lbBoundsCheckSite> *sites) {
