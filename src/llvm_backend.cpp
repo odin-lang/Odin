@@ -4286,6 +4286,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lb_do_build_diagnostics(gen);
 	}
 
+	if (build_context.export_bounds_checks_file.len > 0) {
+		TIME_SECTION("LLVM Export Bounds Checks");
+		lb_export_bounds_checks(gen);
+	}
+
 	llvm_error = nullptr;
 	defer (LLVMDisposeMessage(llvm_error));
 

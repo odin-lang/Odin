@@ -3646,6 +3646,538 @@ gb_internal void lb_do_build_diagnostics(lbGenerator *gen) {
 	gb_printf("------------------------------------------------------------------------------------------\n\n");
 }
 
+
+struct lbBoundsCheckSite {
+	String file;
+	i32    line;
+	i32    column;
+	String kind;
+	String procedure;
+	isize  count;
+};
+
+gb_internal void json_escape_string(gbString *s, String str);
+
+gb_internal String lb_bounds_check_kind(String const &name) {
+	struct Handler {
+		String prefix;
+		String kind;
+	};
+	gb_local_persist Handler const handlers[] = {
+		{str_lit("runtime::bounds_check_error"),               str_lit("index")},
+		{str_lit("runtime::matrix_bounds_check_error"),        str_lit("matrix")},
+		{str_lit("runtime::slice_expr_error"),                 str_lit("slice")},
+		{str_lit("runtime::slice_handle_error"),               str_lit("slice")},
+		{str_lit("runtime::multi_pointer_slice_expr_error"),   str_lit("slice")},
+		{str_lit("runtime::multi_pointer_slice_handle_error"), str_lit("slice")},
+	};
+	for (Handler const &h : handlers) {
+		if (string_starts_with(name, h.prefix)) {
+			return h.kind;
+		}
+	}
+	return {};
+}
+
+gb_internal String lb_value_name(LLVMValueRef value) {
+	size_t len = 0;
+	char const *name = LLVMGetValueName2(value, &len);
+	return make_string(cast(u8 const *)name, cast(isize)len);
+}
+
+// NOTE(bill): The location of a bounds check is found by evaluating the constants it is made of, through the memory they are stored in.
+// The parameters of the procedure a call goes to stand for the call's arguments.
+#define LB_CONST_EVAL_MAX_DEPTH 16
+
+struct lbConstEval {
+	LLVMTargetDataRef td;
+	LLVMValueRef      call;
+};
+
+struct lbConstLeaf {
+	i64          offset;
+	LLVMValueRef value;
+};
+
+gb_internal LLVMValueRef lb_const_eval_argument(lbConstEval const &ev, LLVMValueRef param) {
+	if (ev.call == nullptr) {
+		return nullptr;
+	}
+	LLVMValueRef proc = LLVMGetParamParent(param);
+	if (proc != LLVMGetCalledValue(ev.call)) {
+		return nullptr;
+	}
+
+	unsigned param_count = LLVMCountParams(proc);
+	unsigned arg_count   = LLVMGetNumArgOperands(ev.call);
+	for (unsigned i = 0; i < param_count && i < arg_count; i++) {
+		if (LLVMGetParam(proc, i) == param) {
+			return LLVMGetOperand(ev.call, i);
+		}
+	}
+	return nullptr;
+}
+
+gb_internal bool lb_member_offset(LLVMTargetDataRef td, LLVMTypeRef *type, i64 index, i64 *offset) {
+	switch (LLVMGetTypeKind(*type)) {
+	case LLVMStructTypeKind:
+		*offset += cast(i64)LLVMOffsetOfElement(td, *type, cast(unsigned)index);
+		*type    = LLVMStructGetTypeAtIndex(*type, cast(unsigned)index);
+		return true;
+	case LLVMArrayTypeKind:
+	case LLVMVectorTypeKind:
+		*type    = LLVMGetElementType(*type);
+		*offset += index * cast(i64)LLVMABISizeOfType(td, *type);
+		return true;
+	}
+	return false;
+}
+
+gb_internal bool lb_gep_constant_offset(LLVMTargetDataRef td, LLVMValueRef value, i64 *offset) {
+	bool is_gep_inst = LLVMIsAGetElementPtrInst(value) != nullptr;
+	bool is_gep_expr = LLVMIsAConstantExpr(value) && LLVMGetConstOpcode(value) == LLVMGetElementPtr;
+	if (!is_gep_inst && !is_gep_expr) {
+		return false;
+	}
+
+	LLVMTypeRef type = LLVMGetGEPSourceElementType(value);
+	unsigned count = LLVMGetNumOperands(value);
+
+	i64 total = 0;
+	for (unsigned i = 1; i < count; i++) {
+		LLVMValueRef index = LLVMGetOperand(value, i);
+		if (!LLVMIsAConstantInt(index)) {
+			return false;
+		}
+		i64 k = LLVMConstIntGetSExtValue(index);
+		if (i == 1) {
+			total += k * cast(i64)LLVMABISizeOfType(td, type);
+		} else if (!lb_member_offset(td, &type, k, &total)) {
+			return false;
+		}
+	}
+	*offset = total;
+	return true;
+}
+
+gb_internal void lb_const_leaves_of_value (lbConstEval const &ev, LLVMValueRef value, i64 offset, Array<lbConstLeaf> *leaves, isize depth);
+gb_internal void lb_const_leaves_of_memory(lbConstEval const &ev, LLVMValueRef ptr,   i64 offset, Array<lbConstLeaf> *leaves, isize depth);
+
+gb_internal void lb_const_leaves_of_member(lbConstEval const &ev, LLVMValueRef inst, i64 offset, Array<lbConstLeaf> *leaves, isize depth) {
+	LLVMValueRef aggregate     = LLVMGetOperand(inst, 0);
+	LLVMTypeRef  member_type   = LLVMTypeOf(aggregate);
+	i64          member_offset = 0;
+
+	unsigned index_count = LLVMGetNumIndices(inst);
+	unsigned const *indices = LLVMGetIndices(inst);
+	for (unsigned i = 0; i < index_count; i++) {
+		if (!lb_member_offset(ev.td, &member_type, indices[i], &member_offset)) {
+			return;
+		}
+	}
+	i64 member_end = member_offset + cast(i64)LLVMABISizeOfType(ev.td, member_type);
+
+	auto aggregate_leaves = array_make<lbConstLeaf>(temporary_allocator(), 0, 8);
+	lb_const_leaves_of_value(ev, aggregate, 0, &aggregate_leaves, depth+1);
+
+	if (LLVMIsAExtractValueInst(inst)) {
+		for (lbConstLeaf const &leaf : aggregate_leaves) {
+			if (member_offset <= leaf.offset && leaf.offset < member_end) {
+				array_add(leaves, lbConstLeaf{offset + leaf.offset - member_offset, leaf.value});
+			}
+		}
+		return;
+	}
+
+	for (lbConstLeaf const &leaf : aggregate_leaves) {
+		if (leaf.offset < member_offset || member_end <= leaf.offset) {
+			array_add(leaves, lbConstLeaf{offset + leaf.offset, leaf.value});
+		}
+	}
+	lb_const_leaves_of_value(ev, LLVMGetOperand(inst, 1), offset + member_offset, leaves, depth+1);
+}
+
+gb_internal void lb_const_leaves_of_value(lbConstEval const &ev, LLVMValueRef value, i64 offset, Array<lbConstLeaf> *leaves, isize depth) {
+	if (value == nullptr) {
+		return;
+	}
+	if (depth > LB_CONST_EVAL_MAX_DEPTH) {
+		return;
+	}
+
+	if (LLVMIsAConstantInt(value) || LLVMIsAGlobalValue(value)) {
+		array_add(leaves, lbConstLeaf{offset, value});
+		return;
+	}
+
+	if (LLVMIsAArgument(value)) {
+		lbConstEval caller = {ev.td, nullptr};
+		lb_const_leaves_of_value(caller, lb_const_eval_argument(ev, value), offset, leaves, depth+1);
+		return;
+	}
+
+	LLVMOpcode cast_op = {};
+	if (LLVMIsAConstantExpr(value)) {
+		cast_op = LLVMGetConstOpcode(value);
+	} else if (LLVMIsACastInst(value)) {
+		cast_op = LLVMGetInstructionOpcode(value);
+	}
+	switch (cast_op) {
+	case LLVMPtrToInt:
+	case LLVMIntToPtr:
+	case LLVMBitCast:
+		lb_const_leaves_of_value(ev, LLVMGetOperand(value, 0), offset, leaves, depth+1);
+		return;
+	}
+
+	if (LLVMIsAConstantStruct(value) || LLVMIsAConstantArray(value) || LLVMIsAConstantVector(value)) {
+		unsigned count = LLVMGetNumOperands(value);
+		for (unsigned i = 0; i < count; i++) {
+			LLVMTypeRef type = LLVMTypeOf(value);
+			i64 member_offset = offset;
+			lb_member_offset(ev.td, &type, i, &member_offset);
+			lb_const_leaves_of_value(ev, LLVMGetOperand(value, i), member_offset, leaves, depth+1);
+		}
+		return;
+	}
+
+	if (LLVMIsALoadInst(value)) {
+		lb_const_leaves_of_memory(ev, LLVMGetOperand(value, 0), offset, leaves, depth+1);
+		return;
+	}
+
+	if (LLVMIsAExtractValueInst(value) || LLVMIsAInsertValueInst(value)) {
+		lb_const_leaves_of_member(ev, value, offset, leaves, depth);
+	}
+}
+
+gb_internal void lb_const_leaves_of_slot(lbConstEval const &ev, LLVMValueRef addr, i64 offset, Array<lbConstLeaf> *leaves, isize depth) {
+	if (depth > LB_CONST_EVAL_MAX_DEPTH) {
+		return;
+	}
+	for (LLVMUseRef use = LLVMGetFirstUse(addr); use != nullptr; use = LLVMGetNextUse(use)) {
+		LLVMValueRef user = LLVMGetUser(use);
+
+		if (LLVMIsAStoreInst(user) && LLVMGetOperand(user, 1) == addr) {
+			lb_const_leaves_of_value(ev, LLVMGetOperand(user, 0), offset, leaves, depth+1);
+			continue;
+		}
+
+		i64 gep_offset = 0;
+		if (LLVMGetOperand(user, 0) == addr && lb_gep_constant_offset(ev.td, user, &gep_offset)) {
+			lb_const_leaves_of_slot(ev, user, offset + gep_offset, leaves, depth+1);
+			continue;
+		}
+
+		if (LLVMIsACallInst(user) && LLVMGetOperand(user, 0) == addr) {
+			String callee = lb_value_name(LLVMGetCalledValue(user));
+			if (string_starts_with(callee, str_lit("llvm.memcpy"))) {
+				lb_const_leaves_of_memory(ev, LLVMGetOperand(user, 1), offset, leaves, depth+1);
+			}
+		}
+	}
+}
+
+gb_internal void lb_const_leaves_of_memory(lbConstEval const &ev, LLVMValueRef ptr, i64 offset, Array<lbConstLeaf> *leaves, isize depth) {
+	if (ptr == nullptr) {
+		return;
+	}
+	if (depth > LB_CONST_EVAL_MAX_DEPTH) {
+		return;
+	}
+
+	if (LLVMIsAGlobalVariable(ptr)) {
+		lb_const_leaves_of_value(ev, LLVMGetInitializer(ptr), offset, leaves, depth+1);
+		return;
+	}
+
+	if (LLVMIsAAllocaInst(ptr)) {
+		lb_const_leaves_of_slot(ev, ptr, offset, leaves, depth+1);
+		return;
+	}
+
+	if (LLVMIsAArgument(ptr)) {
+		lbConstEval caller = {ev.td, nullptr};
+		lb_const_leaves_of_memory(caller, lb_const_eval_argument(ev, ptr), offset, leaves, depth+1);
+		return;
+	}
+
+	i64 gep_offset = 0;
+	if (lb_gep_constant_offset(ev.td, ptr, &gep_offset)) {
+		lb_const_leaves_of_memory(ev, LLVMGetOperand(ptr, 0), offset - gep_offset, leaves, depth+1);
+	}
+}
+
+// Only when every store at the offset agrees
+gb_internal LLVMValueRef lb_const_leaf_at(Array<lbConstLeaf> const &leaves, i64 offset) {
+	LLVMValueRef found = nullptr;
+	for (lbConstLeaf const &leaf : leaves) {
+		if (leaf.offset != offset) {
+			continue;
+		}
+		if (found != nullptr && found != leaf.value) {
+			return nullptr;
+		}
+		found = leaf.value;
+	}
+	return found;
+}
+
+gb_internal String lb_const_string_at(Array<lbConstLeaf> const &leaves, i64 offset) {
+	LLVMValueRef data = lb_const_leaf_at(leaves, offset);
+	if (data == nullptr) {
+		return {};
+	}
+	if (!LLVMIsAGlobalVariable(data)) {
+		return {};
+	}
+	LLVMValueRef init = LLVMGetInitializer(data);
+	if (init == nullptr) {
+		return {};
+	}
+	if (!LLVMIsAConstantDataSequential(init)) {
+		return {};
+	}
+
+	size_t size = 0;
+	char const *text = LLVMGetAsString(init, &size);
+	isize count = cast(isize)size;
+
+	i64 len_offset = gb_max(build_context.ptr_size, build_context.int_size);
+	LLVMValueRef len = lb_const_leaf_at(leaves, offset + len_offset);
+	if (len != nullptr && LLVMIsAConstantInt(len)) {
+		isize len_value = cast(isize)LLVMConstIntGetZExtValue(len);
+		count = gb_min(count, len_value);
+	}
+	return copy_string(heap_allocator(), make_string(cast(u8 const *)text, count));
+}
+
+gb_internal i32 lb_const_i32_at(Array<lbConstLeaf> const &leaves, i64 offset) {
+	LLVMValueRef value = lb_const_leaf_at(leaves, offset);
+	if (value == nullptr) {
+		return 0;
+	}
+	if (!LLVMIsAConstantInt(value)) {
+		return 0;
+	}
+	return cast(i32)LLVMConstIntGetSExtValue(value);
+}
+
+gb_internal bool lb_location_from_leaves(Array<lbConstLeaf> const &leaves, lbBoundsCheckSite *site) {
+	i32 line = lb_const_i32_at(leaves, type_offset_of(t_source_code_location, 1));
+	if (line == 0) {
+		return false;
+	}
+	site->file   = lb_const_string_at(leaves, 0);
+	site->line   = line;
+	site->column = lb_const_i32_at(leaves, type_offset_of(t_source_code_location, 2));
+	return true;
+}
+
+// NOTE(bill): An error handler reports the location from a `Source_Code_Location` it makes on the stack.
+// Its parameters stand for the call's arguments.
+// That still works once LLVM has moved constants into the handler and dropped those parameters.
+gb_internal bool lb_bounds_check_location_from_handler(LLVMTargetDataRef td, LLVMValueRef call, LLVMValueRef handler, lbBoundsCheckSite *site) {
+	LLVMBasicBlockRef entry = LLVMGetFirstBasicBlock(handler);
+	if (entry == nullptr) {
+		return false;
+	}
+
+	lbConstEval ev = {td, call};
+	for (LLVMValueRef inst = LLVMGetFirstInstruction(entry); inst != nullptr; inst = LLVMGetNextInstruction(inst)) {
+		if (!LLVMIsAAllocaInst(inst)) {
+			continue;
+		}
+		LLVMTypeRef type = LLVMGetAllocatedType(inst);
+		if (LLVMGetTypeKind(type) != LLVMStructTypeKind) {
+			continue;
+		}
+		char const *type_name = LLVMGetStructName(type);
+		if (type_name == nullptr) {
+			continue;
+		}
+		if (make_string_c(type_name) != "runtime::Source_Code_Location") {
+			continue;
+		}
+
+		auto leaves = array_make<lbConstLeaf>(temporary_allocator(), 0, 8);
+		lb_const_leaves_of_slot(ev, inst, 0, &leaves, 0);
+		if (lb_location_from_leaves(leaves, site)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// NOTE(bill): Every target passes the file as one argument, by pointer or as a value, followed by the line and column.
+// The `_loc` procedures take a `Source_Code_Location` instead.
+gb_internal void lb_bounds_check_location_from_call(LLVMTargetDataRef td, LLVMValueRef call, bool takes_location, lbBoundsCheckSite *site) {
+	if (LLVMGetNumArgOperands(call) < 3) {
+		return;
+	}
+
+	lbConstEval ev = {td, nullptr};
+	auto leaves = array_make<lbConstLeaf>(temporary_allocator(), 0, 8);
+	LLVMValueRef first = LLVMGetOperand(call, 0);
+	if (LLVMGetTypeKind(LLVMTypeOf(first)) == LLVMPointerTypeKind) {
+		lb_const_leaves_of_memory(ev, first, 0, &leaves, 0);
+	} else {
+		lb_const_leaves_of_value(ev, first, 0, &leaves, 0);
+	}
+
+	if (takes_location) {
+		lb_location_from_leaves(leaves, site);
+		return;
+	}
+	site->file = lb_const_string_at(leaves, 0);
+
+	LLVMValueRef line   = LLVMGetOperand(call, 1);
+	LLVMValueRef column = LLVMGetOperand(call, 2);
+	if (!LLVMIsAConstantInt(line)) {
+		return;
+	}
+	if (!LLVMIsAConstantInt(column)) {
+		return;
+	}
+	if (LLVMGetIntTypeWidth(LLVMTypeOf(line)) != 32) {
+		return;
+	}
+	site->line   = cast(i32)LLVMConstIntGetSExtValue(line);
+	site->column = cast(i32)LLVMConstIntGetSExtValue(column);
+}
+
+gb_internal void lb_collect_bounds_checks(lbModule *m, Array<lbBoundsCheckSite> *sites) {
+	LLVMTargetDataRef td = LLVMGetModuleDataLayout(m->mod);
+
+	for (LLVMValueRef proc = LLVMGetFirstFunction(m->mod); proc != nullptr; proc = LLVMGetNextFunction(proc)) {
+		if (LLVMIsDeclaration(proc)) {
+			continue;
+		}
+		String procedure = lb_value_name(proc);
+		if (lb_bounds_check_kind(procedure).len > 0) {
+			continue;
+		}
+
+		for (LLVMBasicBlockRef block = LLVMGetFirstBasicBlock(proc); block != nullptr; block = LLVMGetNextBasicBlock(block)) {
+			for (LLVMValueRef inst = LLVMGetFirstInstruction(block); inst != nullptr; inst = LLVMGetNextInstruction(inst)) {
+				if (!LLVMIsACallInst(inst)) {
+					continue;
+				}
+				LLVMValueRef callee = LLVMGetCalledValue(inst);
+				if (!LLVMIsAFunction(callee)) {
+					continue;
+				}
+				String callee_name = lb_value_name(callee);
+				String kind = lb_bounds_check_kind(callee_name);
+				if (kind.len == 0) {
+					continue;
+				}
+
+				lbBoundsCheckSite site = {};
+				site.kind      = kind;
+				site.procedure = copy_string(heap_allocator(), procedure);
+				site.count     = 1;
+
+				TEMPORARY_ALLOCATOR_GUARD();
+				bool found = lb_bounds_check_location_from_handler(td, inst, callee, &site);
+				if (!found) {
+					bool takes_location = string_ends_with(callee_name, str_lit("_loc"));
+					lb_bounds_check_location_from_call(td, inst, takes_location, &site);
+				}
+				array_add(sites, site);
+			}
+		}
+	}
+}
+
+gb_internal int lb_bounds_check_site_cmp(void const *a, void const *b) {
+	lbBoundsCheckSite const *x = cast(lbBoundsCheckSite const *)a;
+	lbBoundsCheckSite const *y = cast(lbBoundsCheckSite const *)b;
+
+	int file_cmp = string_compare(x->file, y->file);
+	if (file_cmp != 0) {
+		return file_cmp;
+	}
+	if (x->line != y->line) {
+		return x->line < y->line ? -1 : +1;
+	}
+	if (x->column != y->column) {
+		return x->column < y->column ? -1 : +1;
+	}
+	int kind_cmp = string_compare(x->kind, y->kind);
+	if (kind_cmp != 0) {
+		return kind_cmp;
+	}
+	return string_compare(x->procedure, y->procedure);
+}
+
+// The sites in order, each counted once with how many calls it has
+gb_internal void lb_merge_bounds_check_sites(Array<lbBoundsCheckSite> *sites) {
+	gb_sort_array(sites->data, sites->count, lb_bounds_check_site_cmp);
+
+	isize unique = 0;
+	for (lbBoundsCheckSite const &site : *sites) {
+		if (unique > 0 && lb_bounds_check_site_cmp(&(*sites)[unique-1], &site) == 0) {
+			(*sites)[unique-1].count += 1;
+			continue;
+		}
+		(*sites)[unique] = site;
+		unique += 1;
+	}
+	sites->count = unique;
+}
+
+gb_internal void lb_export_bounds_checks(lbGenerator *gen) {
+	auto sites = array_make<lbBoundsCheckSite>(heap_allocator());
+	defer (array_free(&sites));
+
+	for (auto const &entry : gen->modules) {
+		lb_collect_bounds_checks(entry.value, &sites);
+	}
+	lb_merge_bounds_check_sites(&sites);
+
+	gbString out = gb_string_make(heap_allocator(), "{\n\t\"bounds_checks\": [\n");
+	defer (gb_string_free(out));
+
+	// NOTE(bill): A location passed in at run time, e.g. through `#caller_location`, is not known and is written as null.
+	for (isize i = 0; i < sites.count; i++) {
+		lbBoundsCheckSite const &site = sites[i];
+
+		out = gb_string_appendc(out, "\t\t{\"file\": ");
+		if (site.file.len > 0) {
+			json_escape_string(&out, site.file);
+		} else {
+			out = gb_string_appendc(out, "null");
+		}
+
+		if (site.line > 0) {
+			out = gb_string_append_fmt(out, ", \"line\": %d, \"column\": %d", site.line, site.column);
+		} else {
+			out = gb_string_appendc(out, ", \"line\": null, \"column\": null");
+		}
+
+		out = gb_string_append_fmt(out, ", \"kind\": \"%.*s\", \"procedure\": ", LIT(site.kind));
+		json_escape_string(&out, site.procedure);
+		out = gb_string_append_fmt(out, ", \"count\": %td}", site.count);
+
+		if (i+1 < sites.count) {
+			out = gb_string_appendc(out, ",");
+		}
+		out = gb_string_appendc(out, "\n");
+	}
+	out = gb_string_appendc(out, "\t]\n}\n");
+
+	char const *path = cast(char const *)build_context.export_bounds_checks_file.text;
+	gbFile f = {};
+	if (gb_file_open_mode(&f, gbFileMode_Write, path) != gbFileError_None) {
+		gb_printf_err("Failed to export bounds checks to: %s\n", path);
+		exit_with_errors();
+		return;
+	}
+	gb_file_write(&f, out, gb_string_length(out));
+	gb_file_close(&f);
+}
+
 // LLVM only adds `evex512` by itself for the generic x86 CPUs, so with e.g. the default `x86-64-v2`
 // an explicit `+avx512f` gives no zmm registers and 512-bit vectors are returned as ymm pairs, unlike C.
 // Like clang, ask for it whenever an AVX-512 feature is enabled and `evex512` isn't named explicitly.
