@@ -10109,6 +10109,12 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		}
 		if (c->curr_proc_decl != nullptr && analysis_in_use(AnalysisFlag_Escape)) {
 			per_thread_array_add(&c->info->checked_calls_queue, CheckedCall{c->curr_proc_decl, callee});
+
+			// NOTE(bill): The deferred procedure is called at the end of the scope, see `escape_defer_call`.
+			Entity *deferred = callee->Procedure.deferred_procedure.entity;
+			if (deferred != nullptr) {
+				per_thread_array_add(&c->info->checked_calls_queue, CheckedCall{c->curr_proc_decl, deferred});
+			}
 		}
 		if (callee->Procedure.futex != ProcedureFutex_None && call->CallExpr.args.count > 0 && analysis_in_use(AnalysisFlag_Atomic)) {
 			per_thread_array_add(&c->info->checked_atomics_queue, CheckedAtomic{call, c->curr_proc_decl, BuiltinProc_Invalid, callee->Procedure.futex});
