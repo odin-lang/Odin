@@ -1767,6 +1767,21 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 					wmi.storeInt(off(W, W), e.code.length)
 					wmi.storeString(off(32, 1), e.key);
 					wmi.storeString(off(32, 1), e.code);
+				} else if (e instanceof CompositionEvent) {
+					// `composition.text` is a byte buffer with its length, the way `key` is: encode, then
+					// truncate at a character boundary so the tail is never a broken UTF-8 sequence.
+					let bytes = new TextEncoder().encode(e.data ?? "");
+					if (bytes.length > 256) {
+						let n = 256;
+						while (n > 0 && (bytes[n] & 0xC0) === 0x80) {
+							n -= 1;
+						}
+						bytes = bytes.subarray(0, n);
+					}
+					// `text` itself is rebuilt on the Odin side from the buffer, the way `key` is.
+					off(W*2, W);
+					wmi.storeInt(off(W, W), bytes.length);
+					new Uint8Array(wmi.memory.buffer, off(256, 1), bytes.length).set(bytes);
 				} else if (e.type === 'scroll') {
 					wmi.storeF64(off(8, 8), window.scrollX);
 					wmi.storeF64(off(8, 8), window.scrollY);
