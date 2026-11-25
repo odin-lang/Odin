@@ -121,7 +121,7 @@ sort_by_runtime :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 sort_by_constant :: proc(data: $T/[]$E, $less: proc(i, j: E) -> bool) {
 	when size_of(E) != 0 {
 		Less :: distinct proc(i, j: E) -> bool
-		gingersort(([]E)(data), Less(less), .Less)
+		gingersort(([]E)(data), Less(less), .Less_Constant)
 	}
 }
 
@@ -179,7 +179,7 @@ sort_by_cmp_runtime :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
 sort_by_cmp_constant :: proc(data: $T/[]$E, $cmp: proc(i, j: E) -> Ordering) {
 	when size_of(E) != 0 {
 		Cmp :: distinct proc(i, j: E) -> Ordering
-		gingersort(([]E)(data), Cmp(cmp), .Cmp)
+		gingersort(([]E)(data), Cmp(cmp), .Cmp_Constant)
 	}
 }
 
@@ -317,7 +317,7 @@ reverse_sort_by_runtime :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 reverse_sort_by_constant :: proc(data: $T/[]$E, $less: proc(i, j: E) -> bool) {
 	when size_of(E) != 0 {
 		Less :: distinct proc(i, j: E) -> bool
-		gingersort(([]E)(data), Less(less), .Less_Reverse)
+		gingersort(([]E)(data), Less(less), .Less_Reverse_Constant)
 	}
 }
 
@@ -335,7 +335,7 @@ reverse_sort_by_cmp_runtime :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Orderin
 reverse_sort_by_cmp_constant :: proc(data: $T/[]$E, $cmp: proc(i, j: E) -> Ordering) {
 	when size_of(E) != 0 {
 		Cmp :: distinct proc(i, j: E) -> Ordering
-		gingersort(([]E)(data), Cmp(cmp), .Cmp_Reverse)
+		gingersort(([]E)(data), Cmp(cmp), .Cmp_Reverse_Constant)
 	}
 }
 

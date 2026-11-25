@@ -8,8 +8,8 @@ import "base:intrinsics"
 // It is stable, sorts in place, and needs no allocator.
 // Its only scratch space is a stack buffer of at most GINGER_SWAP_BYTES.
 // Small inputs use a smaller local buffer instead, and large inputs of small elements a buffer of GINGER_LARGE items.
-// With cheap comparisons, fewer than 8 items go straight to the sorting networks.
-// Otherwise the smallest inputs are sorted by insertion, with a higher cut-off where moves cost more.
+// With cheap comparisons, or a constant comparator on small elements, fewer than 8 items go straight to the sorting networks.
+// Otherwise the smallest inputs are sorted by insertion, with a higher cut-off where moves cost more or the comparator is called through a pointer.
 // Small inputs and small partitions are sorted with branchless sorting networks and parity merges, then merged through the buffer.
 // Larger inputs are checked for quarters that are already ordered or reversed.
 // The rest is partitioned stably around a sampled pivot, using rotations where a part does not fit the buffer.
@@ -25,9 +25,13 @@ Sort_Kind :: enum {
 	Ordered_Reverse,
 	Less,
 	Less_Reverse,
+	Less_Constant,
+	Less_Reverse_Constant,
 	Less_With_Data,
 	Cmp,
 	Cmp_Reverse,
+	Cmp_Constant,
+	Cmp_Reverse_Constant,
 	Cmp_With_Data,
 	Generic_Cmp,
 	Key,
@@ -83,6 +87,8 @@ GINGER_LARGE           :: 1024
 GINGER_SMALL_BYTES     :: 2048
 GINGER_INSERTION_SMALL :: 8
 GINGER_INSERTION_LARGE :: 32
+GINGER_INSERTION_HUGE  :: 64
+GINGER_NETWORK_BYTES   :: 16
 
 gingersort :: proc(data: []$E, call: $P, $KIND: Sort_Kind) {
 	when ODIN_OPTIMIZATION_MODE == .Size {
@@ -128,17 +134,24 @@ ginger_sort_typed :: proc(data: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_che
 		return
 	}
 
-	when (KIND == .Ordered || KIND == .Ordered_Reverse) && !intrinsics.type_is_string(E) {
+	CHEAP    :: (KIND == .Ordered || KIND == .Ordered_Reverse) && !intrinsics.type_is_string(E)
+	CONSTANT :: KIND == .Less_Constant || KIND == .Less_Reverse_Constant || KIND == .Cmp_Constant || KIND == .Cmp_Reverse_Constant
+
+	when CHEAP || (CONSTANT && size_of(E) <= GINGER_NETWORK_BYTES) {
 		if n < 8 {
 			tiny: [7]E = ---
 			ginger_tiny_sort(data, tiny[:], call, KIND)
 			return
 		}
 	} else {
-		when size_of(E) <= 8 {
-			INSERTION_LIMIT :: GINGER_INSERTION_SMALL
-		} else {
+		when CONSTANT {
 			INSERTION_LIMIT :: GINGER_INSERTION_LARGE
+		} else when size_of(E) <= 8 {
+			INSERTION_LIMIT :: GINGER_INSERTION_SMALL
+		} else when size_of(E) <= 32 {
+			INSERTION_LIMIT :: GINGER_INSERTION_LARGE
+		} else {
+			INSERTION_LIMIT :: GINGER_INSERTION_HUGE
 		}
 
 		if n <= INSERTION_LIMIT {
@@ -224,15 +237,15 @@ ginger_greater :: #force_inline proc(a, b: $E, call: $P, $KIND: Sort_Kind) -> bo
 		return a > b
 	} else when KIND == .Ordered_Reverse {
 		return a < b
-	} else when KIND == .Less {
+	} else when KIND == .Less || KIND == .Less_Constant {
 		return call(b, a)
-	} else when KIND == .Less_Reverse {
+	} else when KIND == .Less_Reverse || KIND == .Less_Reverse_Constant {
 		return call(a, b)
 	} else when KIND == .Less_With_Data {
 		return call.less(b, a, call.user_data)
-	} else when KIND == .Cmp {
+	} else when KIND == .Cmp || KIND == .Cmp_Constant {
 		return call(a, b) == .Greater
-	} else when KIND == .Cmp_Reverse {
+	} else when KIND == .Cmp_Reverse || KIND == .Cmp_Reverse_Constant {
 		return call(b, a) == .Greater
 	} else when KIND == .Cmp_With_Data {
 		return call.cmp(a, b, call.user_data) == .Greater
