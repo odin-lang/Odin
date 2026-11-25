@@ -4882,13 +4882,9 @@ gb_internal void check_binary_expr_dependency(CheckerContext *c, Token op, Type 
 			break;
 		}
 	} else if (op.kind == Token_Shr || op.kind == Token_ShrEq) {
-		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
-		case Basic_u128:
-		case Basic_i128:
-			if (is_arch_wasm()) {
-				add_package_dependency(c, "runtime", "__lshrti3", REQUIRE);
-			}
-			break;
+		if (bt->kind == Type_Basic && is_arch_wasm()) switch (bt->Basic.kind) {
+		case Basic_u128: add_package_dependency(c, "runtime", "__lshrti3", REQUIRE); break;
+		case Basic_i128: add_package_dependency(c, "runtime", "__ashrti3", REQUIRE); break;
 		}
 	}
 }

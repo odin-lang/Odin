@@ -28,15 +28,18 @@ NORMAL_PACKAGES="
 	encoding/uuid
 	encoding/varint
 	encoding/xml
+	flags
 	fmt
 	hash
 	io
 	math/big
 	math/big_cutoffs
+	math/bits
 	math/fixed
 	math/linalg/hlsl
 	math/noise
 	mem
+	os
 	reflect
 	runtime
 	slice
@@ -44,6 +47,7 @@ NORMAL_PACKAGES="
 	strconv
 	strings
 	terminal/ansi
+	text/edit
 	text/i18n
 	text/match
 	text/regex

@@ -754,7 +754,7 @@ test_remove_all_symlink_inside :: proc(t: ^testing.T) {
 	testing.expect(t, os.exists(kept))
 }
 
-when ODIN_OS != .Windows {
+when ODIN_OS != .Windows && ODIN_OS != .WASI {
 	@(test)
 	test_remove_all_permission_denied :: proc(t: ^testing.T) {
 		root := remove_all_temp_root(t)

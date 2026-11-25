@@ -647,7 +647,7 @@ test_keep_indent :: proc(t: ^testing.T) {
 	testing.expect_value(t, strings.to_string(s.builder), expected)
 	testing.expect_value(t, s.state.selection, [2]int{202, 202})
 
-	expect_undos(t, &s, {before})
+	expect_undos(t, &s, {before, "    foo"})
 }
 
 clipboard_set :: proc(user_data: rawptr, text: string) -> (ok: bool) {
@@ -924,5 +924,36 @@ test_undo_groups :: proc(t: ^testing.T) {
 		type_text(&s, "b")
 		edit.undo_group_end(&s.state)
 		expect_undos(t, &s, {""})
+	}
+}
+
+@(test)
+test_undo_empty_stack :: proc(t: ^testing.T) {
+	{
+		s: State
+		state_init(&s, "", false)
+		defer state_destroy(&s)
+
+		type_text(&s, "ab")
+		expect_undos(t, &s, {""})
+	}
+	{
+		s: State
+		undo_init(&s, "", {})
+		defer state_destroy(&s)
+
+		type_text(&s, "a")
+		edit.undo_clear(&s.state, &s.state.undo)
+		type_text(&s, "b")
+		expect_undos(t, &s, {"a"})
+	}
+	{
+		s: State
+		state_init(&s, "", false)
+		defer state_destroy(&s)
+
+		edit.undo_check(&s.state)
+		edit.undo_check(&s.state)
+		testing.expect_value(t, len(s.state.undo), 1)
 	}
 }
