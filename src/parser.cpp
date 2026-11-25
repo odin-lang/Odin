@@ -7575,7 +7575,8 @@ gb_internal isize calc_decl_count(Ast *decl) {
 		{
 			isize inner_count = calc_decl_count(decl->WhenStmt.body);
 			if (decl->WhenStmt.else_stmt) {
-				inner_count = gb_max(inner_count, calc_decl_count(decl->WhenStmt.else_stmt));
+				isize else_count = calc_decl_count(decl->WhenStmt.else_stmt);
+				inner_count = gb_max(inner_count, else_count);
 			}
 			count += inner_count;
 		}
