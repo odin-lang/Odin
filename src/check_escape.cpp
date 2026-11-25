@@ -317,6 +317,7 @@ gb_internal void               escape_scan         (EscapeAnalysis *ea, Ast *exp
 gb_internal void               escape_stmt         (EscapeAnalysis *ea, Ast *node);
 gb_internal void               escape_branch       (EscapeAnalysis *ea, Ast *label, TokenKind kind);
 gb_internal void               escape_exit         (EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &results, Array<EscapeValue> const &values);
+gb_internal bool               escape_path_is_within(Type *t, EscapePath const &path);
 
 // see checker_global.cpp
 gb_internal i32  global_graph_scc(i32 node_count, Array<i32> const &offsets,   Array<i32> const &targets, Array<i32> *comp_of_);
@@ -622,10 +623,14 @@ gb_internal EscapeValue escape_as_pointer(EscapeValue const &v) {
 	return escape_pointer_offset(v, {});
 }
 
-// what a parameter holds at a path within what it holds at another
+// what a parameter holds at a path within what it holds at another, unless that path is not one within its value,
+// e.g. when a variant of a type switch holds the parameter's pointers anywhere within it, where it is all of it as before
 gb_internal EscapeOrigin escape_origin_within(EscapeOrigin o, EscapePath const &path, isize from) {
 	if (o.kind == EscapeOrigin_Param && escape_path_deref_index(o.path) == o.path.count) {
-		o.path = escape_path_concat(o.path, slice(path, from, path.count));
+		EscapePath within = escape_path_concat(o.path, slice(path, from, path.count));
+		if (escape_path_is_within(o.obj.entity->type, within)) {
+			o.path = within;
+		}
 	}
 	return o;
 }
@@ -1069,6 +1074,35 @@ gb_internal Type *escape_type_within(Type *t, EscapePath const &path) {
 		}
 	}
 	return t;
+}
+
+// whether a value of a type may hold something at a path, where the fields of a union are those of its variants,
+// e.g. not a field of another struct, which the type of an 'any' does not tell
+gb_internal bool escape_path_is_within(Type *t, EscapePath const &path) {
+	for (EscapeStep const &step : path) {
+		Type *bt = base_type(t);
+		if (bt == nullptr || is_type_any(bt)) {
+			return true;
+		}
+		if (step.kind != EscapeStep_Field) {
+			t = escape_elem_type(bt);
+			if (t == nullptr) {
+				return false;
+			}
+			continue;
+		}
+		bool has_field = escape_struct_has_field(bt, step.field);
+		if (bt->kind == Type_Union) {
+			for (Type *variant : bt->Union.variants) {
+				has_field |= escape_struct_has_field(base_type(variant), step.field);
+			}
+		}
+		if (!has_field) {
+			return false;
+		}
+		t = step.field->type;
+	}
+	return true;
 }
 
 gb_internal Type *escape_type_at(EscapeObject const &obj, EscapePath const &path) {
