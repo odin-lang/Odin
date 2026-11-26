@@ -666,13 +666,78 @@ _append_soa_elems :: proc(#no_alias array: ^$T/#soa[dynamic]$E, zero_memory: boo
 	return arg_len, err
 }
 
+// `append_soa_slice` appends the elements of the #soa slice `elems` to the end of an #soa dynamic array.
+// `elems` may be a part of the array itself.
+@builtin
+append_soa_slice :: proc(#no_alias array: ^$T/#soa[dynamic]$E, elems: $S/#soa[]E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+	if array == nil {
+		return
+	}
+	old_len := len(array)
+	from    := _soa_index_in(array[:], elems)
+
+	err = _grow_soa(array, old_len+len(elems), false, loc) // do not 'or_return' here as it could be a partial success
+	n = min(cap(array)-old_len, len(elems))
+	if n <= 0 {
+		return
+	}
+	raw_soa_footer(array).len = old_len + n
+
+	src := elems
+	if from >= 0 {
+		src = array[from:]
+	}
+	copy_soa(array[old_len:], src[:n])
+	return
+}
+
 // The append_soa built-in procedure appends elements to the end of an #soa dynamic array
 @builtin
 append_soa :: proc{
 	append_soa_elem,
 	append_soa_elems,
+	append_soa_slice,
 	append_soa_fixed_capacity_elem,
 	append_soa_fixed_capacity_elems,
+	append_soa_fixed_capacity_slice,
+}
+
+// The index in `s` of the first element of `part` when `part` is a part of `s`, otherwise -1
+@(private, require_results)
+_soa_index_in :: proc "contextless" (s, part: $S/#soa[]$E) -> int {
+	s, part := s, part
+	columns := ([^]uintptr)(&s)
+	parts   := ([^]uintptr)(&part)
+	for size, i in intrinsics.type_soa_field_sizes(S) {
+		if size == 0 {
+			continue
+		}
+		if !(columns[i] <= parts[i] && parts[i] < columns[i] + uintptr(len(s)*size)) {
+			return -1
+		}
+		return int(parts[i] - columns[i]) / size
+	}
+	return -1
+}
+
+// Copies `elems` into `s` at `index`, once the elements from `index` have moved along by `len(elems)`.
+// `from` is where `elems` was in `s` before that move, or -1 when it is not a part of `s`.
+@(private)
+_soa_copy_injected :: proc "contextless" (s, elems: $S/#soa[]$E, index, from: int) {
+	m := len(elems)
+	switch {
+	case from < 0:
+		copy_soa(s[index:], elems)
+	case from+m <= index:
+		copy_soa(s[index:], s[from:][:m])
+	case from >= index:
+		copy_soa(s[index:], s[from+m:][:m])
+	case:
+		// `elems` straddles `index`, so only its end moved
+		k := index - from
+		copy_soa(s[index:],   s[from:][:k])
+		copy_soa(s[index+k:], s[index+m:][:m-k])
+	}
 }
 
 
@@ -741,8 +806,49 @@ inject_at_elems_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int index
 	return
 }
 
+// `inject_at_slice_soa` injects the elements of the #soa slice `elems` in a dynamic SOA array at a specified index and moves the previous elements after that index "across".
+// `elems` may be a part of the array itself.
+@builtin
+inject_at_slice_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int index: int, elems: $S/#soa[]E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
+	if array == nil {
+		return
+	}
+	m := len(elems)
+	if m == 0 {
+		ok = true
+		return
+	}
+
+	old_len := len(array)
+	n       := max(old_len, index)
+	from    := _soa_index_in(array[:], elems)
+
+	_grow_soa(array, n + m, false, loc) or_return
+	non_zero_resize_soa(array, n + m, loc) or_return
+
+	if index > old_len {
+		_soa_zero(array[:], old_len, index - old_len)
+	}
+	_soa_move(array[:], index + m, index, n - index)
+	_soa_copy_injected(array[:], elems, index, from)
+
+	ok = true
+	return
+}
+
 // `inject_at_soa` injects something into a dynamic SOA array at a specified index and moves the previous elements after that index "across"
-@builtin inject_at_soa :: proc{inject_at_elem_soa, inject_at_elems_soa, inject_at_elem_soa_fixed_capacity, inject_at_elems_soa_fixed_capacity}
+@builtin
+inject_at_soa :: proc{
+	inject_at_elem_soa,
+	inject_at_elems_soa,
+	inject_at_slice_soa,
+	inject_at_elem_soa_fixed_capacity,
+	inject_at_elems_soa_fixed_capacity,
+	inject_at_slice_soa_fixed_capacity,
+}
 
 @builtin
 delete_soa_slice :: proc(array: $T/#soa[]$E, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
@@ -960,6 +1066,16 @@ append_soa_fixed_capacity_elems :: proc "contextless" (array: ^$T/#soa[dynamic; 
 	return
 }
 
+// `append_soa_fixed_capacity_slice` appends as many of the elements of the #soa slice `elems` as fit, and returns how many
+@builtin
+append_soa_fixed_capacity_slice :: proc "contextless" (array: ^$T/#soa[dynamic; $N]$E, elems: $S/#soa[]E) -> (num_appended: int) {
+	n := len(array)
+	num_appended = min(N - n, len(elems))
+	_soa_fixed_capacity_len(array)^ = n + num_appended
+	copy_soa(array[n:], elems[:num_appended])
+	return
+}
+
 @builtin
 append_nothing_soa_fixed_capacity :: proc "contextless" (array: ^$T/#soa[dynamic; $N]$E) -> (n: int, ok: bool) {
 	if array == nil {
@@ -1004,6 +1120,37 @@ inject_at_elems_soa_fixed_capacity :: proc(array: ^$T/#soa[dynamic; $N]$E, #any_
 	for arg, j in args {
 		array[index + j] = arg
 	}
+	return true
+}
+
+// `inject_at_slice_soa_fixed_capacity` injects the elements of the #soa slice `elems` at `index`, and fails when they do not all fit.
+// `elems` may be a part of the array itself.
+@builtin
+inject_at_slice_soa_fixed_capacity :: proc(array: ^$T/#soa[dynamic; $N]$E, #any_int index: int, elems: $S/#soa[]E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
+	if array == nil {
+		return false
+	}
+	m := len(elems)
+	if m == 0 {
+		return true
+	}
+
+	old_len := len(array)
+	n       := max(old_len, index)
+	if n + m > N {
+		return false
+	}
+	from := _soa_index_in(array[:], elems)
+
+	_soa_fixed_capacity_len(array)^ = n + m
+	if index > old_len {
+		_soa_zero(array[:], old_len, index - old_len)
+	}
+	_soa_move(array[:], index + m, index, n - index)
+	_soa_copy_injected(array[:], elems, index, from)
 	return true
 }
 

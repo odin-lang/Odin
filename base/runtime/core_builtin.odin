@@ -1126,8 +1126,10 @@ append :: proc{
 
 	append_soa_elem,
 	append_soa_elems,
+	append_soa_slice,
 	append_soa_fixed_capacity_elem,
 	append_soa_fixed_capacity_elems,
+	append_soa_fixed_capacity_slice,
 }
 
 @builtin
@@ -1142,8 +1144,10 @@ non_zero_append :: proc{
 
 	non_zero_append_soa_elem,
 	non_zero_append_soa_elems,
+	append_soa_slice,
 	append_soa_fixed_capacity_elem,
 	append_soa_fixed_capacity_elems,
+	append_soa_fixed_capacity_slice,
 }
 
 
@@ -1363,8 +1367,10 @@ inject_at :: proc{
 
 	inject_at_elem_soa,
 	inject_at_elems_soa,
+	inject_at_slice_soa,
 	inject_at_elem_soa_fixed_capacity,
 	inject_at_elems_soa_fixed_capacity,
+	inject_at_slice_soa_fixed_capacity,
 }
 
 

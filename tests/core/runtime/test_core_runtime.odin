@@ -497,6 +497,54 @@ test_copy_soa :: proc(t: ^testing.T) {
 	testing.expect_value(t, copy(aos, empty), 0)
 }
 
+// `append` and `inject_at` take the elements of an #soa slice, which may be a part of the array itself
+@(test)
+test_append_inject_soa_slice :: proc(t: ^testing.T) {
+	V :: struct {
+		a: f32,
+		b: u8,
+	}
+	v :: proc(i: int) -> V {
+		return {f32(i), u8(i)}
+	}
+
+	other := make(#soa[]V, 3)
+	defer delete(other)
+	for i in 0..<3 {
+		other[i] = v(10 + i)
+	}
+
+	d := make(#soa[dynamic]V, 0, 3)
+	defer delete(d)
+	testing.expect_value(t, append(&d, other), 3)
+	testing.expect_value(t, d[2], v(12))
+
+	// Growing moves the array, and the elements being appended with it
+	testing.expect_value(t, append(&d, d[:]), 3)
+	testing.expect_value(t, len(d), 6)
+	testing.expect_value(t, d[5], v(12))
+
+	// [10 11 12 10 11 12] with [11 12 10] injected at 2, which it straddles
+	testing.expect(t, inject_at(&d, 2, d[1:4]))
+	want := [?]V{v(10), v(11), v(11), v(12), v(10), v(12), v(10), v(11), v(12)}
+	for w, i in want {
+		testing.expect_value(t, d[i], w)
+	}
+
+	c: #soa[dynamic; 4]V
+	testing.expect_value(t, append(&c, other), 3)
+	testing.expect_value(t, append(&c, c[:]), 1)
+	testing.expect_value(t, c[3], v(10))
+	testing.expect(t, !inject_at(&c, 0, other[:1]))
+
+	resize(&c, 2)
+	testing.expect(t, inject_at(&c, 0, c[1:2]))
+	testing.expect_value(t, len(c), 3)
+	testing.expect_value(t, c[0], v(11))
+	testing.expect_value(t, c[1], v(10))
+	testing.expect_value(t, c[2], v(11))
+}
+
 // Elements whose fields are all 4 or 8 bytes are copied in blocks, with the rest one at a time
 @(test)
 test_copy_soa_blocks :: proc(t: ^testing.T) {
