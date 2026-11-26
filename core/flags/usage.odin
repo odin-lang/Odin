@@ -99,6 +99,19 @@ write_usage :: proc(
 		return
 	}
 
+	describe_enum_type_usage :: proc(flag: Flag, enum_type: runtime.Type_Info_Enum) -> string {
+		enum_names := strings.join(enum_type.names, ", ", context.temp_allocator)
+		return fmt.tprintf("{{%s}}%s",
+			enum_names,
+			", required" if flag.is_required else "")
+	}
+
+	describe_other_type_usage :: proc(flag: Flag, field: reflect.Struct_Field) -> string {
+		return fmt.tprintf("<%v>%s",
+			field.type.id,
+			", required" if flag.is_required else "")
+	}
+
 	builder := strings.builder_make()
 	defer strings.builder_destroy(&builder)
 
@@ -173,7 +186,15 @@ write_usage :: proc(
 				flag.type_description = fmt.tprintf("<%v>%s", specific_type_info.elem.id,
 					requirement_spec if len(requirement_spec) > 0 else ", multiple")
 			}
-
+		case runtime.Type_Info_Enum:
+			flag.type_description = describe_enum_type_usage(flag, specific_type_info)
+		case runtime.Type_Info_Named:
+			#partial switch base_type_info in specific_type_info.base.variant {
+			case runtime.Type_Info_Enum:
+				flag.type_description = describe_enum_type_usage(flag, base_type_info)
+			case:
+				flag.type_description = describe_other_type_usage(flag, field)
+			}
 		case:
 			if flag.is_boolean {
 				/*
@@ -182,9 +203,7 @@ write_usage :: proc(
 				}
 				*/
 			} else {
-				flag.type_description = fmt.tprintf("<%v>%s",
-					field.type.id,
-					", required" if flag.is_required else "")
+				flag.type_description = describe_other_type_usage(flag, field)
 			}
 		}
 
