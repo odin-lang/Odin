@@ -3931,6 +3931,10 @@ gb_internal ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) 
 	for (isize i = 0; i < px.param_count; i++) {
 		Entity *ex = px.params->Tuple.variables[i];
 		Entity *ey = py.params->Tuple.variables[i];
+		// `$T: typeid` and `x: $T` share the type `$T` but take a type and a value
+		if ((ex->kind == Entity_TypeName) != (ey->kind == Entity_TypeName)) {
+			return ProcOverload_ParamTypes;
+		}
 		if (!are_types_identical(ex->type, ey->type)) {
 			return ProcOverload_ParamTypes;
 		}
