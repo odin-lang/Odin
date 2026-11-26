@@ -3738,19 +3738,16 @@ fmt_quaternion  :: proc(fi: ^Info, q: quaternion256, bits: int, verb: rune) {
 // - component: The imaginary unit of the component: `i`, `j`, or `k`.
 // - verb: The formatting verb rune ('f', 'F', 'v', 'h', 'H', 'w').
 _fmt_imaginary_component :: proc(fi: ^Info, value: f64, bit_size: int, component: rune, verb: rune) {
-	if math.is_nan(value) {
-		// Edge case: `fmt_float` will never prefix NaN with a sign.
-		// However, in this case, the '+' character is not a sign, but
-		// a binary operator.
-		str := "+NaN"
-		_pad(fi, str)
-	} else if verb == 'h' || verb == 'H' {
+	if verb == 'h' || verb == 'H' {
 		// Edge case: `fmt_float` would disable `fi.plus`.
 		_fmt_float_as_hex(fi, value, bit_size, verb, prefix_plus = true)
 	} else {
-		prev_plus := fi.plus
-		defer fi.plus = prev_plus
-		fi.plus = true
+		signed := !math.is_nan(value) && (fi.plus || math.sign_bit(value) || math.is_inf(value))
+		if !signed {
+			_write_byte(fi, '+')
+		} else if fi.width_set {
+			_write_byte(fi, ' ')
+		}
 		fmt_float(fi, value, bit_size, verb)
 	}
 	_write_rune(fi, component)
