@@ -96,14 +96,10 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, #any_int length, alignment: int, a
 
 	max_align := max(alignment, align_of(E))
 
-	ti := type_info_of(typeid_of(T))
-	ti = type_info_base(ti)
-	si := ti.variant.(^Type_Info_Struct)
-
 	FIELD_COUNT :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
 
 	offsets: [FIELD_COUNT]int
-	total_size := _soa_layout(si, length, max_align, offsets[:]) or_return
+	total_size := _soa_layout(intrinsics.type_soa_field_sizes(T)[:], length, max_align, offsets[:]) or_return
 
 	allocator := allocator
 	if allocator.procedure == nil {
@@ -190,15 +186,9 @@ resize_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int length: int, l
 	// reused [old_len, min(old_cap, length)) still needs zeroing
 	to_zero_end := min(old_cap, length)
 	if size_of(E) > 0 && to_zero_end > old_len {
-		ti := type_info_base(type_info_of(typeid_of(T)))
-		si := ti.variant.(^Type_Info_Struct)
-
-		field_count := len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
-
 		columns := ([^][^]byte)(array)
-		for i in 0..<field_count {
-			type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
-			mem_zero(&columns[i][type.size * old_len], type.size * (to_zero_end - old_len))
+		for size, i in intrinsics.type_soa_field_sizes(T) {
+			mem_zero(&columns[i][size*old_len], size*(to_zero_end - old_len))
 		}
 	}
 
@@ -233,7 +223,7 @@ non_zero_reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int capacity: int,
 // 128 bytes also covers the cache lines of Apple Silicon.
 // A column moves at most its own size, and only the first 32 move, to keep the padding small.
 @(private, require_results)
-_soa_layout :: proc(si: ^Type_Info_Struct, count, max_align: int, offsets: []int) -> (total: int, err: Allocator_Error) {
+_soa_layout :: proc(sizes: []int, count, max_align: int, offsets: []int) -> (total: int, err: Allocator_Error) {
 	PERIOD :: 4096
 	SLOT   :: 128
 
@@ -251,7 +241,7 @@ _soa_layout :: proc(si: ^Type_Info_Struct, count, max_align: int, offsets: []int
 
 	step := max(max_align, SLOT)
 	for &offset, i in offsets {
-		size := _checked_size_mul(si.types[i].variant.(^Type_Info_Multi_Pointer).elem.size, count) or_return
+		size := _checked_size_mul(sizes[i], count) or_return
 		_ = _checked_size_add(total, 2*step) or_return
 		offset = align_forward_int(total, max_align)
 
@@ -293,17 +283,14 @@ _reserve_soa :: #force_no_inline proc(array: ^$T/#soa[dynamic]$E, capacity: int,
 		return nil
 	}
 
-	ti := type_info_of(typeid_of(T))
-	ti = type_info_base(ti)
-	si := ti.variant.(^Type_Info_Struct)
-
 	FIELD_COUNT :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
 	assert(footer.cap == old_cap)
 
 	max_align :: align_of(E)
+	sizes := intrinsics.type_soa_field_sizes(T)
 	old_offsets, new_offsets: [FIELD_COUNT]int
-	old_size := _soa_layout(si, old_cap,  max_align, old_offsets[:]) or_return
-	new_size := _soa_layout(si, capacity, max_align, new_offsets[:]) or_return
+	old_size := _soa_layout(sizes[:], old_cap,  max_align, old_offsets[:]) or_return
+	new_size := _soa_layout(sizes[:], capacity, max_align, new_offsets[:]) or_return
 
 	columns  := ([^]rawptr)(array)
 	old_data := ([^]byte)(columns[0])
@@ -341,7 +328,7 @@ _reserve_soa :: #force_no_inline proc(array: ^$T/#soa[dynamic]$E, capacity: int,
 		if (new_offsets[i] >= old_offsets[i]) != up {
 			continue
 		}
-		size   := si.types[i].variant.(^Type_Info_Multi_Pointer).elem.size
+		size   := sizes[i]
 		column := &new_data[new_offsets[i]]
 		mem_copy(column, &old_columns[old_offsets[i]], size*old_cap)
 		if zero_memory && in_place {
@@ -516,14 +503,8 @@ inject_at_elems_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int index
 	non_zero_resize_soa(array, new_len, loc) or_return
 
 	when size_of(E) != 0 {
-		ti := type_info_base(type_info_of(typeid_of(T)))
-		si := ti.variant.(^Type_Info_Struct)
-
-		FIELD_COUNT :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
-
 		columns := ([^][^]byte)(array)
-		for i in 0..<FIELD_COUNT {
-			size := si.types[i].variant.(^Type_Info_Multi_Pointer).elem.size
+		for size, i in intrinsics.type_soa_field_sizes(T) {
 			if index > old_len {
 				mem_zero(&columns[i][old_len*size], (index - old_len)*size)
 			}
@@ -686,15 +667,9 @@ ordered_remove_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int index:
 // index must already be known to be in bounds.
 _ordered_remove_soa :: proc "contextless" (#no_alias array: ^$T/#soa[dynamic]$E, index: int) #no_bounds_check {
 	if index+1 < len(array) {
-		ti := type_info_of(typeid_of(T))
-		ti = type_info_base(ti)
-		si := ti.variant.(^Type_Info_Struct)
-
 		l1 := len(array)-1
-		field_count := len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
 		columns := ([^][^]byte)(array)
-		for i in 0..<field_count {
-			size := si.types[i].variant.(^Type_Info_Multi_Pointer).elem.size
+		for size, i in intrinsics.type_soa_field_sizes(T) {
 			mem_copy(&columns[i][index*size], &columns[i][(index + 1)*size], (l1 - index)*size)
 		}
 	}

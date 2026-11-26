@@ -2071,6 +2071,15 @@ gb_internal bool is_type_soa_struct(Type *t) {
 	if (t == nullptr) { return false; }
 	return t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None;
 }
+
+// The number of data fields of an #soa type: one per field, or element, of its element type
+gb_internal isize soa_field_count(Type *t) {
+	Type *elem = base_type(base_type(t)->Struct.soa_elem);
+	if (elem->kind == Type_Array) {
+		return cast(isize)elem->Array.count;
+	}
+	return elem->Struct.fields.count;
+}
 gb_internal bool is_type_soa_dynamic_array(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }

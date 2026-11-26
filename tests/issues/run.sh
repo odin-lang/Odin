@@ -79,6 +79,7 @@ fi
 
 $ODIN check ../test_issue_7429 $COMMON_CHECK
 $ODIN check ../test_issue_7260 -no-entry-point $COMMON_CHECK
+$ODIN check ../test_issue_soa_no_rtti -target:freestanding_amd64_sysv -no-rtti -no-entry-point $COMMON_CHECK
 $ODIN check ../test_issue_7336 -no-entry-point $COMMON_CHECK
 
 if [[ $($ODIN check ../test_issue_ambiguous_union_literal $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then

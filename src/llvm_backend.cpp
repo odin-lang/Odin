@@ -1202,6 +1202,31 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	return {p->value, p->type};
 }
 
+// A read-only table of the element size of each field of an #soa type, for intrinsics.type_soa_field_sizes
+gb_internal lbValue lb_gen_soa_field_sizes_ptr(lbModule *m, Type *type) {
+	lbAddr *found = map_get(&m->soa_field_sizes_map, type);
+	if (found) {
+		return found->addr;
+	}
+
+	Type *elem = base_type(base_type(type)->Struct.soa_elem);
+	isize count = soa_field_count(type);
+	Type *table_type = alloc_type_array(t_int, count);
+
+	LLVMValueRef *sizes = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+	for (isize i = 0; i < count; i++) {
+		Type *field_type = elem->kind == Type_Array ? elem->Array.elem : elem->Struct.fields[i]->type;
+		sizes[i] = lb_const_int(m, t_int, type_size_of(field_type)).value;
+	}
+	lbValue table = {llvm_const_array(m, lb_type(m, t_int), sizes, count), table_type};
+
+	lbAddr addr = lb_add_global_generated_with_name(m, table_type, table, lb_internal_gen_name_from_type("ggv$soa_field_sizes", type));
+	lb_make_global_private_const(addr);
+
+	map_set(&m->soa_field_sizes_map, type, addr);
+	return addr.addr;
+}
+
 gb_internal lbValue lb_gen_map_cell_info_ptr(lbModule *m, Type *type) {
 	lbAddr *found = map_get(&m->map_cell_info_map, type);
 	if (found) {

@@ -8308,6 +8308,17 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		operand->mode = Addressing_Constant;
 		operand->type = t_untyped_integer;
 		break;
+	case BuiltinProc_type_soa_field_sizes: {
+		if (operand->mode != Addressing_Type || !is_type_soa_struct(operand->type) || is_type_polymorphic(operand->type)) {
+			error(operand->expr, "Expected an #soa type for '%.*s'", LIT(builtin_name));
+			operand->mode = Addressing_Invalid;
+			operand->type = t_invalid;
+			return false;
+		}
+		operand->mode = Addressing_Value;
+		operand->type = alloc_type_pointer(alloc_type_array(t_int, soa_field_count(operand->type)));
+		break;
+	}
 	case BuiltinProc_type_struct_has_implicit_padding:
 		operand->value = exact_value_bool(false);
 		if (operand->mode != Addressing_Type) {

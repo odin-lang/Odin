@@ -259,6 +259,9 @@ type_field_index_of :: proc($T: typeid, $name: string) -> uintptr ---
 
 type_fixed_capacity_dynamic_array_len_offset :: proc($T: typeid/[dynamic; $N]$E) -> uintptr ---
 
+// A pointer to a read-only table of the element size of each field of the #soa type T, in order
+type_soa_field_sizes :: proc($T: typeid) -> ^[N]int ---
+
 // "Contiguous" means that the set of enum constants, when sorted, have a difference of either 0 or 1 between consecutive values.
 // This is the exact opposite of "sparse".
 type_enum_is_contiguous :: proc($T: typeid) -> bool where type_is_enum(T) ---

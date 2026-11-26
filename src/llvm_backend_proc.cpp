@@ -4040,6 +4040,12 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 
 	// "Intrinsics"
 
+	case BuiltinProc_type_soa_field_sizes: {
+		lbValue table = lb_gen_soa_field_sizes_ptr(p->module, type_of_expr(ce->args[0]));
+		table.type = tv.type;
+		return table;
+	}
+
 	case BuiltinProc_soa_copy_from_slice:
 		{
 			lbValue ptr    = lb_build_expr(p, ce->args[0]);
