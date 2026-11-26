@@ -119,6 +119,18 @@ test_split_multi_mixed_lengths :: proc(t: ^testing.T) {
 	}
 }
 
+@test
+test_split_multi_empty :: proc(t: ^testing.T) {
+	buf := []byte{'a', ','}
+	res := bytes.split_multi(buf[2:], [][]byte{buf[1:]})
+	defer delete(res)
+	testing.expect_value(t, len(res), 0)
+
+	res2 := bytes.split_multi(buf, [][]byte{buf[:0]})
+	defer delete(res2)
+	testing.expect_value(t, len(res2), 0)
+}
+
 
 @(private="file")
 Hiccup_Reader :: struct {

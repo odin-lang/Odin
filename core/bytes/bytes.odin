@@ -1060,7 +1060,7 @@ trim_suffix :: proc(s, suffix: []byte) -> []byte {
 }
 
 split_multi :: proc(s: []byte, substrs: [][]byte, skip_empty := false, allocator := context.allocator, loc := #caller_location) -> [][]byte #no_bounds_check {
-	if s == nil || len(substrs) <= 0 {
+	if len(s) == 0 || len(substrs) <= 0 {
 		return nil
 	}
 
