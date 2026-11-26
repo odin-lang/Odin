@@ -412,6 +412,7 @@ enum FieldFlag : u32 {
 	FieldFlag_no_broadcast = 1<<9, // disallow array programming
 
 	FieldFlag_no_capture  = 1<<11,
+	FieldFlag_soa_split   = 1<<12,
 
 	// Internal use by the parser only
 	FieldFlag_Tags      = 1<<15,
@@ -426,7 +427,7 @@ enum FieldFlag : u32 {
 	                      FieldFlag_const|FieldFlag_any_int|FieldFlag_by_ptr|FieldFlag_no_broadcast|
 	                      FieldFlag_no_capture,
 
-	FieldFlag_Struct    = FieldFlag_using|FieldFlag_subtype|FieldFlag_Tags,
+	FieldFlag_Struct    = FieldFlag_using|FieldFlag_subtype|FieldFlag_soa_split|FieldFlag_Tags,
 };
 
 enum StmtAllowFlag {

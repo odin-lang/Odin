@@ -2117,6 +2117,19 @@ gb_internal bool is_type_soa_slice(Type *t) {
 	return t->kind == Type_Struct && t->Struct.soa_kind == StructSoa_Slice;
 }
 
+// The type of a `#soa_split` field: its fields, or the elements of the array, become columns of their own
+gb_internal bool is_type_soa_splittable(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	switch (t->kind) {
+	case Type_Struct:
+		return !t->Struct.is_raw_union && t->Struct.soa_kind == StructSoa_None;
+	case Type_Array:
+		return t->Array.count <= 4;
+	}
+	return false;
+}
+
 // `soa` is `#soa[N]T` and `array` is `[N]T`, for the same `N` and `T`
 gb_internal bool is_type_soa_of_array(Type *soa, Type *array) {
 	soa   = base_type(soa);

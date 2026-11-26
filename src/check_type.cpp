@@ -202,8 +202,9 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 			type = t_invalid;
 		}
 
-		bool is_using = (p->flags&FieldFlag_using) != 0;
-		bool is_subtype = (p->flags&FieldFlag_subtype) != 0;
+		bool is_using     = (p->flags&FieldFlag_using) != 0;
+		bool is_subtype   = (p->flags&FieldFlag_subtype) != 0;
+		bool is_soa_split = (p->flags&FieldFlag_soa_split) != 0;
 
 		for_array(j, p->names) {
 			Ast *name = p->names[j];
@@ -230,6 +231,9 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 			field->Variable.field_group_index = field_group_index;
 			if (is_subtype) {
 				field->flags |= EntityFlag_Subtype;
+			}
+			if (is_soa_split) {
+				field->flags |= EntityFlag_SoaSplit;
 			}
 
 			if (j == 0) {
@@ -278,6 +282,17 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 				Token name_token = p->names[0]->Ident.token;
 				gbString type_str = type_to_string(first_type);
 				error(name_token, "'subtype' cannot be applied to the field '%.*s' of type '%s'", LIT(name_token.string), type_str);
+				gb_string_free(type_str);
+			}
+		}
+
+		if (is_soa_split && p->names.count > 0 && p->names[0]->kind == Ast_Ident) {
+			Token name_token = p->names[0]->Ident.token;
+			if (struct_type->Struct.is_raw_union) {
+				error(name_token, "'#soa_split' cannot be applied to a field of a 'struct #raw_union'");
+			} else if (!is_type_polymorphic(type) && !is_type_soa_splittable(type)) {
+				gbString type_str = type_to_string(type);
+				error(name_token, "'#soa_split' cannot be applied to the field '%.*s' of type '%s', expected a struct or an array of length 4 or below", LIT(name_token.string), type_str);
 				gb_string_free(type_str);
 			}
 		}

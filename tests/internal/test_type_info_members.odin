@@ -37,6 +37,20 @@ Sub :: struct {
 }
 
 @(private="file")
+Split :: struct {
+	#soa_split pos:   Base,
+	#soa_split lanes: [3]f32,
+	w:                int,
+}
+
+@(private="file")
+Unsplit :: struct {
+	pos:   Base,
+	lanes: [3]f32,
+	w:     int,
+}
+
+@(private="file")
 Untagged_Bits :: bit_field u16 {
 	lo: u8  | 4,
 	hi: u16 | 12,
@@ -127,6 +141,14 @@ test_type_info_member_usings :: proc(t: ^testing.T) {
 	testing.expect(t, .Subtype in sub.field_flags[0])
 	testing.expect(t, .Using not_in sub.field_flags[0])
 	testing.expect(t, sub.field_flags[1] == {})
+
+	// Outside an #soa array, a `#soa_split` field is like any other
+	split := struct_info(Split)
+	testing.expect(t, split.field_flags[0] == {.Soa_Split})
+	testing.expect(t, split.field_flags[1] == {.Soa_Split})
+	testing.expect(t, split.field_flags[2] == {})
+	testing.expect_value(t, size_of(Split), size_of(Unsplit))
+	testing.expect_value(t, offset_of(Split, lanes), offset_of(Unsplit, lanes))
 
 	untagged := struct_info(Untagged)
 	for i in 0..<untagged.field_count {

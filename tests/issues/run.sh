@@ -135,6 +135,13 @@ fi
 
 $ODIN test ../../core/runtime $COMMON -define:ODIN_TEST_NAMES=test_core_runtime.test_copy_soa_blocks
 
+if [[ $($ODIN check ../test_issue_soa_split_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "'#soa_split' cannot be applied") -eq 7 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_array_conversion_parens $COMMON_CHECK 2>&1 >/dev/null | grep -c "needs parentheses") -eq 3 ]] &&
    [[ $($ODIN check ../test_issue_array_conversion_parens $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]]; then
 	echo "SUCCESSFUL 1/1"

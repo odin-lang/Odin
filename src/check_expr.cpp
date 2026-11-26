@@ -15017,6 +15017,9 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, u32 flags) {
 		if (f->flags&FieldFlag_subtype) {
 			str = gb_string_appendc(str, "#subtype ");
 		}
+		if (f->flags&FieldFlag_soa_split) {
+			str = gb_string_appendc(str, "#soa_split ");
+		}
 
 		for_array(i, f->names) {
 			Ast *name = f->names[i];
@@ -15088,6 +15091,9 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, u32 flags) {
 				}
 				if (field->flags&FieldFlag_subtype) {
 					str = gb_string_appendc(str, "#subtype ");
+				}
+				if (field->flags&FieldFlag_soa_split) {
+					str = gb_string_appendc(str, "#soa_split ");
 				}
 
 				str = write_expr_to_string(str, field->type, flags);

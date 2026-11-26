@@ -217,6 +217,9 @@ gb_internal u8 lb_type_info_field_flags(Entity *f) {
 	if (f->flags & EntityFlag_Subtype) {
 		flags |= 1<<1; // .Subtype
 	}
+	if (f->flags & EntityFlag_SoaSplit) {
+		flags |= 1<<2; // .Soa_Split
+	}
 	return flags;
 }
 
