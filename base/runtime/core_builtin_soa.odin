@@ -100,9 +100,10 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, #any_int length, alignment: int, a
 	ti = type_info_base(ti)
 	si := ti.variant.(^Type_Info_Struct)
 
-	field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
+	FIELD_COUNT :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
 
-	total_size := _soa_total_size(si, field_count, length, max_align) or_return
+	offsets: [FIELD_COUNT]int
+	total_size := _soa_layout(si, length, max_align, offsets[:]) or_return
 
 	allocator := allocator
 	if allocator.procedure == nil {
@@ -120,14 +121,8 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, #any_int length, alignment: int, a
 	}
 	new_data := raw_data(new_bytes)
 
-	offset := 0
-	for i in 0..<field_count {
-		type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
-
-		offset = align_forward_int(offset, max_align)
-
-		([^]rawptr)(&array)[i] = rawptr(uintptr(new_data) + uintptr(offset))
-		offset += type.size * length
+	for offset, i in offsets {
+		([^]rawptr)(&array)[i] = &new_data[offset]
 	}
 	footer.len = length
 
@@ -200,17 +195,10 @@ resize_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int length: int, l
 
 		field_count := len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
 
-		data := (^rawptr)(array)^
-
-		soa_offset := 0
+		columns := ([^][^]byte)(array)
 		for i in 0..<field_count {
 			type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
-
-			soa_offset = align_forward_int(soa_offset, align_of(E))
-
-			mem_zero(rawptr(uintptr(data) + uintptr(soa_offset) + uintptr(type.size * old_len)), type.size * (to_zero_end - old_len))
-
-			soa_offset += type.size * footer.cap
+			mem_zero(&columns[i][type.size * old_len], type.size * (to_zero_end - old_len))
 		}
 	}
 
@@ -230,14 +218,6 @@ non_zero_resize_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int lengt
 }
 
 // `reserve_soa` will try to reserve memory of a passed SOA dynamic array to the requested element count (setting the `cap`).
-//
-// For maximizing performance it is recommended to avoid power-of-2 capacities
-// when manually reserving memory for SOA arrays, more so for sizes above 512.
-// For element types with several fields, prefer padding such capacities by at
-// least the number of fields that fit in a CPU cache line.
-// Modern cache lines are typically 64 (Intel/AMD/Arm64) or 128 bytes (Apple Silicon),
-// so pad requested capacity with e.g. `128 / size_of(field)` (for the smallest field when field sizes differ),
-// that is, prefer capacity of 4128 instead of 4096 for 4-byte fields.
 @builtin
 reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int capacity: int, loc := #caller_location) -> Allocator_Error {
 	return _reserve_soa(array, capacity, true, loc)
@@ -248,44 +228,47 @@ non_zero_reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int capacity: int,
 	return _reserve_soa(array, capacity, false, loc)
 }
 
+// NOTE(bill): Columns starting a multiple of 4 KiB apart, as power-of-two capacities make them, evict each other from the L1 cache.
+// A column starting within 128 bytes of an earlier one, modulo 4 KiB, moves forward to a 128-byte boundary that does not.
+// 128 bytes also covers the cache lines of Apple Silicon.
+// A column moves at most its own size, and only the first 32 move, to keep the padding small.
 @(private, require_results)
-_soa_total_size :: proc(si: ^Type_Info_Struct, field_count: uintptr, count: int, max_align: int) -> (total: int, err: Allocator_Error) {
-	for i in 0..<field_count {
-		type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
-		field_size := _checked_size_mul(type.size, count) or_return
-		total = _checked_size_add(total, field_size) or_return
-		_ = _checked_size_add(total, max_align - 1) or_return
-		total = align_forward_int(total, max_align)
+_soa_layout :: proc(si: ^Type_Info_Struct, count, max_align: int, offsets: []int) -> (total: int, err: Allocator_Error) {
+	PERIOD :: 4096
+	SLOT   :: 128
+
+	// Columns less than 4 KiB apart share cache lines, not sets
+	collides :: proc "contextless" (earlier: []int, offset: int) -> bool {
+		for e in earlier {
+			apart := offset - e
+			near  := apart % PERIOD
+			if apart >= PERIOD - SLOT && (near < SLOT || near > PERIOD - SLOT) {
+				return true
+			}
+		}
+		return false
 	}
+
+	step := max(max_align, SLOT)
+	for &offset, i in offsets {
+		size := _checked_size_mul(si.types[i].variant.(^Type_Info_Multi_Pointer).elem.size, count) or_return
+		_ = _checked_size_add(total, 2*step) or_return
+		offset = align_forward_int(total, max_align)
+
+		start := offset
+		for i < PERIOD/SLOT && collides(offsets[:i], offset) {
+			offset = align_forward_int(offset + 1, step)
+			if offset - start > min(size, PERIOD) {
+				offset = start
+				break
+			}
+		}
+		total = _checked_size_add(offset, size) or_return
+	}
+	total = align_forward_int(total, max_align)
 	return
 }
 
-
-// Note: capacity and performance
-// Each field is stored in contiguous memory with stride between fields capacity * size_of(field) (+ alignment).
-// When the stride is a multiple of 4KB, e.g. a power-of-2 capacity >= 1024 with 4-byte fields,
-// every same-size field's cache line for a given index maps to the same L1 set, and
-// per-element operations degrade (e.g. append_soa, inject_at_soa).
-// It is worst past 8 same-size fields where the burst exceeds the common
-// L1 8-way associativity and the fields collide (measured up to ~7-8x degradation
-// on a type with 18 same-size fields; fields of different sizes advance through
-// the sets at different rates, so they don't collide persistently).
-// Common SoA iterative flows may also be affected, when the loop touches multiple fields
-// and other hot data aliases the same L1 set.
-// So, for types with several fields, prefer padding such capacities by at
-// least the number of fields that fit in a CPU cache line.
-// Modern cache lines are typically 64 (Intel/AMD/Arm64) or 128 bytes (Apple Silicon),
-// so pad with e.g. 128 / size_of(field) (for the smallest field when field sizes differ),
-// so prefer 4128 instead of 4096 for 4-byte fields. Setting cap to e.g. 4097 is NOT enough
-// (it shifts field memory by only 4 bytes (same cache line) and fields keep colliding).
-// Note: 4KB stride in the discussion above is the x86 L1 set period (32–48KB/8–12-way);
-// Apple Silicon (128KB/8-way) has a 16KB period, so cap 4096 × 4 = 16KB stride
-// is still pathological there and the recommended 128-byte pad fixes it.
-// Note: struct size also plays a role, but the user facing padding recommendation
-// on reserve_soa() will handle up to 256 fields (of 4 bytes) decently on 8-way caches.
-// Note: Ideally, this should be handled internally by allowing allocated capacity to exceed requested capacity.
-// This would break current runtime tests though, they explicitly test requested cap.
-// Note: Capacities produced by append growth all the way from empty (2*cap + 8) are not affected.
 _reserve_soa :: #force_no_inline proc(array: ^$T/#soa[dynamic]$E, capacity: int, zero_memory: bool, loc := #caller_location) -> Allocator_Error {
 	if array == nil {
 		return nil
@@ -314,110 +297,65 @@ _reserve_soa :: #force_no_inline proc(array: ^$T/#soa[dynamic]$E, capacity: int,
 	ti = type_info_base(ti)
 	si := ti.variant.(^Type_Info_Struct)
 
-	field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
+	FIELD_COUNT :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
 	assert(footer.cap == old_cap)
 
 	max_align :: align_of(E)
-	old_size := _soa_total_size(si, field_count, old_cap, max_align) or_return
-	new_size := _soa_total_size(si, field_count, capacity, max_align) or_return
+	old_offsets, new_offsets: [FIELD_COUNT]int
+	old_size := _soa_layout(si, old_cap,  max_align, old_offsets[:]) or_return
+	new_size := _soa_layout(si, capacity, max_align, new_offsets[:]) or_return
 
-	old_data := (^rawptr)(array)^
+	columns  := ([^]rawptr)(array)
+	old_data := ([^]byte)(columns[0])
+	new_data: [^]byte
 
-	resize: if old_data != nil {
-
+	// NOTE(bill): Less padding can make a larger capacity smaller, and then it cannot be resized in place.
+	if old_data != nil && new_size >= old_size {
 		new_bytes, resize_err := array.allocator.procedure(
 			array.allocator.data, .Resize_Non_Zeroed, new_size, max_align,
 			old_data, old_size, loc,
 		)
-		new_data := raw_data(new_bytes)
-
 		#partial switch resize_err {
-		case .Mode_Not_Implemented: break resize
-		case .None: // continue resizing
-		case: return resize_err
+		case .None:                 new_data = raw_data(new_bytes)
+		case .Mode_Not_Implemented: // allocate instead
+		case:                       return resize_err
 		}
-
-		footer.cap = capacity
-
-		old_offset := 0
-		new_offset := 0
-
-		// Correct data memory
-		// from: |x x y y z z _ _ _|
-		// to:   |x x _ y y _ z z _|
-
-		// move old data to the end of the new allocation to avoid overlap
-		old_data = rawptr(uintptr(new_data) + uintptr(new_size - old_size))
-		mem_copy(old_data, new_data, old_size)
-
-		// now:  |_ _ _ x x y y z z|
-
-		for i in 0..<field_count {
-			type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
-
-			old_offset = align_forward_int(old_offset, max_align)
-			new_offset = align_forward_int(new_offset, max_align)
-
-			new_data_elem := rawptr(uintptr(new_data) + uintptr(new_offset))
-			old_data_elem := rawptr(uintptr(old_data) + uintptr(old_offset))
-
-			old_size_elem := type.size * old_cap
-			new_size_elem := type.size * capacity
-
-			mem_copy(new_data_elem, old_data_elem, old_size_elem)
-
-			([^]rawptr)(array)[i] = new_data_elem
-
-			if zero_memory {
-				mem_zero(rawptr(uintptr(new_data_elem) + uintptr(old_size_elem)), new_size_elem - old_size_elem)
-			}
-
-			old_offset += old_size_elem
-			new_offset += new_size_elem
-		}
-
-		return nil
 	}
 
-	new_bytes := array.allocator.procedure(
-		array.allocator.data, .Alloc if zero_memory else .Alloc_Non_Zeroed, new_size, max_align,
-		nil, old_size, loc,
-	) or_return
-	new_data := raw_data(new_bytes)
-
+	in_place := new_data != nil
+	if !in_place {
+		new_bytes := array.allocator.procedure(
+			array.allocator.data, .Alloc if zero_memory else .Alloc_Non_Zeroed, new_size, max_align,
+			nil, old_size, loc,
+		) or_return
+		new_data = raw_data(new_bytes)
+	}
+	old_columns := new_data if in_place else old_data
 	footer.cap = capacity
 
-	old_offset := 0
-	new_offset := 0
-
-	// Correct data memory
-	// from: |x x y y z z| ... |_ _ _ _ _ _ _ _ _|
-	// to:                     |x x _ y y _ z z _|
-
-	for i in 0..<field_count {
-		type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
-
-		old_offset = align_forward_int(old_offset, max_align)
-		new_offset = align_forward_int(new_offset, max_align)
-
-		new_data_elem := rawptr(uintptr(new_data) + uintptr(new_offset))
-		old_data_elem := rawptr(uintptr(old_data) + uintptr(old_offset))
-
-		mem_copy(new_data_elem, old_data_elem, type.size * old_cap)
-
-		([^]rawptr)(array)[i] = new_data_elem
-
-		old_offset += type.size * old_cap
-		new_offset += type.size * capacity
+	// NOTE(bill): In place, columns moving up are moved from the last one, then columns moving down from the first one.
+	// No column is then overwritten before it moves.
+	for k in 0..<2*FIELD_COUNT {
+		up := k < FIELD_COUNT
+		i  := FIELD_COUNT-1-k if up else k-FIELD_COUNT
+		if (new_offsets[i] >= old_offsets[i]) != up {
+			continue
+		}
+		size   := si.types[i].variant.(^Type_Info_Multi_Pointer).elem.size
+		column := &new_data[new_offsets[i]]
+		mem_copy(column, &old_columns[old_offsets[i]], size*old_cap)
+		if zero_memory && in_place {
+			mem_zero(&new_data[new_offsets[i] + size*old_cap], size*(capacity - old_cap))
+		}
+		columns[i] = column
 	}
 
-	if old_data != nil {
+	if old_data != nil && !in_place {
 		array.allocator.procedure(
 			array.allocator.data, .Free, 0, max_align,
 			old_data, old_size, loc,
 		) or_return
 	}
-
 	return nil
 }
 

@@ -322,6 +322,58 @@ test_soa_array_resize :: proc(t: ^testing.T) {
 	testing.expect_value(t, array[2], V{0, 0})
 }
 
+// Power-of-two capacities would start every column at the same offset modulo 4 KiB
+@(test)
+test_soa_columns_staggered :: proc(t: ^testing.T) {
+	V :: struct {a, b, c, d, e, f: f32}
+
+	check :: proc(t: ^testing.T, columns: []uintptr, loc := #caller_location) {
+		for i in 1..<len(columns) {
+			for j in 0..<i {
+				apart := (columns[i] - columns[j]) % 4096
+				testing.expectf(t, apart >= 128 && apart <= 4096-128, "columns %d and %d start %d bytes apart, modulo 4 KiB", j, i, apart, loc=loc)
+			}
+		}
+	}
+
+	array := make(#soa[dynamic]V, 0, 4096)
+	defer delete(array)
+	check(t, ([^]uintptr)(&array)[:6])
+
+	slice := make(#soa[]V, 1 << 16)
+	defer delete(slice)
+	check(t, ([^]uintptr)(&slice)[:6])
+}
+
+// Growing in place moves columns up and down, as the padding between them changes
+@(test)
+test_soa_reserve_in_place :: proc(t: ^testing.T) {
+	V :: struct {a: u8, b: f64, c: u16, d: f32}
+	N :: 3000
+
+	arena: virtual.Arena
+	testing.expect_value(t, virtual.arena_init_static(&arena), nil)
+	defer virtual.arena_destroy(&arena)
+
+	array := make(#soa[dynamic]V, virtual.arena_allocator(&arena))
+	for i in 0..<N {
+		reserve(&array, len(array) + 1 + i%5)
+		append(&array, V{u8(i), f64(i), u16(i), f32(i)})
+	}
+	resize(&array, N + 100)
+
+	for i in 0..<N {
+		if !testing.expect_value(t, array[i], V{u8(i), f64(i), u16(i), f32(i)}) {
+			return
+		}
+	}
+	for i in N..<N + 100 {
+		if !testing.expect_value(t, array[i], V{}) {
+			return
+		}
+	}
+}
+
 @(test)
 test_soa_make_len :: proc(t: ^testing.T) {
 
