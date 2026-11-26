@@ -466,6 +466,11 @@ test_fmt_zero_flag :: proc(t: ^testing.T) {
 	check(t, "+001.50", "%+07.2f", 1.5)
 	check(t, "  1.50",  "{:6.2f}", 1.5)
 	check(t, "001.50",  "{:06.2f}", 1.5)
+	check(t, "   +Inf", "%07.2f",  math.inf_f64(1))
+	check(t, "   -Inf", "%+07.2f", math.inf_f64(-1))
+	check(t, "    NaN", "%07.2f",  math.nan_f64())
+	check(t, "    +Inf", "%08e",   math.inf_f32(1))
+	check(t, "NaN    ", "%-07.2f", math.nan_f64())
 
 	// a '#' prefix stays next to the digits
 	check(t, "    0xff",   "%#8x",  255)
@@ -586,6 +591,8 @@ test_complex_quaternion_padding_flags :: proc(t: ^testing.T) {
 	check(t, "1.000  +1.000  i -1.000 j+1.000  k",     "%-7f", q)
 	check(t, "001.000+001.000i -01.000j+001.000k",     "%07f", q)
 	check(t, "  1.000  -1.000i",                       "%7f",  complex128(1-1i))
+	inf, nan := math.inf_f64(1), math.nan_f64()
+	check(t, "   +Inf+    NaNi    -Infj+001.000k",     "%07f", quaternion(real = inf, imag = nan, jmag = -inf, kmag = 1))
 }
 
 @(test)

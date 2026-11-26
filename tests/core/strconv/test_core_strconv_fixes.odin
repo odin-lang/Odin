@@ -207,6 +207,20 @@ test_fix_parse_complex_nan_imaginary :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_fix_parse_complex_invalid_number :: proc(t: ^testing.T) {
+	for s in ([]string{"1+0h12345i", "1+0hi", "0h+1i", "1e999+1i", "1+1e999i", "0x1p99999+1i"}) {
+		n: int
+		v, ok := strconv.parse_complex128(s, &n)
+		testing.expectf(t, !ok && n == len(s), "parse_complex128(%q) = %v, n=%d, ok=%v", s, v, n, ok)
+	}
+	for s in ([]string{"1+0h12345i+2j+3k", "0h+2i+3j+4k", "1e999+2i+3j+4k", "1+2i+3j+1e999k"}) {
+		n: int
+		v, ok := strconv.parse_quaternion256(s, &n)
+		testing.expectf(t, !ok && n == len(s), "parse_quaternion256(%q) = %v, n=%d, ok=%v", s, v, n, ok)
+	}
+}
+
+@(test)
 test_fix_unquote_string :: proc(t: ^testing.T) {
 	Case :: struct {
 		lit:  string,
