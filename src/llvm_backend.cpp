@@ -3888,9 +3888,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				isize types;
 				isize names;
 				isize offsets;
-				isize usings;
+				isize field_flags;
 				isize tags;
-				isize empty_usings;
+				isize empty_field_flags;
 				isize empty_tags;
 				isize enum_indices;
 			};
@@ -3917,10 +3917,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 					c.types   += n;
 					c.names   += n;
 					c.offsets += n;
-					if (lb_type_info_struct_has_usings(t)) {
-						c.usings += n;
+					if (lb_type_info_struct_has_field_flags(t)) {
+						c.field_flags += n;
 					} else {
-						c.empty_usings = gb_max(c.empty_usings, n);
+						c.empty_field_flags = gb_max(c.empty_field_flags, n);
 					}
 					if (lb_type_info_has_tags(t)) {
 						c.tags += n;
@@ -3966,16 +3966,16 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			for (lbModule *tm : gen->type_info_modules) {
 				MemberCounts const &c = counts[tm->type_info_part];
 				lbTypeInfoMembers *members = permanent_alloc_item<lbTypeInfoMembers>();
-				members->types   = global_type_info_make(tm, LB_TYPE_INFO_TYPES_NAME,   t_type_info_ptr, c.types);
-				members->names   = global_type_info_make(tm, LB_TYPE_INFO_NAMES_NAME,   t_string,        c.names);
-				members->offsets = global_type_info_make(tm, LB_TYPE_INFO_OFFSETS_NAME, t_uintptr,       c.offsets);
-				members->usings  = global_type_info_make(tm, LB_TYPE_INFO_USINGS_NAME,  t_bool,          c.empty_usings + c.usings);
-				members->tags    = global_type_info_make(tm, LB_TYPE_INFO_TAGS_NAME,    t_string,        c.empty_tags   + c.tags);
+				members->types       = global_type_info_make(tm, LB_TYPE_INFO_TYPES_NAME,       t_type_info_ptr, c.types);
+				members->names       = global_type_info_make(tm, LB_TYPE_INFO_NAMES_NAME,       t_string,        c.names);
+				members->offsets     = global_type_info_make(tm, LB_TYPE_INFO_OFFSETS_NAME,     t_uintptr,       c.offsets);
+				members->field_flags = global_type_info_make(tm, LB_TYPE_INFO_FIELD_FLAGS_NAME, t_u8,            c.empty_field_flags + c.field_flags);
+				members->tags        = global_type_info_make(tm, LB_TYPE_INFO_TAGS_NAME,        t_string,        c.empty_tags        + c.tags);
 
-				members->empty_usings_count = c.empty_usings;
-				members->empty_tags_count   = c.empty_tags;
-				members->usings_index       = c.empty_usings;
-				members->tags_index         = c.empty_tags;
+				members->empty_field_flags_count = c.empty_field_flags;
+				members->empty_tags_count        = c.empty_tags;
+				members->field_flags_index       = c.empty_field_flags;
+				members->tags_index              = c.empty_tags;
 
 				if (c.enum_indices > 0) {
 					members->enum_indices       = global_type_info_make(tm, LB_TYPE_INFO_ENUM_INDICES_NAME, t_type_info_enum_value, c.enum_indices);

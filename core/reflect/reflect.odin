@@ -549,11 +549,11 @@ Struct_Tag :: distinct string
 
 // `Struct_Field` represents a information of a field of a struct
 Struct_Field :: struct {
-	name:     string,
-	type:     ^Type_Info,
-	tag:      Struct_Tag,
-	offset:   uintptr, // in bytes
-	is_using: bool,
+	name:   string,
+	type:   ^Type_Info,
+	tag:    Struct_Tag,
+	offset: uintptr, // in bytes
+	flags:  runtime.Type_Info_Struct_Field_Flags,
 }
 
 // Returns a `Struct_Field` containing the information for a struct field of a typeid `T` at index `i`
@@ -562,11 +562,11 @@ struct_field_at :: proc(T: typeid, i: int) -> (field: Struct_Field) {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(^runtime.Type_Info_Struct); ok {
 		if 0 <= i && i < int(s.field_count) {
-			field.name     = s.names[i]
-			field.type     = s.types[i]
-			field.tag      = Struct_Tag(s.tags[i])
-			field.offset   = s.offsets[i]
-			field.is_using = s.usings[i]
+			field.name   = s.names[i]
+			field.type   = s.types[i]
+			field.tag    = Struct_Tag(s.tags[i])
+			field.offset = s.offsets[i]
+			field.flags  = s.field_flags[i]
 		}
 	}
 	return
@@ -579,11 +579,11 @@ struct_field_by_name :: proc(T: typeid, name: string) -> (field: Struct_Field) {
 	if s, ok := ti.variant.(^runtime.Type_Info_Struct); ok {
 		for fname, i in s.names[:s.field_count] {
 			if fname == name {
-				field.name     = s.names[i]
-				field.type     = s.types[i]
-				field.tag      = Struct_Tag(s.tags[i])
-				field.offset   = s.offsets[i]
-				field.is_using = s.usings[i]
+				field.name   = s.names[i]
+				field.type   = s.types[i]
+				field.tag    = Struct_Tag(s.tags[i])
+				field.offset = s.offsets[i]
+				field.flags  = s.field_flags[i]
 				break
 			}
 		}
@@ -610,7 +610,7 @@ struct_field_value_by_name :: proc(a: any, field: string, allow_using := false) 
 				}
 			}
 
-			if allow_using && s.usings[i] {
+			if allow_using && .Using in s.field_flags[i] {
 				f := any{
 					rawptr(uintptr(a.data) + s.offsets[i]),
 					s.types[i].id,
@@ -721,7 +721,7 @@ struct_field_count :: proc(T: typeid, method := Struct_Field_Count_Method.Top_Le
 		case .Using:
 			count = int(s.field_count)
 			for type, i in s.types[:s.field_count] {
-				if s.usings[i] {
+				if .Using in s.field_flags[i] {
 					count += struct_field_count(type.id)
 				}
 			}
@@ -747,11 +747,11 @@ struct_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Struct_Field) {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(^runtime.Type_Info_Struct); ok {
 		return soa_zip(
-			name     = s.names[:s.field_count],
-			type     = s.types[:s.field_count],
-			tag      = ([^]Struct_Tag)(s.tags)[:s.field_count],
-			offset   = s.offsets[:s.field_count],
-			is_using = s.usings[:s.field_count],
+			name   = s.names[:s.field_count],
+			type   = s.types[:s.field_count],
+			tag    = ([^]Struct_Tag)(s.tags)[:s.field_count],
+			offset = s.offsets[:s.field_count],
+			flags  = s.field_flags[:s.field_count],
 		)
 	}
 	return nil

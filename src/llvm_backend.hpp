@@ -119,16 +119,16 @@ struct lbTypeInfoMembers {
 	lbAddr types;
 	lbAddr names;
 	lbAddr offsets;
-	lbAddr usings;
+	lbAddr field_flags;
 	lbAddr tags;
 
 	isize types_index;
 	isize names_index;
 	isize offsets_index;
-	isize usings_index;
+	isize field_flags_index;
 	isize tags_index;
 
-	isize empty_usings_count;
+	isize empty_field_flags_count;
 	isize empty_tags_count;
 
 	lbAddr enum_indices;
@@ -749,7 +749,7 @@ gb_internal u64 lb_get_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, Stri
 #define LB_TYPE_INFO_TYPES_NAME        "__$type_info_types_data"
 #define LB_TYPE_INFO_NAMES_NAME        "__$type_info_names_data"
 #define LB_TYPE_INFO_OFFSETS_NAME      "__$type_info_offsets_data"
-#define LB_TYPE_INFO_USINGS_NAME       "__$type_info_usings_data"
+#define LB_TYPE_INFO_FIELD_FLAGS_NAME  "__$type_info_field_flags_data"
 #define LB_TYPE_INFO_TAGS_NAME         "__$type_info_tags_data"
 #define LB_TYPE_INFO_ENUM_INDICES_NAME "__$type_info_enum_indices"
 
