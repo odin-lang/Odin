@@ -1262,65 +1262,162 @@ ginger_median_of_cbrt :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) -> (pivot:
 	return
 }
 
-@(require_results)
-ginger_partition_keeps :: #force_inline proc(item, pivot: $E, call: $P, $KIND: Sort_Kind, $STRICT: bool) -> bool #no_bounds_check {
-	return ginger_greater(pivot, item, call, KIND) if STRICT else !ginger_greater(item, pivot, call, KIND)
+// Which items a partition moves to the front: those not greater than the pivot, or only those less than it.
+// The two differ only in where the items equal to the pivot go.
+Ginger_Front :: enum {
+	Not_Greater,
+	Less,
 }
 
-// Moves the items not greater than `pivot` (less than it, when STRICT) to the front, keeping their order and that of the rest.
 @(require_results)
-ginger_stable_partition :: proc(a, s: []$E, pivot: E, call: $P, $KIND: Sort_Kind, $STRICT: bool) -> (count: int) #no_bounds_check {
+ginger_partition_keeps :: #force_inline proc(item, pivot: $E, call: $P, $KIND: Sort_Kind, $FRONT: Ginger_Front) -> bool #no_bounds_check {
+	return ginger_greater(pivot, item, call, KIND) if FRONT == .Less else !ginger_greater(item, pivot, call, KIND)
+}
+
+// The partition moves four 32-bit items at a time with a 16-byte `simd_runtime_swizzle`, where that is one instruction:
+// SSSE3 on x86 (x86-64-v2, the default, has it), NEON on ARM, and simd128 on wasm.
+// Elsewhere the swizzle is emulated a lane at a time, several times slower than the scalar loop.
+GINGER_PARTITION_SIMD :: (ODIN_ARCH == .amd64  || ODIN_ARCH == .i386)      && intrinsics.has_target_feature("ssse3") ||
+                         (ODIN_ARCH == .arm64  || ODIN_ARCH == .arm32)     && intrinsics.has_target_feature("neon")  ||
+                         (ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32) && intrinsics.has_target_feature("simd128")
+
+// For each mask of four lanes, the byte shuffle that moves the masked lanes to the front, in order, and the others after them.
+@(rodata)
+ginger_lane_shuffles := [16]#simd[16]u8{
+	{ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15},
+	{ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15},
+	{ 4,  5,  6,  7,  0,  1,  2,  3,  8,  9, 10, 11, 12, 13, 14, 15},
+	{ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15},
+	{ 8,  9, 10, 11,  0,  1,  2,  3,  4,  5,  6,  7, 12, 13, 14, 15},
+	{ 0,  1,  2,  3,  8,  9, 10, 11,  4,  5,  6,  7, 12, 13, 14, 15},
+	{ 4,  5,  6,  7,  8,  9, 10, 11,  0,  1,  2,  3, 12, 13, 14, 15},
+	{ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15},
+	{12, 13, 14, 15,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11},
+	{ 0,  1,  2,  3, 12, 13, 14, 15,  4,  5,  6,  7,  8,  9, 10, 11},
+	{ 4,  5,  6,  7, 12, 13, 14, 15,  0,  1,  2,  3,  8,  9, 10, 11},
+	{ 0,  1,  2,  3,  4,  5,  6,  7, 12, 13, 14, 15,  8,  9, 10, 11},
+	{ 8,  9, 10, 11, 12, 13, 14, 15,  0,  1,  2,  3,  4,  5,  6,  7},
+	{ 0,  1,  2,  3,  8,  9, 10, 11, 12, 13, 14, 15,  4,  5,  6,  7},
+	{ 4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,  0,  1,  2,  3},
+	{ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15},
+}
+
+// Moves the four items at `src` in order, the kept ones to `lows` and the rest to `highs`, and returns how many it kept.
+// Each destination takes a whole vector.
+@(require_results)
+ginger_partition_lanes :: #force_inline proc(src, lows, highs: ^$E, pivot: E, $KIND: Sort_Kind, $FRONT: Ginger_Front) -> int #no_bounds_check {
+	V :: #simd[4]E
+
+	x := intrinsics.unaligned_load((^V)(src))
+	p := V(pivot)
+	// Orders the operands so that `simd_lanes_gt(a, b)` is greater(item, pivot) in the sort's direction.
+	when KIND == .Ordered {
+		a, b := x, p
+	} else {
+		a, b := p, x
+	}
+	when FRONT == .Less {
+		keep := intrinsics.simd_lanes_gt(b, a)  // greater(pivot, item)
+	} else {
+		keep := ~intrinsics.simd_lanes_gt(a, b) // not greater(item, pivot)
+	}
+	mask := int(transmute(u8)intrinsics.simd_extract_msbs(keep))
+
+	bytes := transmute(#simd[16]u8)x
+	intrinsics.unaligned_store((^#simd[16]u8)(lows),  intrinsics.simd_runtime_swizzle(bytes, ginger_lane_shuffles[mask]))
+	intrinsics.unaligned_store((^#simd[16]u8)(highs), intrinsics.simd_runtime_swizzle(bytes, ginger_lane_shuffles[mask ~ 0xF]))
+	return int(intrinsics.count_ones(u8(mask)))
+}
+
+// Moves the items FRONT selects to the front, keeping their order and that of the rest.
+@(require_results)
+ginger_stable_partition :: proc(a, s: []$E, pivot: E, call: $P, $KIND: Sort_Kind, $FRONT: Ginger_Front) -> (count: int) #no_bounds_check {
+	NUMERIC :: (intrinsics.type_is_integer(E) || intrinsics.type_is_float(E)) && intrinsics.type_is_endian_platform(E)
+	LANES   :: 4 when GINGER_PARTITION_SIMD && (KIND == .Ordered || KIND == .Ordered_Reverse) && NUMERIC && size_of(E) == 4 else 1
+
 	n := len(a)
 	if n <= len(s) {
-		for k in 0..<n {
+		k := 0
+		when LANES > 1 {
+			for /**/; k+LANES <= n; k += LANES {
+				count += ginger_partition_lanes(&a[k], &a[count], &s[k-count], pivot, KIND, FRONT)
+			}
+		}
+		for /**/; k < n; k += 1 {
 			item := a[k]
 			a[count]   = item
 			s[k-count] = item
-			count += int(ginger_partition_keeps(item, pivot, call, KIND, STRICT))
+			count += int(ginger_partition_keeps(item, pivot, call, KIND, FRONT))
 		}
 		copy(a[count:n], s[:n-count])
 		return
 	}
 	// Up to GINGER_PARTITION_HALVES levels of halving and rotating are cheaper than the block passes.
-	if n > len(s) << GINGER_PARTITION_HALVES && n <= GINGER_PARTITION_BLOCKS*(len(s)/2) {
-		return ginger_block_partition(a, s, pivot, call, KIND, STRICT)
+	block := len(s)/2 - (LANES-1)
+	if n > len(s) << GINGER_PARTITION_HALVES && block >= LANES && n <= GINGER_PARTITION_BLOCKS*block {
+		return ginger_block_partition(a, s, pivot, call, KIND, FRONT, LANES)
 	}
 
 	half  := n / 2
-	left  := ginger_stable_partition(a[:half], s, pivot, call, KIND, STRICT)
-	right := ginger_stable_partition(a[half:], s, pivot, call, KIND, STRICT)
+	left  := ginger_stable_partition(a[:half], s, pivot, call, KIND, FRONT)
+	right := ginger_stable_partition(a[half:], s, pivot, call, KIND, FRONT)
 	ginger_trinity_rotation(a[left:half+right], s, half-left)
 	return left + right
 }
 
 // Each half of the buffer collects one side and is written back as a whole block once full, into the part of `a` already read.
 // The blocks are then put in order. Every item moves a fixed number of times, not once per level of halving.
+// With LANES > 1 each half has room for a whole vector past its block, and what overflows a full block is carried over.
 @(require_results)
-ginger_block_partition :: proc(a, s: []$E, pivot: E, call: $P, $KIND: Sort_Kind, $STRICT: bool) -> (count: int) #no_bounds_check {
+ginger_block_partition :: proc(a, s: []$E, pivot: E, call: $P, $KIND: Sort_Kind, $FRONT: Ginger_Front, $LANES: int) -> (count: int) #no_bounds_check {
 	WORDS :: GINGER_PARTITION_BLOCKS / 64
+	SLACK :: LANES - 1
 
 	n     := len(a)
-	b     := len(s) / 2
-	lows  := s[:b]
-	highs := s[b:2*b]
+	b     := len(s)/2 - SLACK
+	lows  := s[:b+SLACK]
+	highs := s[b+SLACK:][:b+SLACK]
 
 	low_blocks: [WORDS]u64
-	blocks, nl, nh := 0, 0, 0
-	for k in 0..<n {
+	blocks := 0
+	nl, nh := 0, 0
+	k      := 0
+	when LANES > 1 {
+		for /**/; k+LANES <= n; k += LANES {
+			kept := ginger_partition_lanes(&a[k], &lows[nl], &highs[nh], pivot, KIND, FRONT)
+			nl += kept
+			nh += LANES - kept
+
+			if nl >= b {
+				copy(a[blocks*b:][:b], lows[:b])
+				copy(lows, lows[b:nl])
+				low_blocks[blocks>>6] |= 1 << uint(blocks&63)
+				blocks += 1
+				nl -= b
+			}
+			if nh >= b {
+				copy(a[blocks*b:][:b], highs[:b])
+				copy(highs, highs[b:nh])
+				blocks += 1
+				nh -= b
+			}
+		}
+	}
+	for /**/; k < n; k += 1 {
 		item := a[k]
-		keep := ginger_partition_keeps(item, pivot, call, KIND, STRICT)
+		keep := ginger_partition_keeps(item, pivot, call, KIND, FRONT)
 		lows[nl]  = item
 		highs[nh] = item
 		nl += int(keep)
 		nh += int(!keep)
 
 		if nl == b {
-			copy(a[blocks*b:][:b], lows)
+			copy(a[blocks*b:][:b], lows[:b])
 			low_blocks[blocks>>6] |= 1 << uint(blocks&63)
 			blocks += 1
 			nl = 0
 		} else if nh == b {
-			copy(a[blocks*b:][:b], highs)
+			copy(a[blocks*b:][:b], highs[:b])
 			blocks += 1
 			nh = 0
 		}
@@ -1388,19 +1485,19 @@ ginger_partition :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_chec
 			}
 		}
 
-		// A strict partition leaves only items equal to the pivot on the high side, which needs no sorting.
-		strict := has_previous && !ginger_greater(previous_pivot, pivot, call, KIND)
+		// Partitioning on .Less leaves only items equal to the pivot on the high side, which needs no sorting.
+		equal_high := has_previous && !ginger_greater(previous_pivot, pivot, call, KIND)
 		low_count := 0
-		if !strict {
-			low_count = ginger_stable_partition(a[:n], s, pivot, call, KIND, STRICT=false)
-			strict = low_count == n
+		if !equal_high {
+			low_count  = ginger_stable_partition(a[:n], s, pivot, call, KIND, .Not_Greater)
+			equal_high = low_count == n
 		}
-		if strict {
-			low_count = ginger_stable_partition(a[:n], s, pivot, call, KIND, STRICT=true)
+		if equal_high {
+			low_count = ginger_stable_partition(a[:n], s, pivot, call, KIND, .Less)
 		}
 		high_count := n - low_count
 
-		if !strict {
+		if !equal_high {
 			if low_count <= high_count/16 || high_count <= GINGER_OUT {
 				ginger_quadsort(a[low_count:n], s, call, KIND)
 			} else {
@@ -1414,7 +1511,7 @@ ginger_partition :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_chec
 		}
 		n = low_count
 		previous_pivot = pivot
-		has_previous = !strict
+		has_previous = !equal_high
 	}
 }
 

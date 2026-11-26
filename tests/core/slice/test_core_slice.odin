@@ -680,6 +680,47 @@ test_sort_ordered :: proc(t: ^testing.T) {
 	}
 }
 
+// 4-byte keys go through a vector partition on most targets. Its float and unsigned compares must agree with
+// the comparator path bit for bit: -0.0 and 0.0 compare equal and keep their order, and u32 keys above 1<<31 stay unsigned.
+@test
+test_sort_ordered_lanes :: proc(t: ^testing.T) {
+	rand.reset(t.seed)
+
+	check :: proc(t: ^testing.T, $E: typeid, key: proc(i, n: int) -> E) {
+		values   := make([]E, 40011)
+		expected := make([]E, 40011)
+		defer delete(values)
+		defer delete(expected)
+
+		for n in ([?]int{0, 3, 4, 5, 17, 100, 1023, 1025, 5000, 40011}) {
+			for &v, i in values[:n] {
+				v = key(i, n)
+			}
+
+			copy(expected[:n], values[:n])
+			slice.stable_sort_by(expected[:n], proc(a, b: E) -> bool { return a < b })
+			slice.sort(values[:n])
+			testing.expectf(t, slice.equal(transmute([]u32)values[:n], transmute([]u32)expected[:n]), "sort, %v, n = %d", typeid_of(E), n)
+
+			copy(expected[:n], values[:n])
+			slice.stable_sort_by(expected[:n], proc(a, b: E) -> bool { return a > b })
+			slice.reverse_sort(values[:n])
+			testing.expectf(t, slice.equal(transmute([]u32)values[:n], transmute([]u32)expected[:n]), "reverse_sort, %v, n = %d", typeid_of(E), n)
+		}
+	}
+
+	check(t, f32, proc(i, n: int) -> f32 {
+		switch rand.int_max(4) {
+		case 0: return -0.0
+		case 1: return 0.0
+		}
+		return f32(rand.int_max(max(n/8, 2)) - n/16)
+	})
+	check(t, u32, proc(i, n: int) -> u32 {
+		return u32(rand.int_max(max(n/8, 2))) + (1 << 31 if rand.int_max(2) == 0 else 0)
+	})
+}
+
 @test
 test_reverse_sorts :: proc(t: ^testing.T) {
 	rand.reset(t.seed)
