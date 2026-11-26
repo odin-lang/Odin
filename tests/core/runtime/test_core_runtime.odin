@@ -497,6 +497,58 @@ test_copy_soa :: proc(t: ^testing.T) {
 	testing.expect_value(t, copy(aos, empty), 0)
 }
 
+// Elements whose fields are all 4 or 8 bytes are copied in blocks, with the rest one at a time
+@(test)
+test_copy_soa_blocks :: proc(t: ^testing.T) {
+	check :: proc(t: ^testing.T, $E: typeid, loc := #caller_location) {
+		for n in 0..=10 {
+			n := n if n < 10 else 100
+
+			aos := make([]E, n)
+			defer delete(aos)
+			for &b, i in slice.to_bytes(aos) {
+				b = u8(i*7 + 3)
+			}
+
+			soa := make(#soa[]E, n+1)
+			defer delete(soa)
+			testing.expect_value(t, copy(soa, aos), n, loc=loc)
+			for i in 0..<n {
+				if !testing.expect_value(t, soa[i], aos[i], loc=loc) {
+					return
+				}
+			}
+			testing.expect_value(t, soa[n], E{}, loc=loc)
+
+			back := make([]E, n+1)
+			defer delete(back)
+			testing.expect_value(t, copy(back, soa[:n]), n, loc=loc)
+			for i in 0..<n {
+				if !testing.expect_value(t, back[i], aos[i], loc=loc) {
+					return
+				}
+			}
+			testing.expect_value(t, back[n], E{}, loc=loc)
+		}
+	}
+
+	Two   :: struct {a, b: u32}
+	Three :: struct {a, b, c: f32}
+	Four  :: struct {a, b, c, d: i32}
+	Six   :: struct {a, b, c, d, e, f: f32}
+	Wide  :: struct {a, b, c: f64}
+	Mixed :: struct {a: f32, b: u8, c: f64}
+
+	check(t, Two)
+	check(t, Three)
+	check(t, Four)
+	check(t, Six)
+	check(t, Wide)
+	check(t, Mixed)
+	check(t, [3]f32)
+	check(t, [2]u64)
+}
+
 // `#soa[dynamic; N]T` holds its elements inline like `#soa[N]T`, with a length like `[dynamic; N]T`
 @(test)
 test_soa_fixed_capacity_dynamic_array :: proc(t: ^testing.T) {

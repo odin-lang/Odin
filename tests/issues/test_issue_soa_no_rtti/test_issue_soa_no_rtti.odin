@@ -35,5 +35,9 @@ soa_no_rtti :: proc "contextless" (allocator: runtime.Allocator) -> int {
 	n += copy(aos[:], ps[:])
 	n += copy(ps[:], aos[:])
 
+	quads: [16][4]f32
+	n += copy(lanes, quads[:])
+	n += copy(quads[:], lanes)
+
 	return len(ps) + len(lanes) + len(fixed) + n
 }

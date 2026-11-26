@@ -263,7 +263,82 @@ copy_soa :: proc "contextless" (dst, src: $S/#soa[]$E) -> int {
 @builtin
 copy_soa_from_slice :: proc "contextless" (dst: $S/#soa[]$E, src: []E) -> int #no_bounds_check {
 	n := min(len(dst), len(src))
-	for i in 0..<n {
+	i := 0
+	when size_of(E) >= 8 && size_of(E)%4 == 0 {
+		sizes := intrinsics.type_soa_field_sizes(S)
+		k     := len(sizes)
+		soa   := dst
+		switch _soa_uniform_field_size(sizes[:], size_of(E)) {
+		case 4:
+			V :: #simd[4]u32
+			columns := ([^][^]u32)(&soa)
+			rows    := ([^]u32)(raw_data(src))
+			switch k {
+			case 2:
+				for /**/; i+4 <= n; i += 4 {
+					r0 := intrinsics.unaligned_load((^V)(&rows[i*2]))
+					r1 := intrinsics.unaligned_load((^V)(&rows[i*2+4]))
+					intrinsics.unaligned_store((^V)(&columns[0][i]), intrinsics.simd_shuffle(r0, r1, 0, 2, 4, 6))
+					intrinsics.unaligned_store((^V)(&columns[1][i]), intrinsics.simd_shuffle(r0, r1, 1, 3, 5, 7))
+				}
+			case 3:
+				for /**/; i+4 <= n; i += 4 {
+					r0 := intrinsics.unaligned_load((^V)(&rows[i*3]))
+					r1 := intrinsics.unaligned_load((^V)(&rows[i*3+4]))
+					r2 := intrinsics.unaligned_load((^V)(&rows[i*3+8]))
+
+					t0 := intrinsics.simd_shuffle(r0, r1, 0, 3, 6, 0)
+					t1 := intrinsics.simd_shuffle(r0, r1, 1, 4, 7, 0)
+					t2 := intrinsics.simd_shuffle(r0, r1, 2, 5, 0, 0)
+
+					intrinsics.unaligned_store((^V)(&columns[0][i]), intrinsics.simd_shuffle(t0, r2, 0, 1, 2, 5))
+					intrinsics.unaligned_store((^V)(&columns[1][i]), intrinsics.simd_shuffle(t1, r2, 0, 1, 2, 6))
+					intrinsics.unaligned_store((^V)(&columns[2][i]), intrinsics.simd_shuffle(t2, r2, 0, 1, 4, 7))
+				}
+			case:
+				for /**/; i+4 <= n; i += 4 {
+					block := rows[i*k:]
+					for w := 0; w < k; w += 4 {
+						f := min(w, k-4)
+
+						r0 := intrinsics.unaligned_load((^V)(&block[f]))
+						r1 := intrinsics.unaligned_load((^V)(&block[k+f]))
+						r2 := intrinsics.unaligned_load((^V)(&block[2*k+f]))
+						r3 := intrinsics.unaligned_load((^V)(&block[3*k+f]))
+
+						t0 := intrinsics.simd_shuffle(r0, r1, 0, 4, 1, 5)
+						t1 := intrinsics.simd_shuffle(r0, r1, 2, 6, 3, 7)
+						t2 := intrinsics.simd_shuffle(r2, r3, 0, 4, 1, 5)
+						t3 := intrinsics.simd_shuffle(r2, r3, 2, 6, 3, 7)
+
+						intrinsics.unaligned_store((^V)(&columns[f+0][i]), intrinsics.simd_shuffle(t0, t2, 0, 1, 4, 5))
+						intrinsics.unaligned_store((^V)(&columns[f+1][i]), intrinsics.simd_shuffle(t0, t2, 2, 3, 6, 7))
+						intrinsics.unaligned_store((^V)(&columns[f+2][i]), intrinsics.simd_shuffle(t1, t3, 0, 1, 4, 5))
+						intrinsics.unaligned_store((^V)(&columns[f+3][i]), intrinsics.simd_shuffle(t1, t3, 2, 3, 6, 7))
+					}
+				}
+			}
+		case 8:
+			V :: #simd[2]u64
+			columns := ([^][^]u64)(&soa)
+			rows    := ([^]u64)(raw_data(src))
+			if k >= 2 {
+				for /**/; i+2 <= n; i += 2 {
+					block := rows[i*k:]
+					for w := 0; w < k; w += 2 {
+						f := min(w, k-2)
+
+						r0 := intrinsics.unaligned_load((^V)(&block[f]))
+						r1 := intrinsics.unaligned_load((^V)(&block[k+f]))
+
+						intrinsics.unaligned_store((^V)(&columns[f+0][i]), intrinsics.simd_shuffle(r0, r1, 0, 2))
+						intrinsics.unaligned_store((^V)(&columns[f+1][i]), intrinsics.simd_shuffle(r0, r1, 1, 3))
+					}
+				}
+			}
+		}
+	}
+	for /**/; i < n; i += 1 {
 		dst[i] = src[i]
 	}
 	return n
@@ -277,10 +352,101 @@ copy_soa_from_slice :: proc "contextless" (dst: $S/#soa[]$E, src: []E) -> int #n
 @builtin
 copy_slice_from_soa :: proc "contextless" (dst: []$E, src: $S/#soa[]E) -> int #no_bounds_check {
 	n := min(len(dst), len(src))
-	for i in 0..<n {
+	i := 0
+	when size_of(E) >= 8 && size_of(E)%4 == 0 {
+		sizes := intrinsics.type_soa_field_sizes(S)
+		k     := len(sizes)
+		soa   := src
+		switch _soa_uniform_field_size(sizes[:], size_of(E)) {
+		case 4:
+			V :: #simd[4]u32
+			columns := ([^][^]u32)(&soa)
+			rows    := ([^]u32)(raw_data(dst))
+			switch k {
+			case 2:
+				for /**/; i+4 <= n; i += 4 {
+					c0 := intrinsics.unaligned_load((^V)(&columns[0][i]))
+					c1 := intrinsics.unaligned_load((^V)(&columns[1][i]))
+					intrinsics.unaligned_store((^V)(&rows[i*2]),   intrinsics.simd_shuffle(c0, c1, 0, 4, 1, 5))
+					intrinsics.unaligned_store((^V)(&rows[i*2+4]), intrinsics.simd_shuffle(c0, c1, 2, 6, 3, 7))
+				}
+			case 3:
+				for /**/; i+4 <= n; i += 4 {
+					c0 := intrinsics.unaligned_load((^V)(&columns[0][i]))
+					c1 := intrinsics.unaligned_load((^V)(&columns[1][i]))
+					c2 := intrinsics.unaligned_load((^V)(&columns[2][i]))
+
+					t0 := intrinsics.simd_shuffle(c0, c1, 0, 4, 1, 0)
+					t1 := intrinsics.simd_shuffle(c1, c2, 1, 5, 2, 0)
+					t2 := intrinsics.simd_shuffle(c2, c0, 2, 7, 3, 0)
+
+					intrinsics.unaligned_store((^V)(&rows[i*3]),   intrinsics.simd_shuffle(t0, c2, 0, 1, 4, 2))
+					intrinsics.unaligned_store((^V)(&rows[i*3+4]), intrinsics.simd_shuffle(t1, c0, 0, 1, 6, 2))
+					intrinsics.unaligned_store((^V)(&rows[i*3+8]), intrinsics.simd_shuffle(t2, c1, 0, 1, 7, 2))
+				}
+			case:
+				for /**/; i+4 <= n; i += 4 {
+					block := rows[i*k:]
+					for w := 0; w < k; w += 4 {
+						f := min(w, k-4)
+
+						c0 := intrinsics.unaligned_load((^V)(&columns[f+0][i]))
+						c1 := intrinsics.unaligned_load((^V)(&columns[f+1][i]))
+						c2 := intrinsics.unaligned_load((^V)(&columns[f+2][i]))
+						c3 := intrinsics.unaligned_load((^V)(&columns[f+3][i]))
+
+						t0 := intrinsics.simd_shuffle(c0, c1, 0, 4, 1, 5)
+						t1 := intrinsics.simd_shuffle(c0, c1, 2, 6, 3, 7)
+						t2 := intrinsics.simd_shuffle(c2, c3, 0, 4, 1, 5)
+						t3 := intrinsics.simd_shuffle(c2, c3, 2, 6, 3, 7)
+
+						intrinsics.unaligned_store((^V)(&block[f]),     intrinsics.simd_shuffle(t0, t2, 0, 1, 4, 5))
+						intrinsics.unaligned_store((^V)(&block[k+f]),   intrinsics.simd_shuffle(t0, t2, 2, 3, 6, 7))
+						intrinsics.unaligned_store((^V)(&block[2*k+f]), intrinsics.simd_shuffle(t1, t3, 0, 1, 4, 5))
+						intrinsics.unaligned_store((^V)(&block[3*k+f]), intrinsics.simd_shuffle(t1, t3, 2, 3, 6, 7))
+					}
+				}
+			}
+		case 8:
+			V :: #simd[2]u64
+			columns := ([^][^]u64)(&soa)
+			rows    := ([^]u64)(raw_data(dst))
+			if k >= 2 {
+				for /**/; i+2 <= n; i += 2 {
+					block := rows[i*k:]
+					for w := 0; w < k; w += 2 {
+						f := min(w, k-2)
+
+						c0 := intrinsics.unaligned_load((^V)(&columns[f+0][i]))
+						c1 := intrinsics.unaligned_load((^V)(&columns[f+1][i]))
+
+						intrinsics.unaligned_store((^V)(&block[f]),   intrinsics.simd_shuffle(c0, c1, 0, 2))
+						intrinsics.unaligned_store((^V)(&block[k+f]), intrinsics.simd_shuffle(c0, c1, 1, 3))
+					}
+				}
+			}
+		}
+	}
+	for /**/; i < n; i += 1 {
 		dst[i] = src[i]
 	}
 	return n
+}
+
+// The size of each field of an #soa element when they are all the same, with no padding between them, otherwise 0.
+// Blocks of such elements are copied as small matrices, transposed with shuffles.
+@(private, require_results)
+_soa_uniform_field_size :: proc "contextless" (sizes: []int, elem_size: int) -> int {
+	size := sizes[0]
+	for s in sizes {
+		if s != size {
+			return 0
+		}
+	}
+	if size*len(sizes) != elem_size {
+		return 0
+	}
+	return size
 }
 
 // NOTE(bill): Columns starting a multiple of 4 KiB apart, as power-of-two capacities make them, evict each other from the L1 cache.
