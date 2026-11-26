@@ -4885,7 +4885,35 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, type_target_max_align());
 }
 
-gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_packed, bool is_raw_union, i64 min_field_align, i64 max_field_align) {
+// NOTE(bill): The inline columns of `#soa[N]T` and `#soa[dynamic; N]T` are staggered by the rule of `_soa_layout` for `#soa[dynamic]T`.
+// A column starting within 128 bytes of an earlier one, modulo 4 KiB, moves forward to a 128-byte boundary that does not.
+// A column moves at most its own size, and only the first 32 move.
+// Fields are never reordered.
+gb_internal i64 soa_stagger_column(i64 const *offsets, isize index, i64 offset, i64 align, i64 size) {
+	i64 const PERIOD = 4096;
+	i64 const SLOT   = 128;
+
+	if (index >= PERIOD/SLOT) {
+		return offset;
+	}
+	i64 step  = gb_max(align, SLOT);
+	i64 limit = gb_min(size, PERIOD);
+	i64 start = offset;
+	for (isize i = 0; i < index; i++) {
+		i64 apart   = offset - offsets[i];
+		i64 residue = apart % PERIOD;
+		if (apart >= PERIOD - SLOT && (residue < SLOT || residue > PERIOD - SLOT)) {
+			offset = align_formula(offset + 1, step);
+			if (offset - start > limit) {
+				return start;
+			}
+			i = -1; // the moved column could now collide with an earlier one
+		}
+	}
+	return offset;
+}
+
+gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_packed, bool is_raw_union, i64 min_field_align, i64 max_field_align, isize soa_column_count) {
 	gbAllocator a = permanent_allocator();
 	auto offsets = gb_alloc_array(a, i64, fields.count);
 	i64 curr_offset = 0;
@@ -4924,6 +4952,9 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 				}
 				i64 size  = gb_max(type_size_of_internal(t, &path), 0);
 				curr_offset = align_formula(curr_offset, align);
+				if (i < soa_column_count) {
+					curr_offset = soa_stagger_column(offsets, i, curr_offset, align, size);
+				}
 				offsets[i] = curr_offset;
 				curr_offset += size;
 			}
@@ -4942,7 +4973,11 @@ gb_internal bool type_set_offsets(Type *t) {
 		MUTEX_GUARD(&t->Struct.offset_mutex);
 		if (!t->Struct.are_offsets_set) {
 			t->Struct.are_offsets_being_processed.store(true);
-			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union, t->Struct.custom_min_field_align, t->Struct.custom_max_field_align);
+			isize soa_column_count = 0;
+			if (soa_has_inline_fields(t)) {
+				soa_column_count = soa_field_count(t);
+			}
+			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union, t->Struct.custom_min_field_align, t->Struct.custom_max_field_align, soa_column_count);
 			t->Struct.are_offsets_being_processed.store(false);
 			t->Struct.are_offsets_set = !struct_fields_are_being_checked_here(t);
 		}
@@ -4951,7 +4986,7 @@ gb_internal bool type_set_offsets(Type *t) {
 		MUTEX_GUARD(&t->Tuple.mutex);
 		if (!t->Tuple.are_offsets_set) {
 			t->Tuple.are_offsets_being_processed.store(true);
-			t->Tuple.offsets = type_set_offsets_of(t->Tuple.variables, t->Tuple.is_packed, false, 1, 0);
+			t->Tuple.offsets = type_set_offsets_of(t->Tuple.variables, t->Tuple.is_packed, false, 1, 0, 0);
 			t->Tuple.are_offsets_being_processed.store(false);
 			t->Tuple.are_offsets_set = true;
 		}
