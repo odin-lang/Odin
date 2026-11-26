@@ -548,6 +548,57 @@ test_shrink_soa :: proc(t: ^testing.T) {
 	expect_elements(t, d)
 }
 
+// Resizes always move, and the memory left behind is overwritten
+@(private="file")
+moving_allocator_proc :: proc(data: rawptr, mode: runtime.Allocator_Mode, size, alignment: int, old_memory: rawptr, old_size: int, loc := #caller_location) -> (bytes: []byte, err: runtime.Allocator_Error) {
+	parent := (^runtime.Allocator)(data)^
+	#partial switch mode {
+	case .Resize, .Resize_Non_Zeroed:
+		bytes = parent.procedure(parent.data, .Alloc, size, alignment, nil, 0, loc) or_return
+		if old_memory != nil {
+			mem.copy(raw_data(bytes), old_memory, min(size, old_size))
+			mem.set(old_memory, 0xcd, old_size)
+			parent.procedure(parent.data, .Free, 0, 0, old_memory, old_size, loc) or_return
+		}
+		return
+	}
+	return parent.procedure(parent.data, mode, size, alignment, old_memory, old_size, loc)
+}
+
+// The elements `append` and `inject_at` take may be a part of the array itself
+@(test)
+test_append_inject_from_itself :: proc(t: ^testing.T) {
+	parent := context.allocator
+	context.allocator = {moving_allocator_proc, &parent}
+
+	d := make([dynamic]int, 0, 3)
+	defer delete(d)
+	append(&d, 1, 2, 3)
+	append(&d, ..d[:])
+	testing.expect_value(t, len(d), 6)
+	testing.expect_value(t, d[5], 3)
+
+	clear(&d)
+	append(&d, 1, 2, 3, 4)
+	inject_at(&d, 0, ..d[2:4])
+	for v, i in ([?]int{3, 4, 1, 2, 3, 4}) {
+		testing.expect_value(t, d[i], v)
+	}
+
+	shrink(&d)
+	inject_at(&d, 1, ..d[:2])
+	for v, i in ([?]int{3, 3, 4, 4, 1, 2, 3, 4}) {
+		testing.expect_value(t, d[i], v)
+	}
+
+	f: [dynamic; 8]int
+	append(&f, 1, 2, 3, 4)
+	inject_at(&f, 1, ..f[2:4])
+	for v, i in ([?]int{1, 3, 4, 2, 3, 4}) {
+		testing.expect_value(t, f[i], v)
+	}
+}
+
 // `append` and `inject_at` take the elements of an #soa slice, which may be a part of the array itself
 @(test)
 test_append_inject_soa_slice :: proc(t: ^testing.T) {

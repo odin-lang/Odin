@@ -792,25 +792,6 @@ _soa_index_in :: proc "contextless" (s, part: $S/#soa[]$E) -> int {
 	return -1
 }
 
-// Copies `elems` into `s` at `index`, once the elements from `index` have moved along by `len(elems)`.
-// `from` is where `elems` was in `s` before that move, or -1 when it is not a part of `s`.
-@(private)
-_soa_copy_injected :: proc "contextless" (s, elems: $S/#soa[]$E, index, from: int) {
-	m := len(elems)
-	switch {
-	case from < 0:
-		copy_soa(s[index:], elems)
-	case from+m <= index:
-		copy_soa(s[index:], s[from:][:m])
-	case from >= index:
-		copy_soa(s[index:], s[from+m:][:m])
-	case:
-		// `elems` straddles `index`, so only its end moved
-		k := index - from
-		copy_soa(s[index:],   s[from:][:k])
-		copy_soa(s[index+k:], s[index+m:][:m-k])
-	}
-}
 
 
 // Reserves room for `length` elements, growing the capacity as `append_soa` does, so growing a few elements at a time stays cheap
@@ -897,7 +878,7 @@ inject_at_slice_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int index
 	non_zero_resize_soa(array, n + m, loc) or_return
 
 	_soa_make_room(array[:], old_len, index, m)
-	_soa_copy_injected(array[:], elems, index, from)
+	_copy_injected(array[:], elems, index, from)
 
 	ok = true
 	return
@@ -1202,7 +1183,7 @@ inject_at_slice_soa_fixed_capacity :: proc(array: ^$T/#soa[dynamic; $N]$E, #any_
 
 	_soa_fixed_capacity_len(array)^ = n + m
 	_soa_make_room(array[:], old_len, index, m)
-	_soa_copy_injected(array[:], elems, index, from)
+	_copy_injected(array[:], elems, index, from)
 	return true
 }
 
