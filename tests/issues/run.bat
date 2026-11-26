@@ -53,6 +53,7 @@ set ODIN_FULL=%CD%\..\..\..\odin.exe
 %ODIN% check "..\test_issue_soa_conversion_errors" %COMMON% 2>&1 | find /c "Error:" | findstr /x "5" || exit /b
 %ODIN% check "..\test_issue_soa_conversion_errors" %COMMON% 2>&1 | find /c "an #soa array and an array convert only" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_soa_conversion_errors" %COMMON% 2>&1 | find /c "'copy' copies the elements" | findstr /x "2" || exit /b
+%ODIN% test "..\test_issue_soa_copy_blocks" %COMMON% -microarch:native || exit /b
 %ODIN% check "..\test_issue_array_conversion_parens" %COMMON% 2>&1 | find /c "needs parentheses" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_array_conversion_parens" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_7199" %COMMON% 2>&1 | find /c "..19988 chars.." | findstr /x "1" || exit /b

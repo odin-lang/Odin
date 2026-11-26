@@ -133,6 +133,8 @@ else
 	exit 1
 fi
 
+$ODIN test ../test_issue_soa_copy_blocks $COMMON
+
 if [[ $($ODIN check ../test_issue_array_conversion_parens $COMMON_CHECK 2>&1 >/dev/null | grep -c "needs parentheses") -eq 3 ]] &&
    [[ $($ODIN check ../test_issue_array_conversion_parens $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]]; then
 	echo "SUCCESSFUL 1/1"
