@@ -244,30 +244,24 @@ _soa_layout :: proc(sizes: []int, count, max_align: int, offsets: []int) -> (tot
 	PERIOD :: 4096
 	SLOT   :: 128
 
-	// Columns less than 4 KiB apart share cache lines, not sets
-	collides :: proc "contextless" (earlier: []int, offset: int) -> bool {
-		for e in earlier {
-			apart := offset - e
-			near  := apart % PERIOD
-			if apart >= PERIOD - SLOT && (near < SLOT || near > PERIOD - SLOT) {
-				return true
-			}
-		}
-		return false
-	}
-
 	step := max(max_align, SLOT)
 	for &offset, i in offsets {
-		size := _checked_size_mul(sizes[i], count) or_return
-		_ = _checked_size_add(total, 2*step) or_return
+		size  := _checked_size_mul(sizes[i],  count) or_return
+		_      = _checked_size_add(total,    2*step) or_return
 		offset = align_forward_int(total, max_align)
 
 		start := offset
-		for i < PERIOD/SLOT && collides(offsets[:i], offset) {
-			offset = align_forward_int(offset + 1, step)
-			if offset - start > min(size, PERIOD) {
-				offset = start
-				break
+		for j := 0; i < PERIOD/SLOT && j < i; j += 1 {
+			apart   := offset - offsets[j]
+			residue := apart % PERIOD
+			// Columns less than 4 KiB apart share cache lines, not sets
+			if apart >= PERIOD - SLOT && (residue < SLOT || residue > PERIOD - SLOT) {
+				offset = align_forward_int(offset + 1, step)
+				if offset - start > min(size, PERIOD) {
+					offset = start
+					break
+				}
+				j = -1 // the moved column could now collide with an earlier one
 			}
 		}
 		total = _checked_size_add(offset, size) or_return
