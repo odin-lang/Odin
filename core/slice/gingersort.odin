@@ -82,6 +82,7 @@ GINGER_INSERTION_HUGE   :: 64
 GINGER_NETWORK_BYTES    :: 16
 GINGER_PARTITION_BLOCKS :: 4096
 GINGER_PARTITION_HALVES :: 4
+GINGER_RADIX_SMALL      :: 64
 
 gingersort :: proc(data: []$E, call: $P, $KIND: Sort_Kind) {
 	when size_of(E) == 0 {
@@ -1336,8 +1337,9 @@ ginger_partition_lanes :: #force_inline proc(src, lows, highs: ^$E, pivot: E, ca
 // Moves the items FRONT selects to the front, keeping their order and that of the rest.
 @(require_results)
 ginger_stable_partition :: proc(a, s: []$E, pivot: E, call: $P, $KIND: Sort_Kind, $FRONT: Ginger_Front) -> (count: int) #no_bounds_check {
-	NUMERIC :: (intrinsics.type_is_integer(E) || intrinsics.type_is_float(E)) && intrinsics.type_is_endian_platform(E)
-	LANES   :: 4 when GINGER_PARTITION_SIMD && (KIND == .Ordered || KIND == .Ordered_Reverse) && NUMERIC && size_of(E) == 4 else 1
+	// Integers in their own order take ginger_radix_sort instead. Only floats come here to use lanes.
+	FLOAT :: intrinsics.type_is_float(E) && intrinsics.type_is_endian_platform(E)
+	LANES :: 4 when GINGER_PARTITION_SIMD && (KIND == .Ordered || KIND == .Ordered_Reverse) && FLOAT && size_of(E) == 4 else 1
 
 	n := len(a)
 	if n <= len(s) {
@@ -1473,6 +1475,116 @@ ginger_block_partition :: proc(a, s: []$E, b: int, pivot: E, call: $P, $KIND: So
 	return low_count*b + nl
 }
 
+// An in-place MSD radix sort, the American flag sort of McIlroy, Bostic and McIlroy, "Engineering Radix Sort" (1993).
+// It is unstable, but equal integers are the same bits: the result is exactly what a stable sort gives.
+ginger_radix_sort :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+	// type_integer_to_unsigned takes neither unsigned types nor rune.
+	when intrinsics.type_is_unsigned(E) {
+		K :: E
+	} else when intrinsics.type_is_rune(E) {
+		K :: u32
+	} else {
+		K :: intrinsics.type_integer_to_unsigned(E)
+	}
+	// Sorting by `K(x) ~ FLIP` as unsigned: signed integers flip their sign bit, and reverse sorts every bit.
+	SIGN :: K(0) when intrinsics.type_is_unsigned(E) else K(1) << (8*size_of(K) - 1)
+	FLIP :: SIGN when KIND == .Ordered else ~SIGN
+
+	// The highest bit any two keys differ in is where sorting starts.
+	first  := K(a[0])
+	differ := K(0)
+	for x in a {
+		differ |= K(x) ~ first
+	}
+	if differ != 0 {
+		top := uint(8*size_of(K) - 1 - int(intrinsics.count_leading_zeros(differ))) &~ 7
+		ginger_radix_level(a, s, top, K, FLIP, call, KIND)
+	}
+}
+
+ginger_radix_level :: proc(a, s: []$E, top: uint, $K: typeid, $FLIP: K, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+	digit :: #force_inline proc "contextless" (x: E, shift: uint) -> int {
+		return int(((K(x) ~ FLIP) >> shift) & 0xFF)
+	}
+
+	n := len(a)
+	if n <= GINGER_RADIX_SMALL {
+		ginger_quadsort(a, s, call, KIND)
+		return
+	}
+
+	// A byte every key shares sorts nothing.
+	shift  := top
+	counts: [256]int
+	for {
+		counts = {}
+		for x in a {
+			counts[digit(x, shift)] += 1
+		}
+		if counts[digit(a[0], shift)] != n {
+			break
+		}
+		if shift == 0 {
+			return
+		}
+		shift -= 8
+	}
+
+	// On the last byte the keys share every other byte. Equal integers being the same bits, the counts say what goes where.
+	if shift == 0 {
+		prefix := (K(a[0]) ~ FLIP) &~ 0xFF
+		i := 0
+		for c, b in counts {
+			fill(a[i:][:c], E((prefix | K(b)) ~ FLIP))
+			i += c
+		}
+		return
+	}
+
+	heads, ends: [256]int
+	sum := 0
+	for c, b in counts {
+		heads[b] = sum
+		sum += c
+		ends[b] = sum
+	}
+
+	// From a copy in the buffer the stores are independent. In place, each item goes straight to its bucket
+	// and the item it displaces moves next, until the cycle closes: every step waits on the one before.
+	if n <= len(s) {
+		copy(s, a)
+		for x in s[:n] {
+			d := digit(x, shift)
+			a[heads[d]] = x
+			heads[d] += 1
+		}
+	} else {
+		for b in 0..<256 {
+			for heads[b] < ends[b] {
+				x := a[heads[b]]
+				d := digit(x, shift)
+				for d != b {
+					y := a[heads[d]]
+					a[heads[d]] = x
+					heads[d] += 1
+					x = y
+					d = digit(x, shift)
+				}
+				a[heads[b]] = x
+				heads[b] += 1
+			}
+		}
+	}
+
+	start := 0
+	for c in counts {
+		if c > 1 {
+			ginger_radix_level(a[start:][:c], s, shift - 8, K, FLIP, call, KIND)
+		}
+		start += c
+	}
+}
+
 ginger_partition :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	n := len(a)
 
@@ -1522,6 +1634,19 @@ ginger_partition :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_chec
 }
 
 ginger_analyze :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+	// Integers in their own order take a radix sort where a partition would go. Single bytes need one
+	// counting pass, which beats any use of the order already there.
+	RADIX :: (KIND == .Ordered || KIND == .Ordered_Reverse) && intrinsics.type_is_integer(E) && intrinsics.type_is_endian_platform(E)
+	when RADIX && size_of(E) == 1 {
+		ginger_radix_sort(a, s, call, KIND)
+		return
+	}
+	when RADIX {
+		unordered :: ginger_radix_sort
+	} else {
+		unordered :: ginger_partition
+	}
+
 	n := len(a)
 
 	half1 := n / 2
@@ -1619,7 +1744,7 @@ ginger_analyze :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check 
 
 	none_ordered := ordered == [4]bool{}
 	if none_ordered {
-		ginger_partition(a, s, call, KIND)
+		unordered(a, s, call, KIND)
 		return
 	}
 
@@ -1633,7 +1758,7 @@ ginger_analyze :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check 
 		}
 
 		if unordered_from >= 0 {
-			ginger_partition(a[bounds[unordered_from]:bounds[k]], s, call, KIND)
+			unordered(a[bounds[unordered_from]:bounds[k]], s, call, KIND)
 			unordered_from = -1
 		}
 		if k < 4 && balance[k] != 0 {

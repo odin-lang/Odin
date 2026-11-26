@@ -680,7 +680,7 @@ test_sort_ordered :: proc(t: ^testing.T) {
 	}
 }
 
-// 4-byte keys go through a vector partition on most targets. Its float and unsigned compares must agree with
+// f32 keys go through a vector partition on most targets, and u32 keys through a radix sort. Both must agree with
 // the comparator path bit for bit: -0.0 and 0.0 compare equal and keep their order, and u32 keys above 1<<31 stay unsigned.
 @test
 test_sort_ordered_lanes :: proc(t: ^testing.T) {
@@ -719,6 +719,53 @@ test_sort_ordered_lanes :: proc(t: ^testing.T) {
 
 	check(t, f32)
 	check(t, u32)
+}
+
+// Integers in their own order go through a radix sort. Every width and sign must sort as a comparison sort does.
+@test
+test_sort_integers :: proc(t: ^testing.T) {
+	rand.reset(t.seed)
+
+	check :: proc(t: ^testing.T, $E: typeid) {
+		values   := make([]E, 40011)
+		expected := make([]E, 40011)
+		defer delete(values)
+		defer delete(expected)
+
+		for pattern in Sort_Pattern {
+			for n in ([?]int{0, 1, 5, 133, 257, 1025, 5000, 40011}) {
+				// Random keys use every bit. The others shift down by n/2, which crosses zero or wraps.
+				for &v, i in values[:n] {
+					if pattern == .Random {
+						v = E(rand.uint128())
+					} else {
+						v = E(sort_pattern_key(pattern, i, n)) - E(n/2)
+					}
+				}
+
+				copy(expected[:n], values[:n])
+				slice.stable_sort_by(expected[:n], proc(a, b: E) -> bool { return a < b })
+				slice.sort(values[:n])
+				testing.expectf(t, slice.equal(values[:n], expected[:n]), "sort, %v, %v, n = %d", typeid_of(E), pattern, n)
+
+				copy(expected[:n], values[:n])
+				slice.stable_sort_by(expected[:n], proc(a, b: E) -> bool { return a > b })
+				slice.reverse_sort(values[:n])
+				testing.expectf(t, slice.equal(values[:n], expected[:n]), "reverse_sort, %v, %v, n = %d", typeid_of(E), pattern, n)
+			}
+		}
+	}
+
+	check(t, i8)
+	check(t, u8)
+	check(t, i16)
+	check(t, u16)
+	check(t, i32)
+	check(t, u32)
+	check(t, i64)
+	check(t, u64)
+	check(t, i128)
+	check(t, u128)
 }
 
 @test
