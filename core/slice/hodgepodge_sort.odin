@@ -7,8 +7,8 @@ import "base:intrinsics"
 // NOTE(bill, 2026-11-25): hodgepodge sort is the sort behind every procedure in this package.
 // It is stable, sorts in place, and needs no allocator: its only scratch space is a stack buffer of at most HODGEPODGE_SWAP_BYTES.
 // It is no one algorithm but a hodgepodge, each part for the input it suits: branchless networks for small runs, merges
-// through the buffer for input with order in it, a stable partition around a sampled pivot for input without (f32 four
-// lanes at a time on most targets), and an in-place radix sort for integers in their own order.
+// through the buffer for input with order in it, a stable partition around a sampled pivot for input without (4-byte
+// numbers four lanes at a time on most targets), and an in-place radix sort for integers in their own order.
 // A comparator that is not a strict weak order still leaves a permutation of the input.
 
 ORD :: intrinsics.type_is_ordered
@@ -85,6 +85,9 @@ HODGEPODGE_NETWORK_BYTES    :: 16
 HODGEPODGE_PARTITION_BLOCKS :: 4096
 HODGEPODGE_PARTITION_HALVES :: 4
 HODGEPODGE_RADIX_SMALL      :: 64
+HODGEPODGE_RADIX_FEW        :: 4
+HODGEPODGE_RADIX_FEW_LANES  :: 32
+HODGEPODGE_RADIX_FEW_BYTES  :: 1 << 20
 
 hodgepodge_sort :: proc(data: []$E, call: $P, $KIND: Sort_Kind) {
 	when size_of(E) == 0 {
@@ -1339,9 +1342,9 @@ hodgepodge_partition_lanes :: #force_inline proc(src, lows, highs: ^$E, pivot: E
 // Moves the items FRONT selects to the front, keeping their order and that of the rest.
 @(require_results)
 hodgepodge_stable_partition :: proc(a, s: []$E, pivot: E, call: $P, $KIND: Sort_Kind, $FRONT: Hodgepodge_Front) -> (count: int) #no_bounds_check {
-	// Integers in their own order take hodgepodge_radix_sort instead. Only f32 comes here to use lanes.
-	F32   :: intrinsics.type_is_float(E) && intrinsics.type_is_endian_platform(E) && size_of(E) == 4
-	LANES :: 4 when HODGEPODGE_PARTITION_SIMD && (KIND == .Ordered || KIND == .Ordered_Reverse) && F32 else 1
+	// Integers come here from hodgepodge_radix_sort when they have few distinct values.
+	NUMERIC :: (intrinsics.type_is_integer(E) || intrinsics.type_is_float(E)) && intrinsics.type_is_endian_platform(E)
+	LANES   :: 4 when HODGEPODGE_PARTITION_SIMD && (KIND == .Ordered || KIND == .Ordered_Reverse) && NUMERIC && size_of(E) == 4 else 1
 
 	n := len(a)
 	if n <= len(s) {
@@ -1510,7 +1513,30 @@ hodgepodge_radix_sort :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds
 	if differ == 0 {
 		return
 	}
-	shift := uint(8*size_of(K) - 1 - int(intrinsics.count_leading_zeros(differ))) &~ 7
+	top   := uint(8*size_of(K) - 1 - int(intrinsics.count_leading_zeros(differ)))
+	shift := top &~ 7
+
+	// Few distinct keys make the in-place cycle a poor buy: each pass costs several partition passes and splits only a
+	// few ways. A sample of the eight highest differing bits shows them. With lanes the partition is cheap enough to take
+	// more of them at any size, and without only once the cycle misses the cache. The last byte takes the counting fill.
+	LANES    :: HODGEPODGE_PARTITION_SIMD && size_of(E) == 4
+	FEW      :: HODGEPODGE_RADIX_FEW_LANES when LANES else HODGEPODGE_RADIX_FEW
+	FEW_FROM :: 0 when LANES else HODGEPODGE_RADIX_FEW_BYTES / size_of(E)
+	if shift > 0 && n > len(s) && n > FEW_FROM {
+		seen: [4]u64
+		for i in 0..<256 {
+			d := digit(a[i*n/256], top - 7)
+			seen[d >> 6] |= 1 << uint(d & 63)
+		}
+		used := 0
+		for w in seen {
+			used += int(intrinsics.count_ones(w))
+		}
+		if used <= FEW {
+			hodgepodge_partition(a, s, call, KIND)
+			return
+		}
+	}
 
 	// Each bucket's count, until a prefix sum in place makes it the bucket's end.
 	ends: [256]int

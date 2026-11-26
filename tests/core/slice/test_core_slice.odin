@@ -703,6 +703,23 @@ test_sort_integers :: proc(t: ^testing.T) {
 				expect_comparison_order(t, values[:n], expected[:n], pattern)
 			}
 		}
+
+		// A few distinct keys spread over every bit take the partition instead: 4-byte keys past the buffer, others past 1 MB.
+		few_values   := make([]E, (1 << 20)/size_of(E) + 1)
+		few_expected := make([]E, len(few_values))
+		defer delete(few_values)
+		defer delete(few_expected)
+
+		for n in ([?]int{1025, 5000, len(few_values)}) {
+			few: [3]E
+			for &f in few {
+				f = E(rand.uint128())
+			}
+			for &v in few_values[:n] {
+				v = few[rand.int_max(len(few))]
+			}
+			expect_comparison_order(t, few_values[:n], few_expected[:n], "few spread keys")
+		}
 	}
 
 	check(t, i8)
