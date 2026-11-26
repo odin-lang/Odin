@@ -5045,8 +5045,53 @@ gb_internal Type *make_soa_struct_fixed_capacity_dynamic_array(CheckerContext *c
 	return make_soa_struct_internal(ctx, array_typ_expr, elem_expr, elem, capacity, generic_type, StructSoa_FixedCapacityDynamic);
 }
 
+// NOTE(bill): `[N]T(x)` is an array of `T(x)`, not a conversion to `[N]T`, which is written `([N]T)(x)`.
+// When `T` is a type that takes no parameters, `T(x)` cannot be a type, so it was meant as that conversion.
+gb_internal bool check_array_elem_is_conversion(CheckerContext *ctx, Ast *e) {
+	ast_node(at, ArrayType, e);
+	if (at->elem->kind != Ast_CallExpr) {
+		return false;
+	}
+	ast_node(ce, CallExpr, at->elem);
+
+	Operand o = {};
+	check_expr_or_type(ctx, &o, ce->proc);
+	if (o.mode != Addressing_Type || is_type_polymorphic_record(o.type)) {
+		return false;
+	}
+
+	gbString whole = expr_to_string(e);
+	gbString call  = expr_to_string(at->elem);
+	gbString proc  = expr_to_string(ce->proc);
+	defer (gb_string_free(proc));
+	defer (gb_string_free(call));
+	defer (gb_string_free(whole));
+
+	String whole_str = make_string_c(whole);
+	String call_str  = make_string_c(call);
+	String proc_str  = make_string_c(proc);
+
+	char const *kind = "an array";
+	if (at->count == nullptr) {
+		kind = "a slice";
+	}
+
+	ERROR_BLOCK();
+	error(at->elem, "'%s' is not a type, so '%s' is not %s type", call, whole, kind);
+	if (string_ends_with(whole_str, call_str) && string_starts_with(call_str, proc_str)) {
+		String array = substring(whole_str, 0, whole_str.len - call_str.len);
+		String args  = substring(call_str, proc_str.len, call_str.len);
+		error_line("\tSuggestion: A conversion to %s type needs parentheses: '(%.*s%.*s)%.*s'\n", kind, LIT(array), LIT(proc_str), LIT(args));
+	}
+	return true;
+}
+
 gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_type) {
 	ast_node(at, ArrayType, e);
+	if (check_array_elem_is_conversion(ctx, e)) {
+		*type = t_invalid;
+		return;
+	}
 	if (at->count != nullptr) {
 		Operand o = {};
 		i64 count = check_array_count(ctx, &o, at->count);

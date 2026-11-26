@@ -14230,6 +14230,9 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 	case Ast_RelativeType:
 		o->mode = Addressing_Type;
 		o->type = check_type(c, node);
+		if (o->type == t_invalid) {
+			o->mode = Addressing_Invalid;
+		}
 		break;
 	}
 
