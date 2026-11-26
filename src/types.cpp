@@ -3113,7 +3113,8 @@ gb_internal bool is_type_comparable(Type *t) {
 		return true;
 
 	case Type_Struct:
-		if (t->Struct.soa_kind != StructSoa_None) {
+		// NOTE(bill): Of the #soa arrays, only `#soa[N]T` holds just its elements, as `[N]T` does.
+		if (t->Struct.soa_kind != StructSoa_None && t->Struct.soa_kind != StructSoa_Fixed) {
 			return false;
 		}
 		// an unspecialized polymorphic record has no values to compare
@@ -3186,6 +3187,10 @@ gb_internal bool is_type_simple_compare(Type *t) {
 
 	case Type_Struct:
 		wait_for_struct_fields(t);
+		// NOTE(bill): The columns of an #soa array can have padding between them, so they are compared one at a time.
+		if (t->Struct.soa_kind != StructSoa_None) {
+			return false;
+		}
 		if (t->Struct.is_simple) {
 			return true;
 		}
