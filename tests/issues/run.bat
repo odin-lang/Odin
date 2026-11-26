@@ -49,6 +49,8 @@ set ODIN_FULL=%CD%\..\..\..\odin.exe
 %ODIN% check "..\test_issue_7421_tagged_duplicate" %COMMON% 2>&1 | find /c "Error: Duplicate case" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_7429" %COMMON% || exit /b
 %ODIN% check "..\test_issue_7708_mismatch" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_8451" %COMMON% 2>&1 | find /c "without a label is only allowed" | findstr /x "6" || exit /b
+%ODIN% check "..\test_issue_8451" %COMMON% 2>&1 | find /c "Suggestion: Did you mean?" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_7938" -no-entry-point %COMMON% 2>&1 | find /c "Error: Missing return statement" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_7975_7976_mismatch" %COMMON% 2>&1 | find /c "Error:" | findstr /x "8" || exit /b
 %ODIN% check "..\test_issue_ambiguous_union_literal" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b

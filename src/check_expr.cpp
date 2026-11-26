@@ -11577,6 +11577,39 @@ gb_internal ExprKind check_or_return_expr(CheckerContext *c, Operand *o, Ast *no
 	return Expr_Expr;
 }
 
+// Returns the name of the label of the innermost labelled statement enclosing the current scope
+// within the current procedure, or an empty string if there is none
+gb_internal String find_enclosing_label_name(CheckerContext *c) {
+	if (c->in_defer) {
+		return {};
+	}
+	for (Scope *s = c->scope; s != nullptr; s = s->parent) {
+		if (s->flags & ScopeFlag_Proc) {
+			break;
+		}
+		Ast *node = s->node;
+		if (node == nullptr) {
+			continue;
+		}
+		Ast *label = nullptr;
+		switch (node->kind) {
+		case Ast_BlockStmt:      label = node->BlockStmt.label;      break;
+		case Ast_IfStmt:         label = node->IfStmt.label;         break;
+		case Ast_ForStmt:        label = node->ForStmt.label;        break;
+		case Ast_RangeStmt:      label = node->RangeStmt.label;      break;
+		case Ast_SwitchStmt:     label = node->SwitchStmt.label;     break;
+		case Ast_TypeSwitchStmt: label = node->TypeSwitchStmt.label; break;
+		}
+		if (label != nullptr && label->kind == Ast_Label && label->Label.name->kind == Ast_Ident) {
+			String name = label->Label.name->Ident.token.string;
+			if (!is_blank_ident(name)) {
+				return name;
+			}
+		}
+	}
+	return {};
+}
+
 gb_internal ExprKind check_or_branch_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ast_node(be, OrBranchExpr, node);
 
@@ -11626,7 +11659,12 @@ gb_internal ExprKind check_or_branch_expr(CheckerContext *c, Operand *o, Ast *no
 	case Token_or_break:
 		node->viral_state_flags |= ViralStateFlag_ContainsOrBreak;
 		if ((c->stmt_flags & Stmt_BreakAllowed) == 0 && label == nullptr) {
-			error(be->token, "'%.*s' only allowed in non-inline loops or 'switch' statements", LIT(name));
+			ERROR_BLOCK();
+			error(be->token, "'%.*s' without a label is only allowed in non-inline loops or 'switch' statements", LIT(name));
+			String label_name = find_enclosing_label_name(c);
+			if (label_name.len != 0) {
+				error_line("\tSuggestion: Did you mean? '%.*s %.*s'\n", LIT(name), LIT(label_name));
+			}
 		}
 		break;
 	case Token_or_continue:
