@@ -626,7 +626,11 @@ when ODIN_OS == .Darwin {
 		}
 
 		pthread_mutex_t :: struct {
-			__size: [32]c.char, // NOTE: may be smaller depending on libc or arch, but never larger.
+			// Preserve the intended upper bound on storage: glibc arm64 requires
+			// 48 bytes, provided here by 40 bytes plus the c.long field below.
+			// musl arm64 requires 40 bytes; extra storage does not preserve the
+			// exact C layout when this type is embedded in structs or used in arrays.
+			__size: [40 when ODIN_ARCH == .arm64 else 32]c.char, // NOTE: may be smaller depending on libc or arch, but never larger.
 			__align: c.long,
 		}
 	}

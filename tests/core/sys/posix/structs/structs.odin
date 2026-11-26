@@ -13,6 +13,7 @@ main :: proc() {
 	fmt.println("pthread_t", size_of(posix.pthread_t), align_of(posix.pthread_t))
 	fmt.println("pthread_attr_t", size_of(posix.pthread_attr_t), align_of(posix.pthread_attr_t))
 	fmt.println("pthread_key_t", size_of(posix.pthread_key_t), align_of(posix.pthread_key_t))
+	fmt.println("pthread_mutex_t", size_of(posix.pthread_mutex_t), align_of(posix.pthread_mutex_t))
 
 	// NOTE: On Linux, differences between libc may mean the Odin side is larger than the other side,
 	// this is fine in practice.
