@@ -462,6 +462,15 @@ append_soa :: proc{
 }
 
 
+// Reserves room for `length` elements, growing the capacity as `append_soa` does, so growing a few elements at a time stays cheap
+@(private)
+_grow_soa :: proc(array: ^$T/#soa[dynamic]$E, length: int, zero_memory: bool, loc := #caller_location) -> Allocator_Error {
+	if length <= cap(array) {
+		return nil
+	}
+	return _reserve_soa(array, max(length, 2*cap(array) + DEFAULT_DYNAMIC_ARRAY_CAPACITY), zero_memory, loc)
+}
+
 // `append_nothing_soa` appends an empty value to a dynamic SOA array. It returns `1, nil` if successful, and `0, err` when it was not possible,
 // whatever `err` happens to be.
 @builtin
@@ -470,6 +479,7 @@ append_nothing_soa :: proc(array: ^$T/#soa[dynamic]$E, loc := #caller_location) 
 		return 0, nil
 	}
 	prev_len := len(array)
+	_grow_soa(array, len(array)+1, true, loc) or_return
 	resize_soa(array, len(array)+1, loc) or_return
 	return len(array)-prev_len, nil
 }
@@ -492,6 +502,7 @@ inject_at_elem_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int index:
 	// The tail shift and the stored element cover every new slot,
 	// except a gap of [old_len, index) when injecting past the end, which is
 	// zeroed explicitly below.
+	_grow_soa(array, new_len, false, loc) or_return
 	non_zero_resize_soa(array, new_len, loc) or_return
 
 	when size_of(E) != 0 {
@@ -543,6 +554,7 @@ inject_at_elems_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int index
 	// The tail shift and the stored elements cover every new slot,
 	// except a gap of [old_len, index) when injecting past the end, which is
 	// zeroed explicitly below.
+	_grow_soa(array, new_len, false, loc) or_return
 	non_zero_resize_soa(array, new_len, loc) or_return
 
 	when size_of(E) != 0 {

@@ -374,6 +374,30 @@ test_soa_reserve_in_place :: proc(t: ^testing.T) {
 	}
 }
 
+// Growing a few elements at a time grows the capacity as `append` does, not to the exact length
+@(test)
+test_grow_like_append :: proc(t: ^testing.T) {
+	V :: struct {x: int, y: u8}
+
+	soa: #soa[dynamic]V
+	defer delete(soa)
+	append_nothing_soa(&soa)
+	testing.expect_value(t, cap(soa), 8)
+	for len(soa) < 9 {
+		inject_at_soa(&soa, len(soa), V{})
+	}
+	testing.expect_value(t, cap(soa), 24)
+
+	array: [dynamic]V
+	defer delete(array)
+	append_nothing(&array)
+	testing.expect_value(t, cap(array), 8)
+	for len(array) < 9 {
+		assign_at(&array, len(array), V{})
+	}
+	testing.expect_value(t, cap(array), 16)
+}
+
 @(test)
 test_soa_make_len :: proc(t: ^testing.T) {
 

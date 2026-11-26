@@ -1127,6 +1127,15 @@ non_zero_append :: proc{
 }
 
 
+// Reserves room for `length` elements, growing the capacity as `append` does, so growing a few elements at a time stays cheap
+@(private)
+_grow_dynamic_array :: proc(#no_alias array: ^$T/[dynamic]$E, length: int, loc := #caller_location) -> Allocator_Error {
+	if length <= cap(array) {
+		return nil
+	}
+	return reserve(array, max(length, 2*cap(array), DEFAULT_DYNAMIC_ARRAY_CAPACITY), loc)
+}
+
 // `append_nothing` appends an empty value to a dynamic array. It returns `1, nil` if successful, and `0, err` when it was not possible,
 // whatever `err` happens to be.
 @builtin
@@ -1135,6 +1144,7 @@ append_nothing_dynamic_array :: proc(#no_alias array: ^$T/[dynamic]$E, loc := #c
 		return 0, nil
 	}
 	prev_len := len(array)
+	_grow_dynamic_array(array, len(array)+1, loc) or_return
 	resize(array, len(array)+1, loc) or_return
 	return len(array)-prev_len, nil
 }
@@ -1174,6 +1184,7 @@ inject_at_elem :: proc(#no_alias array: ^$T/[dynamic]$E, #any_int index: int, #n
 	m :: 1
 	new_size := _checked_size_add(n, m) or_return
 
+	_grow_dynamic_array(array, new_size, loc) or_return
 	resize(array, new_size, loc) or_return
 	when size_of(E) != 0 {
 		copy(array[index + m:], array[index:])
@@ -1201,6 +1212,7 @@ inject_at_elems :: proc(#no_alias array: ^$T/[dynamic]$E, #any_int index: int, #
 	m := len(args)
 	new_size := _checked_size_add(n, m) or_return
 
+	_grow_dynamic_array(array, new_size, loc) or_return
 	resize(array, new_size, loc) or_return
 	when size_of(E) != 0 {
 		copy(array[index + m:], array[index:])
@@ -1228,6 +1240,7 @@ inject_at_elem_string :: proc(#no_alias array: ^$T/[dynamic]$E/u8, #any_int inde
 	m := len(arg)
 	new_size := _checked_size_add(n, m) or_return
 
+	_grow_dynamic_array(array, new_size, loc) or_return
 	resize(array, new_size, loc) or_return
 	copy(array[index+m:], array[index:])
 	copy(array[index:], arg)
@@ -1344,6 +1357,7 @@ assign_at_elem :: proc(#no_alias array: ^$T/[dynamic]$E, #any_int index: int, ar
 		ok = true
 	} else {
 		new_size := _checked_size_add(index, 1) or_return
+		_grow_dynamic_array(array, new_size, loc) or_return
 		resize(array, new_size, loc) or_return
 		array[index] = arg
 		ok = true
@@ -1366,6 +1380,7 @@ assign_at_elems :: proc(#no_alias array: ^$T/[dynamic]$E, #any_int index: int, #
 		copy(array[index:], args)
 		ok = true
 	} else {
+		_grow_dynamic_array(array, new_size, loc) or_return
 		resize(array, new_size, loc) or_return
 		copy(array[index:], args)
 		ok = true
@@ -1387,6 +1402,7 @@ assign_at_elem_string :: proc(#no_alias array: ^$T/[dynamic]$E/u8, #any_int inde
 		copy(array[index:], arg)
 		ok = true
 	} else {
+		_grow_dynamic_array(array, new_size, loc) or_return
 		resize(array, new_size, loc) or_return
 		copy(array[index:], arg)
 		ok = true
