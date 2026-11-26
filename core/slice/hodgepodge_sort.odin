@@ -7,8 +7,9 @@ import "base:intrinsics"
 // NOTE(bill, 2026-11-25): hodgepodge sort is the sort behind every procedure in this package.
 // It is stable, sorts in place, and needs no allocator: its only scratch space is a stack buffer of at most HODGEPODGE_SWAP_BYTES.
 // It is no one algorithm but a hodgepodge, each part for the input it suits: branchless networks for small runs, merges
-// through the buffer for input with order in it, a stable partition around a sampled pivot for input without (4-byte
-// numbers four lanes at a time on most targets), and an in-place radix sort for integers in their own order.
+// through the buffer for input with order in it, drop-merge for input sorted apart from scattered items, a stable partition
+// around a sampled pivot for input without order (4-byte numbers four lanes at a time on most targets), and an in-place
+// radix sort for integers in their own order.
 // A comparator that is not a strict weak order still leaves a permutation of the input.
 
 ORD :: intrinsics.type_is_ordered
@@ -86,6 +87,7 @@ HODGEPODGE_PARTITION_BLOCKS :: 4096
 HODGEPODGE_PARTITION_HALVES :: 4
 HODGEPODGE_RADIX_SMALL      :: 64
 HODGEPODGE_RUN_MIN          :: 32
+HODGEPODGE_DROP_DESCENTS    :: 16
 HODGEPODGE_RADIX_FEW        :: 4
 HODGEPODGE_RADIX_FEW_LANES  :: 32
 HODGEPODGE_RADIX_FEW_BYTES  :: 1 << 20
@@ -1177,6 +1179,104 @@ hodgepodge_quadsort :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_c
 	}
 }
 
+// Whether a sample of 256 adjacent pairs has fewer than HODGEPODGE_DROP_DESCENTS descents.
+@(require_results)
+hodgepodge_nearly_sorted :: proc(a: []$E, call: $P, $KIND: Sort_Kind) -> bool #no_bounds_check {
+	n := len(a)
+	descents := 0
+	for t in 0..<256 {
+		i := t*(n-1)/256
+		descents += int(hodgepodge_greater(a[i], a[i+1], call, KIND))
+	}
+	return descents < HODGEPODGE_DROP_DESCENTS
+}
+
+// Drop-merge, after Ernerfeldt's drop-merge sort (2017), for input sorted apart from scattered items: a non-decreasing
+// sequence stays in place, and the items that break it are set aside sorted, each with its slot, the number of kept
+// items that came before it. Slots settle ties against kept items when the two merge. A kept item that is a lone spike
+// is set aside instead of what follows it. When the buffer is full, what is done so far merges into one sorted segment
+// and the scan carries on. The segments then merge in Powersort's order.
+hodgepodge_drop_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+	// The buffer holds the set-aside items, and after them their slots.
+	limit := (len(s)*size_of(E) - size_of(int)) / (size_of(E) + size_of(int))
+	items := s[:limit]
+	at    := (uintptr(raw_data(s)) + uintptr(limit*size_of(E)) + size_of(int) - 1) &~ (size_of(int) - 1)
+	slots := ([^]int)(rawptr(at))[:limit]
+
+	// Merges the kept a[base:base+k] with the set-aside items[:d] into a[base:base+k+d], from the back.
+	flush :: proc(a, items: []$E, slots: []int, base, k, d: int, call: $P, $KIND: Sort_Kind) {
+		i, j, w := d-1, base+k-1, base+k+d-1
+		for i >= 0 {
+			take_kept := false
+			if j >= base {
+				if hodgepodge_greater(a[j], items[i], call, KIND) {
+					take_kept = true
+				} else if !hodgepodge_greater(items[i], a[j], call, KIND) {
+					take_kept = j-base >= slots[i]
+				}
+			}
+			if take_kept {
+				a[w] = a[j]
+				j -= 1
+			} else {
+				a[w] = items[i]
+				i -= 1
+			}
+			w -= 1
+		}
+	}
+	// Inserts x after any equal set-aside item.
+	set_aside :: proc(items: []$E, slots: []int, d: int, x: E, slot: int, call: $P, $KIND: Sort_Kind) {
+		lo, hi := 0, d
+		for lo < hi {
+			mid := lo + (hi-lo)/2
+			if hodgepodge_greater(items[mid], x, call, KIND) {
+				hi = mid
+			} else {
+				lo = mid + 1
+			}
+		}
+		copy(items[lo+1:d+1], items[lo:d])
+		copy(slots[lo+1:d+1], slots[lo:d])
+		items[lo] = x
+		slots[lo] = slot
+	}
+
+	n := len(a)
+	base, k, d := 0, 0, 0
+	for i in 0..<n {
+		x   := a[i]
+		top := base + k
+		if k == 0 || !hodgepodge_greater(a[top-1], x, call, KIND) {
+			a[top] = x
+			k += 1
+			continue
+		}
+		if d == limit {
+			flush(a, items, slots, base, k, d, call, KIND)
+			base, k, d = i, 1, 0
+			continue
+		}
+		// x is below the last kept item. If x still fits after the one before it, and the next item is below the
+		// last kept one too, that kept item is the odd one out.
+		spike := k >= 2 && !hodgepodge_greater(a[top-2], x, call, KIND) && i+1 < n && hodgepodge_greater(a[top-1], a[i+1], call, KIND)
+		if spike {
+			// Whatever was set aside while the spike was last is below the kept item before it, so no slot moves.
+			set_aside(items, slots, d, a[top-1], k-1, call, KIND)
+			a[top-1] = x
+		} else {
+			set_aside(items, slots, d, x, k, call, KIND)
+		}
+		d += 1
+	}
+	if d > 0 {
+		flush(a, items, slots, base, k, d, call, KIND)
+	}
+	if base > 0 {
+		hodgepodge_power_merge(a, s, call, KIND)
+	}
+}
+
 // The end of the natural run at `start`: non-descending, or strictly descending and then reversed.
 @(require_results)
 hodgepodge_natural_run :: proc(a: []$E, start: int, call: $P, $KIND: Sort_Kind) -> int #no_bounds_check {
@@ -1741,7 +1841,8 @@ hodgepodge_analyze :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_ch
 	// counting pass, which beats any use of the order already there.
 	RADIX :: (KIND == .Ordered || KIND == .Ordered_Reverse) && intrinsics.type_is_integer(E) && intrinsics.type_is_endian_platform(E)
 	// Where a comparison is a call, not a few inlined instructions, a quarter with order in it merges its natural runs
-	// instead of being sorted in fixed blocks: fewer comparisons, and merges that follow the data.
+	// instead of being sorted in fixed blocks, and input sorted apart from scattered items takes drop-merge: fewer
+	// comparisons, and merges that follow the data.
 	CHEAP :: (KIND == .Ordered || KIND == .Ordered_Reverse) && !intrinsics.type_is_string(E) ||
 	         KIND == .Less_Constant || KIND == .Less_Reverse_Constant || KIND == .Cmp_Constant || KIND == .Cmp_Reverse_Constant
 	when RADIX && size_of(E) == 1 {
@@ -1851,6 +1952,12 @@ hodgepodge_analyze :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_ch
 
 	none_ordered := ordered == [4]bool{}
 	if none_ordered {
+		when !CHEAP {
+			if hodgepodge_nearly_sorted(a, call, KIND) {
+				hodgepodge_drop_merge(a, s, call, KIND)
+				return
+			}
+		}
 		unordered(a, s, call, KIND)
 		return
 	}

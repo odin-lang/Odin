@@ -767,13 +767,66 @@ test_sort_runs_stable :: proc(t: ^testing.T) {
 			}
 		}
 
+		// Comparators in variables are calls; literals would be inlined and take the cheap paths.
+		less: proc(a, b: Sort_Item) -> bool = proc(a, b: Sort_Item) -> bool { return a.key < b.key }
+		cmp:  proc(a, b: Sort_Item) -> slice.Ordering = proc(a, b: Sort_Item) -> slice.Ordering { return slice.cmp(a.key, b.key) }
+
 		fill(items)
-		slice.sort_by(items, proc(a, b: Sort_Item) -> bool { return a.key < b.key })
+		slice.sort_by(items, less)
 		if !check(t, items, "sort_by") {
 			return
 		}
 		fill(items)
-		slice.sort_by_cmp(items, proc(a, b: Sort_Item) -> slice.Ordering { return slice.cmp(a.key, b.key) })
+		slice.sort_by_cmp(items, cmp)
+		if !check(t, items, "sort_by_cmp") {
+			return
+		}
+	}
+}
+
+// Sorted keys, each three times, with 1% of items swapped at random: a comparator sort keeps the sorted ones in place and
+// merges the rest back, which must not reorder equal keys, also across the segments of a full buffer.
+@test
+test_sort_nearly_sorted_stable :: proc(t: ^testing.T) {
+	rand.reset(t.seed)
+
+	for n in ([?]int{5000, 40000, 200000}) {
+		items := make([]Sort_Item, n)
+		defer delete(items)
+
+		check :: proc(t: ^testing.T, items: []Sort_Item, api: string) -> bool {
+			for i in 1..<len(items) {
+				a, b := items[i-1], items[i]
+				if a.key > b.key || a.key == b.key && a.index > b.index {
+					return testing.expectf(t, false, "%s, n = %d: out of order at %d", api, len(items), i)
+				}
+			}
+			return true
+		}
+		fill :: proc(items: []Sort_Item) {
+			for &item, i in items {
+				item = {i64(i / 3), i64(i)}
+			}
+			for _ in 0..<len(items)/100 {
+				a, b := rand.int_max(len(items)), rand.int_max(len(items))
+				items[a].key, items[b].key = items[b].key, items[a].key
+			}
+			for &item, i in items {
+				item.index = i64(i)
+			}
+		}
+
+		// Comparators in variables are calls; literals would be inlined and take the cheap paths.
+		less: proc(a, b: Sort_Item) -> bool = proc(a, b: Sort_Item) -> bool { return a.key < b.key }
+		cmp:  proc(a, b: Sort_Item) -> slice.Ordering = proc(a, b: Sort_Item) -> slice.Ordering { return slice.cmp(a.key, b.key) }
+
+		fill(items)
+		slice.sort_by(items, less)
+		if !check(t, items, "sort_by") {
+			return
+		}
+		fill(items)
+		slice.sort_by_cmp(items, cmp)
 		if !check(t, items, "sort_by_cmp") {
 			return
 		}
