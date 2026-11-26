@@ -730,7 +730,20 @@ _append_soa_elems :: proc(#no_alias array: ^$T/#soa[dynamic]$E, zero_memory: boo
 				array[offset + j] = args[j]
 			}
 		} else {
-			intrinsics.soa_copy_from_slice(array, offset, args[:arg_len])
+			// NOTE(bill): Transposed blocks are fastest from 4 elements when the fields are uniform, the compiler's column loops from 8 otherwise.
+			// Fewer elements are stored one at a time: setting up either costs more than it saves.
+			sizes  := intrinsics.type_soa_field_sizes(T)
+			blocks := size_of(E) >= 8 && size_of(E)%4 == 0 && _soa_uniform_field_size(sizes[:], size_of(E)) != 0
+			switch {
+			case blocks && arg_len >= 4:
+				copy_soa_from_slice(array[offset:], args[:arg_len])
+			case arg_len >= 8:
+				intrinsics.soa_copy_from_slice(array, offset, args[:arg_len])
+			case:
+				#no_bounds_check for j in 0..<arg_len {
+					array[offset + j] = args[j]
+				}
+			}
 		}
 	} else {
 		footer.len += arg_len

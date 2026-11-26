@@ -699,6 +699,45 @@ test_copy_soa_blocks :: proc(t: ^testing.T) {
 	check(t, [2]u64)
 }
 
+// With optimizations `append` copies its elements in blocks, in column loops, or one at a time, depending on their fields and count
+@(test)
+test_append_soa_elems_by_count :: proc(t: ^testing.T) {
+	check :: proc(t: ^testing.T, $E: typeid, loc := #caller_location) {
+		for n in ([?]int{1, 3, 4, 5, 7, 8, 9, 100}) {
+			aos := make([]E, n)
+			defer delete(aos)
+			for &b, i in slice.to_bytes(aos) {
+				b = u8(i*7 + 3)
+			}
+
+			d: #soa[dynamic]E
+			defer delete(d)
+			append(&d, E{}) // so the elements start at an offset
+			testing.expect_value(t, append(&d, ..aos), n, loc=loc)
+			testing.expect_value(t, len(d), n+1, loc=loc)
+			testing.expect_value(t, d[0], E{}, loc=loc)
+			for i in 0..<n {
+				if !testing.expect_value(t, d[i+1], aos[i], loc=loc) {
+					return
+				}
+			}
+		}
+	}
+
+	Six      :: struct {a, b, c, d, e, f: f32}
+	Wide     :: struct {a, b, c: f64}
+	Mixed    :: struct {a: f32, b: u8, c: f64}
+	Eighteen :: struct {a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r: u32}
+	Odd      :: struct {a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p: u32, q: u64} // over 16 fields, not uniform
+
+	check(t, Six)
+	check(t, Wide)
+	check(t, Mixed)
+	check(t, Eighteen)
+	check(t, Odd)
+	check(t, [3]f32)
+}
+
 // `#soa[dynamic; N]T` holds its elements inline like `#soa[N]T`, with a length like `[dynamic; N]T`
 @(test)
 test_soa_fixed_capacity_dynamic_array :: proc(t: ^testing.T) {
