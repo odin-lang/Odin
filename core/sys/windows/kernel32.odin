@@ -237,7 +237,7 @@ foreign kernel32 {
 	@(synchronizes=.Acquire)
 	WaitForSingleObject :: proc(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD ---
 	@(synchronizes=.Acquire)
-	WaitForSingleObjectEx :: proc(hHandle: HANDLE, dwMilliseconds: DWORD, bAlterable: BOOL) -> DWORD ---
+	WaitForSingleObjectEx :: proc(hHandle: HANDLE, dwMilliseconds: DWORD, bAlertable: BOOL) -> DWORD ---
 	@(synchronizes=.Acq_Rel)
 	EnterSynchronizationBarrier :: proc(
 		lpBarrier: ^SYNCHRONIZATION_BARRIER,
@@ -465,7 +465,7 @@ foreign kernel32 {
 		lpHandles: ^HANDLE,
 		bWaitAll: BOOL,
 		dwMilliseconds: DWORD,
-		bAlterable: BOOL,
+		bAlertable: BOOL,
 	) -> DWORD ---
 	CreateNamedPipeW :: proc(
 		lpName: LPCWSTR,
