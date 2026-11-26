@@ -510,6 +510,7 @@ Sort_Pattern :: enum {
 	Organ_Pipe,
 	Sawtooth,
 	Runs,
+	Short_Runs,
 	Half_Sorted,
 	Descending_Runs,
 }
@@ -605,6 +606,16 @@ sort_pattern_keys :: proc(keys: []i64, pattern: Sort_Pattern) {
 			}
 			start += length
 			run   += 1
+		}
+	case .Short_Runs:
+		// Sorted runs of 20 to 60 keys: few descents, but each run starts below the one before.
+		for &k in keys {
+			k = i64(rand.int_max(max(n/4, 1)))
+		}
+		for start := 0; start < n; {
+			end := min(start + 20 + rand.int_max(41), n)
+			slice.sort(keys[start:end])
+			start = end
 		}
 	case .Half_Sorted:
 		// Quarters in order and quarters not, over the same keys.

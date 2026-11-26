@@ -88,6 +88,7 @@ HODGEPODGE_PARTITION_HALVES :: 4
 HODGEPODGE_RADIX_SMALL      :: 64
 HODGEPODGE_RUN_MIN          :: 32
 HODGEPODGE_DROP_DESCENTS    :: 16
+HODGEPODGE_DROP_NEW_RUN     :: 16
 HODGEPODGE_RADIX_FEW        :: 4
 HODGEPODGE_RADIX_FEW_LANES  :: 32
 HODGEPODGE_RADIX_FEW_BYTES  :: 1 << 20
@@ -1195,7 +1196,9 @@ hodgepodge_nearly_sorted :: proc(a: []$E, call: $P, $KIND: Sort_Kind) -> bool #n
 // sequence stays in place, and the items that break it are set aside sorted, each with its slot, the number of kept
 // items that came before it. Slots settle ties against kept items when the two merge. A kept item that is a lone spike
 // is set aside instead of what follows it. When the buffer is full, what is done so far merges into one sorted segment
-// and the scan carries on. The segments then merge in Powersort's order.
+// and the scan carries on. The segments then merge in Powersort's order. Concatenated runs pass for nearly sorted too,
+// but each new run starts below the kept items and would be set aside whole: when the input does that, the partition
+// takes over.
 hodgepodge_drop_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	// The buffer holds the set-aside items, and after them their slots.
 	limit := (len(s)*size_of(E) - size_of(int)) / (size_of(E) + size_of(int))
@@ -1225,17 +1228,22 @@ hodgepodge_drop_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds
 			w -= 1
 		}
 	}
-	// Inserts x after any equal set-aside item.
-	set_aside :: proc(items: []$E, slots: []int, d: int, x: E, slot: int, call: $P, $KIND: Sort_Kind) {
-		lo, hi := 0, d
+	// How many items of the sorted `a` are not greater than x: where x goes after any equal item.
+	rank :: proc(a: []$E, x: E, call: $P, $KIND: Sort_Kind) -> int {
+		lo, hi := 0, len(a)
 		for lo < hi {
 			mid := lo + (hi-lo)/2
-			if hodgepodge_greater(items[mid], x, call, KIND) {
+			if hodgepodge_greater(a[mid], x, call, KIND) {
 				hi = mid
 			} else {
 				lo = mid + 1
 			}
 		}
+		return lo
+	}
+	// Inserts x after any equal set-aside item.
+	set_aside :: proc(items: []$E, slots: []int, d: int, x: E, slot: int, call: $P, $KIND: Sort_Kind) {
+		lo := rank(items[:d], x, call, KIND)
 		copy(items[lo+1:d+1], items[lo:d])
 		copy(slots[lo+1:d+1], slots[lo:d])
 		items[lo] = x
@@ -1268,6 +1276,19 @@ hodgepodge_drop_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds
 			set_aside(items, slots, d, x, k, call, KIND)
 		}
 		d += 1
+
+		// A new run below the kept items: the next three items each have HODGEPODGE_DROP_NEW_RUN kept items above them.
+		// A few kept outliers, or one low item, do not look like that.
+		if d % HODGEPODGE_DROP_NEW_RUN == 0 && i+3 < n {
+			kept := a[base:base+k]
+			if k - rank(kept, a[i+1], call, KIND) >= HODGEPODGE_DROP_NEW_RUN &&
+			   k - rank(kept, a[i+2], call, KIND) >= HODGEPODGE_DROP_NEW_RUN &&
+			   k - rank(kept, a[i+3], call, KIND) >= HODGEPODGE_DROP_NEW_RUN {
+				flush(a, items, slots, base, k, d, call, KIND)
+				hodgepodge_partition(a, s, call, KIND)
+				return
+			}
+		}
 	}
 	if d > 0 {
 		flush(a, items, slots, base, k, d, call, KIND)
