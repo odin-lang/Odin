@@ -382,3 +382,24 @@ test_soa :: proc(t: ^testing.T) {
 
 	testing.expect(t, reflect.soa_field_value(P{}, 0, 0) == nil)
 }
+
+// `length` and `capacity` look through a pointer at what it points to
+@test
+test_length_through_pointer :: proc(t: ^testing.T) {
+	s := []int{1, 2, 3}
+	testing.expect_value(t, reflect.length(&s), 3)
+
+	d: [dynamic]int
+	defer delete(d)
+	reserve(&d, 10)
+	append(&d, 1, 2)
+	testing.expect_value(t, reflect.length(&d), 2)
+	testing.expect_value(t, reflect.capacity(&d), cap(d))
+
+	a: [4]int
+	testing.expect_value(t, reflect.length(&a), 4)
+
+	nil_slice: ^[]int
+	testing.expect_value(t, reflect.length(nil_slice), 0)
+	testing.expect_value(t, reflect.capacity(nil_slice), 0)
+}
