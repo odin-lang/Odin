@@ -2,8 +2,8 @@ package test_internal
 
 import "core:testing"
 
-// On i386 a zero-size argument has no LLVM parameter, so the pointers that a split
-// multiple-value result is returned through sit one parameter earlier per empty argument.
+// On i386 a zero-size argument has no LLVM parameter. The pointers that a split multiple-value
+// result is returned through sit one parameter earlier per empty argument.
 // Taking them from the argument count stored the results through the context pointer.
 
 @(private="file")
