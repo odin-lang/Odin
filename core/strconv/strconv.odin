@@ -1240,10 +1240,12 @@ Output:
 parse_complex128 :: proc(str: string, n: ^int = nil) -> (value: complex128, ok: bool) {
 	real_value, imag_value: f64
 	nr_r, nr_i: int
+	real_ok: bool
+	imag_ok := true
 
-	real_value, nr_r, _ = parse_f64_prefix(str)
+	real_value, nr_r, real_ok = parse_f64_prefix(str)
 	if nr_r < len(str) && (str[nr_r] == '+' || str[nr_r] == '-' || str[nr_r] == 'n' || str[nr_r] == 'N') {
-		imag_value, nr_i, _ = parse_f64_prefix(str[nr_r:])
+		imag_value, nr_i, imag_ok = parse_f64_prefix(str[nr_r:])
 	}
 
 	i_parsed := len(str) >= nr_r + nr_i + 1 && str[nr_r + nr_i] == 'i'
@@ -1257,7 +1259,7 @@ parse_complex128 :: proc(str: string, n: ^int = nil) -> (value: complex128, ok: 
 		i_parsed = nr_r > 0
 	}
 
-	ok = i_parsed && len(str) == nr_r + nr_i + 1
+	ok = i_parsed && real_ok && imag_ok && len(str) == nr_r + nr_i + 1
 
 	if n != nil {
 		n^ = nr_r + nr_i + (1 if i_parsed else 0)
@@ -1364,18 +1366,20 @@ Output:
 - ok: `false` if a quaternion could not be found, or if the input string contained more than just the quaternion.
 */
 parse_quaternion256 :: proc(str: string, n: ^int = nil) -> (value: quaternion256, ok: bool) {
-	iterate_and_assign :: proc (iter: ^string, terminator: byte, nr_total: ^int, state: bool) -> (value: f64, ok: bool) {
+	iterate_and_assign :: proc (iter: ^string, terminator: byte, nr_total: ^int, state: bool, valid: ^bool) -> (value: f64, ok: bool) {
 		if !state || len(iter) == 0 || (iter[0] != '+' && iter[0] != '-' && iter[0] != 'n' && iter[0] != 'N') {
 			return
 		}
 
 		nr: int
-		value, nr, _ = parse_f64_prefix(iter^)
+		number_ok: bool
+		value, nr, number_ok = parse_f64_prefix(iter^)
 		iter^ = iter[nr:]
 
 		if nr > 0 && len(iter) > 0 && iter[0] == terminator {
 			iter^ = iter[1:]
 			nr_total^ += nr + 1
+			valid^ &&= number_ok
 			ok = true
 		} else {
 			value = 0
@@ -1386,8 +1390,9 @@ parse_quaternion256 :: proc(str: string, n: ^int = nil) -> (value: quaternion256
 
 	real_value, imag_value, jmag_value, kmag_value: f64
 	nr: int
+	valid: bool
 
-	real_value, nr, _ = parse_f64_prefix(str)
+	real_value, nr, valid = parse_f64_prefix(str)
 	iter := str[nr:]
 
 	// Need to have parsed at least something in order to get started.
@@ -1400,12 +1405,12 @@ parse_quaternion256 :: proc(str: string, n: ^int = nil) -> (value: quaternion256
 		iter = iter[1:]
 		nr += 1
 	} else {
-		imag_value, ok = iterate_and_assign(&iter, 'i', &nr, ok)
+		imag_value, ok = iterate_and_assign(&iter, 'i', &nr, ok, &valid)
 	}
-	jmag_value, ok = iterate_and_assign(&iter, 'j', &nr, ok)
-	kmag_value, ok = iterate_and_assign(&iter, 'k', &nr, ok)
+	jmag_value, ok = iterate_and_assign(&iter, 'j', &nr, ok, &valid)
+	kmag_value, ok = iterate_and_assign(&iter, 'k', &nr, ok, &valid)
 
-	if len(iter) != 0 {
+	if len(iter) != 0 || !valid {
 		ok = false
 	}
 
