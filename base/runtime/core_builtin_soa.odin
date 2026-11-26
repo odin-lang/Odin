@@ -446,6 +446,41 @@ _copy_soa_and_slice :: proc "contextless" (soa: $S/#soa[]$E, aos: []E, $TO_SOA: 
 					}
 				}
 			}
+			when _SOA_NEON {
+				// NOTE(bill): Four elements at a time, a wide access and stride shuffles that become ld3, ld4, or st4.
+				// With 3 fields the 16 lanes loaded reach past the 4 elements, into elements which must exist.
+				// There is no st3: its 12-lane interleave cannot be written as a #simd type.
+				G :: #simd[16]u32
+				switch k {
+				case 3:
+					when TO_SOA {
+						for /**/; i+6 <= n; i += 4 {
+							g := intrinsics.unaligned_load((^G)(&rows[i*3]))
+							intrinsics.unaligned_store((^V)(&columns[0][i]), intrinsics.simd_shuffle(g, g, 0, 3, 6, 9))
+							intrinsics.unaligned_store((^V)(&columns[1][i]), intrinsics.simd_shuffle(g, g, 1, 4, 7, 10))
+							intrinsics.unaligned_store((^V)(&columns[2][i]), intrinsics.simd_shuffle(g, g, 2, 5, 8, 11))
+						}
+					}
+				case 4:
+					for /**/; i+4 <= n; i += 4 {
+						when TO_SOA {
+							g := intrinsics.unaligned_load((^G)(&rows[i*4]))
+							intrinsics.unaligned_store((^V)(&columns[0][i]), intrinsics.simd_shuffle(g, g, 0, 4, 8, 12))
+							intrinsics.unaligned_store((^V)(&columns[1][i]), intrinsics.simd_shuffle(g, g, 1, 5, 9, 13))
+							intrinsics.unaligned_store((^V)(&columns[2][i]), intrinsics.simd_shuffle(g, g, 2, 6, 10, 14))
+							intrinsics.unaligned_store((^V)(&columns[3][i]), intrinsics.simd_shuffle(g, g, 3, 7, 11, 15))
+						} else {
+							c0 := intrinsics.unaligned_load((^V)(&columns[0][i]))
+							c1 := intrinsics.unaligned_load((^V)(&columns[1][i]))
+							c2 := intrinsics.unaligned_load((^V)(&columns[2][i]))
+							c3 := intrinsics.unaligned_load((^V)(&columns[3][i]))
+							c01 := intrinsics.simd_shuffle(c0, c1, 0, 1, 2, 3, 4, 5, 6, 7)
+							c23 := intrinsics.simd_shuffle(c2, c3, 0, 1, 2, 3, 4, 5, 6, 7)
+							intrinsics.unaligned_store((^G)(&rows[i*4]), intrinsics.simd_shuffle(c01, c23, 0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15))
+						}
+					}
+				}
+			}
 			switch k {
 			case 2:
 				for /**/; i+4 <= n; i += 4 {
@@ -585,6 +620,39 @@ _copy_soa_and_slice :: proc "contextless" (soa: $S/#soa[]$E, aos: []E, $TO_SOA: 
 					}
 				}
 			}
+			when _SOA_NEON {
+				// NOTE(bill): Two elements at a time, as ld3, ld4, or st4, the same as for 4-byte fields.
+				G :: #simd[8]u64
+				switch k {
+				case 3:
+					when TO_SOA {
+						for /**/; i+3 <= n; i += 2 {
+							g := intrinsics.unaligned_load((^G)(&rows[i*3]))
+							intrinsics.unaligned_store((^V)(&columns[0][i]), intrinsics.simd_shuffle(g, g, 0, 3))
+							intrinsics.unaligned_store((^V)(&columns[1][i]), intrinsics.simd_shuffle(g, g, 1, 4))
+							intrinsics.unaligned_store((^V)(&columns[2][i]), intrinsics.simd_shuffle(g, g, 2, 5))
+						}
+					}
+				case 4:
+					for /**/; i+2 <= n; i += 2 {
+						when TO_SOA {
+							g := intrinsics.unaligned_load((^G)(&rows[i*4]))
+							intrinsics.unaligned_store((^V)(&columns[0][i]), intrinsics.simd_shuffle(g, g, 0, 4))
+							intrinsics.unaligned_store((^V)(&columns[1][i]), intrinsics.simd_shuffle(g, g, 1, 5))
+							intrinsics.unaligned_store((^V)(&columns[2][i]), intrinsics.simd_shuffle(g, g, 2, 6))
+							intrinsics.unaligned_store((^V)(&columns[3][i]), intrinsics.simd_shuffle(g, g, 3, 7))
+						} else {
+							c0 := intrinsics.unaligned_load((^V)(&columns[0][i]))
+							c1 := intrinsics.unaligned_load((^V)(&columns[1][i]))
+							c2 := intrinsics.unaligned_load((^V)(&columns[2][i]))
+							c3 := intrinsics.unaligned_load((^V)(&columns[3][i]))
+							c01 := intrinsics.simd_shuffle(c0, c1, 0, 1, 2, 3)
+							c23 := intrinsics.simd_shuffle(c2, c3, 0, 1, 2, 3)
+							intrinsics.unaligned_store((^G)(&rows[i*4]), intrinsics.simd_shuffle(c01, c23, 0, 2, 4, 6, 1, 3, 5, 7))
+						}
+					}
+				}
+			}
 			if k >= 2 {
 				for /**/; i+2 <= n; i += 2 {
 					block := rows[i*k:]
@@ -629,6 +697,11 @@ _copy_soa_and_slice :: proc "contextless" (soa: $S/#soa[]$E, aos: []E, $TO_SOA: 
 // Not where LLVM splits unaligned 32-byte loads in two (e.g. `-target-features:avx2` on the default microarchitecture), as that is slower.
 @(private)
 _SOA_AVX2 :: (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) && intrinsics.has_target_feature("avx2") && !intrinsics.has_target_feature("slow-unaligned-mem-32")
+
+// On arm64, blocks of 3 or 4 fields use NEON's structured loads and stores.
+// LLVM only forms those from wide accesses when optimizing for speed: below that, the same code is moves lane by lane.
+@(private)
+_SOA_NEON :: ODIN_ARCH == .arm64 && ODIN_OPTIMIZATION_MODE >= .Speed
 
 // The size of each field of an #soa element when they are all the same, with no padding between them, otherwise 0.
 // Blocks of such elements are copied as small matrices, transposed with shuffles.

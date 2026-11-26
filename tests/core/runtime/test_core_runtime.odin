@@ -649,9 +649,21 @@ test_append_inject_soa_slice :: proc(t: ^testing.T) {
 
 // Elements whose fields are all 4 or 8 bytes are copied in blocks, with the rest one at a time.
 // With AVX2 a block is 8 elements of 5 or more 4-byte fields, or 4 of 3 or more 8-byte fields: the issue tests run this with `-microarch:native`.
-// A field count under the block width also reads or writes the next element, so what lies past the copied elements is checked too.
+// On arm64 with `-o:speed`, 3 or 4 fields use NEON's structured loads and stores.
+// Some blocks read or write past the elements they copy, into elements which must exist.
+// The slice copied from ends at an inaccessible page, and what lies past the slice copied to must stay as it is.
 @(test)
 test_copy_soa_blocks :: proc(t: ^testing.T) {
+	// `n` elements ending where an inaccessible page starts
+	guarded :: proc($E: typeid, n: int) -> (s: []E, region: []byte) {
+		page := mem.PAGE_SIZE
+		size := mem.align_forward_int(n*size_of(E), page)
+		region, _ = virtual.reserve_and_commit(uint(size + page))
+		virtual.protect(&region[size], uint(page), virtual.Protect_No_Access)
+		s = ([^]E)(&region[size - n*size_of(E)])[:n]
+		return
+	}
+
 	check :: proc(t: ^testing.T, $E: typeid, loc := #caller_location) {
 		past: E
 		for &b in ([^]u8)(&past)[:size_of(E)] {
@@ -661,8 +673,8 @@ test_copy_soa_blocks :: proc(t: ^testing.T) {
 		for n in 0..=25 {
 			n := n if n < 25 else 100
 
-			aos := make([]E, n)
-			defer delete(aos)
+			aos, region := guarded(E, n)
+			defer virtual.release(raw_data(region), len(region))
 			for &b, i in slice.to_bytes(aos) {
 				b = u8(i*7 + 3)
 			}
