@@ -2508,112 +2508,77 @@ __handle_raw_union_tag :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.
 	return false
 }
 
+// Formats an #soa array as the array of its elements.
+// Each element is gathered from the fields into one value, which is formatted like any other.
 @(private)
-fmt_soa_struct_internal :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_Struct, type_name: string, hash: bool, indent: int) {
-	is_empty := info.field_count == 0
-
-	fi.indent += 1
-	defer fi.indent -= 1
-
-	base_type_name: string
-	if v, ok := info.soa_base_type.variant.(^runtime.Type_Info_Named); ok {
-		base_type_name = v.name
+fmt_soa :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Struct) {
+	field_count := int(info.field_count)
+	n := int(info.soa_len)
+	switch info.soa_kind {
+	case .None, .Fixed:
+	case .Slice, .Fixed_Capacity_Dynamic:
+		field_count -= 1 // len
+	case .Dynamic:
+		field_count -= 3 // len, cap, allocator
+	}
+	if info.soa_kind != .Fixed {
+		n = (^int)(uintptr(v.data) + info.offsets[field_count])^
 	}
 
-	actual_field_count := info.field_count
-
-	n := uintptr(info.soa_len)
-
-	if info.soa_kind == .Slice {
-		actual_field_count = info.field_count-1 // len
-
-		n = uintptr((^int)(uintptr(v.data) + info.offsets[actual_field_count])^)
-
-	} else if info.soa_kind == .Dynamic {
-		actual_field_count = info.field_count-3 // len, cap, allocator
-
-		n = uintptr((^int)(uintptr(v.data) + info.offsets[actual_field_count])^)
-	} else if info.soa_kind == .Fixed_Capacity_Dynamic {
-		actual_field_count = info.field_count-1 // len
-
-		n = uintptr((^int)(uintptr(v.data) + info.offsets[actual_field_count])^)
+	_write_byte(fi, '[' if verb != 'w' else '{')
+	defer _write_byte(fi, ']' if verb != 'w' else '}')
+	if n <= 0 {
+		return
 	}
+	fi.record_level += 1
+	defer fi.record_level -= 1
 
-	if hash && n > 0 {
+	elem := info.soa_base_type
+	base := runtime.type_info_base(elem)
+	// alloca only takes a constant alignment, so the element's is applied by hand
+	data := ([^]byte)(mem.align_forward(intrinsics.alloca(elem.size + elem.align, 1), uintptr(elem.align)))
+	inline_fields := info.soa_kind == .Fixed || info.soa_kind == .Fixed_Capacity_Dynamic
+
+	hash   := fi.hash
+	indent := fi.indent
+	if hash {
 		_write_byte(fi, '\n')
+		fi.indent += 1
+	}
+	defer if hash {
+		fi.indent = indent
+		fmt_write_indent(fi)
 	}
 
 	for index in 0..<n {
-		if !hash && index > 0 { _write_string(fi, ", ") }
+		for i in 0..<field_count {
+			field_type:   ^runtime.Type_Info
+			field_offset: uintptr
+			#partial switch b in base.variant {
+			case ^runtime.Type_Info_Struct:
+				field_type, field_offset = b.types[i], b.offsets[i]
+			case ^runtime.Type_Info_Array:
+				field_type, field_offset = b.elem, uintptr(i*b.elem_size)
+			}
 
-		field_count := -1
-
-		if !hash && field_count > 0 { _write_string(fi, ", ") }
+			column := uintptr(v.data) + info.offsets[i]
+			if !inline_fields {
+				column = (^uintptr)(column)^
+			}
+			intrinsics.mem_copy_non_overlapping(&data[field_offset], rawptr(column + uintptr(index*field_type.size)), field_type.size)
+		}
 
 		if hash {
-			fi.indent -= 1
 			fmt_write_indent(fi)
-			fi.indent += 1
+		} else if index > 0 {
+			_write_string(fi, ", ")
 		}
-		_write_string(fi, base_type_name)
-		_write_byte(fi, '{')
-		if hash && !is_empty { _write_byte(fi, '\n') }
-		defer {
-			if hash && !is_empty {
-				fi.indent -= 1
-				fmt_write_indent(fi)
-				fi.indent += 1
-			}
-			_write_byte(fi, '}')
-			if hash { _write_string(fi, ",\n") }
+		fmt_arg(fi, any{data, elem.id}, verb)
+		if hash {
+			_write_string(fi, ",\n")
 		}
-		fi.record_level += 1
-		defer fi.record_level -= 1
-
-		for i in 0..<actual_field_count {
-			verb := 'v'
-			name := info.names[i]
-			field_count += 1
-
-			if !hash && field_count > 0 { _write_string(fi, ", ") }
-			if hash {
-				fmt_write_indent(fi)
-			}
-
-			_write_string(fi, name)
-			_write_string(fi, " = ")
-
-			if info.soa_kind == .Fixed || info.soa_kind == .Fixed_Capacity_Dynamic {
-				t := info.types[i].variant.(^runtime.Type_Info_Array).elem
-				t_size := uintptr(t.size)
-				if reflect.is_any(t) {
-					_write_string(fi, "any{}")
-				} else {
-					data := rawptr(uintptr(v.data) + info.offsets[i] + index*t_size)
-					fmt_arg(fi, any{data, t.id}, verb)
-				}
-			} else {
-				t := info.types[i].variant.(^runtime.Type_Info_Multi_Pointer).elem
-				t_size := uintptr(t.size)
-				if reflect.is_any(t) {
-					_write_string(fi, "any{}")
-				} else {
-					field_ptr := (^^byte)(uintptr(v.data) + info.offsets[i])^
-					data := rawptr(uintptr(field_ptr) + index*t_size)
-					fmt_arg(fi, any{data, t.id}, verb)
-				}
-			}
-
-			if hash { _write_string(fi, ",\n") }
-		}
-	}
-
-	if hash && n > 0 {
-		_write_repeated_byte(fi, '\t', indent)
 	}
 }
-
-
 
 // Formats a struct for output, handling various struct types (e.g., SOA, raw unions)
 //
@@ -2642,10 +2607,13 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 		return
 	}
 
-	is_soa := info.soa_kind != .None
-
 	_write_string(fi, type_name)
-	_write_byte(fi, '[' if is_soa && the_verb == 'v' else '{')
+	if info.soa_kind != .None {
+		fmt_soa(fi, v, the_verb, info)
+		return
+	}
+
+	_write_byte(fi, '{')
 	fi.record_level += 1
 	defer fi.record_level -= 1
 
@@ -2658,72 +2626,68 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 
 	is_empty := info.field_count == 0
 
-	if !is_soa && hash && !is_empty {
+	if hash && !is_empty {
 		_write_byte(fi, '\n')
 	}
 	defer {
-		if !is_soa && hash && !is_empty {
+		if hash && !is_empty {
 			_write_repeated_byte(fi, '\t', indent)
 		}
-		_write_byte(fi, ']' if is_soa && the_verb == 'v' else '}')
+		_write_byte(fi, '}')
 	}
 
-	if is_soa {
-		fmt_soa_struct_internal(fi, v, the_verb, info, type_name, hash, indent)
-	} else {
-		field_count := -1
-		for name, i in info.names[:info.field_count] {
-			optional_len: int = -1
-			use_nul_termination: bool = false
-			verb := the_verb if the_verb == 'w' else 'v'
+	field_count := -1
+	for name, i in info.names[:info.field_count] {
+		optional_len: int = -1
+		use_nul_termination: bool = false
+		verb := the_verb if the_verb == 'w' else 'v'
 
-			// NOTE(bill): Most fields have no tag. Those only need `parent_struct` set while they are formatted.
-			has_tag := info.tags[i] != ""
-			new_state: Info_State = ---
-			if has_tag {
-				new_state = fi.state
-				new_state.parent_struct = v
-				if handle_tag(&new_state, v.data, info, i, &verb, &optional_len, &use_nul_termination) {
-					continue
-				}
+		// NOTE(bill): Most fields have no tag. Those only need `parent_struct` set while they are formatted.
+		has_tag := info.tags[i] != ""
+		new_state: Info_State = ---
+		if has_tag {
+			new_state = fi.state
+			new_state.parent_struct = v
+			if handle_tag(&new_state, v.data, info, i, &verb, &optional_len, &use_nul_termination) {
+				continue
 			}
-			field_count += 1
-
-			if optional_len >= 0 {
-				fi.optional_len = optional_len
-			}
-			defer if optional_len >= 0 {
-				fi.optional_len = nil
-			}
-			fi.use_nul_termination = use_nul_termination
-			defer fi.use_nul_termination = false
-
-			if !do_trailing_comma && field_count > 0 {
-				_write_string(fi, ", ")
-			}
-			if hash {
-				fmt_write_indent(fi)
-			}
-
-			_write_string(fi, name)
-			_write_string(fi, " = ")
-
-			if t := info.types[i]; reflect.is_any(t) {
-				_write_string(fi, "any{}")
-			} else {
-				prev_state := fi.state
-				if has_tag {
-					fi.state = new_state
-				} else {
-					fi.parent_struct = v
-				}
-				data := rawptr(uintptr(v.data) + info.offsets[i])
-				_fmt_arg(fi, data, t.id, t, verb)
-				fi.state = prev_state
-			}
-
-			if do_trailing_comma { _write_string(fi, ",\n") }
 		}
+		field_count += 1
+
+		if optional_len >= 0 {
+			fi.optional_len = optional_len
+		}
+		defer if optional_len >= 0 {
+			fi.optional_len = nil
+		}
+		fi.use_nul_termination = use_nul_termination
+		defer fi.use_nul_termination = false
+
+		if !do_trailing_comma && field_count > 0 {
+			_write_string(fi, ", ")
+		}
+		if hash {
+			fmt_write_indent(fi)
+		}
+
+		_write_string(fi, name)
+		_write_string(fi, " = ")
+
+		if t := info.types[i]; reflect.is_any(t) {
+			_write_string(fi, "any{}")
+		} else {
+			prev_state := fi.state
+			if has_tag {
+				fi.state = new_state
+			} else {
+				fi.parent_struct = v
+			}
+			data := rawptr(uintptr(v.data) + info.offsets[i])
+			_fmt_arg(fi, data, t.id, t, verb)
+			fi.state = prev_state
+		}
+
+		if do_trailing_comma { _write_string(fi, ",\n") }
 	}
 }
 // Searches for the first NUL-terminated element in a given buffer
