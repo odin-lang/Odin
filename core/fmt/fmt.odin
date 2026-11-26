@@ -1594,6 +1594,11 @@ _fmt_float_as :: #force_no_inline proc(fi: ^Info, v: f64, bit_size: int, verb: r
 		i := strings.last_index_byte(str, float_fmt)
 		head, tail = str[:i], str[i:]
 	}
+
+	prev_zero := fi.zero
+	defer fi.zero = prev_zero
+	fi.zero &&= !math.is_nan(v) && !math.is_inf(v)
+
 	_pad_parts(fi, head, zeros, tail, suffix)
 }
 // Formats a floating-point number with a specific format.
