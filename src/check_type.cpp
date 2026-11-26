@@ -2309,6 +2309,20 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 			if (pattern->Struct.soa_kind != source->Struct.soa_kind) {
 				return Subst_NoMatch;
 			}
+			if (pattern->Struct.soa_generic_count != nullptr) {
+				if (pattern->Struct.soa_generic_count->Generic.specialized != nullptr) {
+					return Subst_Unhandled;
+				}
+				Entity *ne = poly_generic_entity(pattern->Struct.soa_generic_count);
+				if (ne == nullptr) {
+					return Subst_Unhandled;
+				}
+				if (!poly_subst_bind_value(subst, ne, exact_value_i64(source->Struct.soa_count), t_untyped_integer)) {
+					return Subst_NoMatch;
+				}
+			} else if (pattern->Struct.soa_count != source->Struct.soa_count) {
+				return Subst_NoMatch;
+			}
 			return subst_unify(c, pattern->Struct.soa_elem, source->Struct.soa_elem, subst);
 		}
 		// Anonymous struct with field-level polymorphism (e.g. `struct{x: $T, y: [2]T}`): match fields
@@ -2585,8 +2599,14 @@ gb_internal Type *subst_apply(CheckerContext *c, Type *pattern, Type *source, Po
 			return source;
 		}
 		Type *elem = subst_apply(c, pattern->Struct.soa_elem, source->Struct.soa_elem, subst);
+		i64 count = pattern->Struct.soa_count;
+		if (pattern->Struct.soa_generic_count != nullptr) {
+			PolyBinding *b = poly_subst_find(subst, poly_generic_entity(pattern->Struct.soa_generic_count));
+			GB_ASSERT(b != nullptr && b->kind == PolyBind_Value);
+			count = poly_binding_count(b);
+		}
 		switch (pattern->Struct.soa_kind) {
-		case StructSoa_Fixed:   return make_soa_struct_fixed(c, nullptr, pattern->Struct.node, elem, pattern->Struct.soa_count, nullptr);
+		case StructSoa_Fixed:   return make_soa_struct_fixed(c, nullptr, pattern->Struct.node, elem, count, nullptr);
 		case StructSoa_Slice:   return make_soa_struct_slice(c, nullptr, pattern->Struct.node, elem);
 		case StructSoa_Dynamic: return make_soa_struct_dynamic_array(c, nullptr, pattern->Struct.node, elem);
 		}
@@ -4835,6 +4855,11 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		return alloc_type_array(elem, count, generic_type);
 	}
 
+	// NOTE(bill): `#soa[$N]T` is polymorphic in its count, even when `T` is not.
+	if (generic_type != nullptr) {
+		is_polymorphic = true;
+	}
+
 	Type * soa_struct  = nullptr;
 	Scope *scope       = nullptr;
 	bool   is_complete = false;
@@ -4850,6 +4875,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	soa_struct = alloc_type_struct();
 	soa_struct->Struct.soa_kind = soa_kind;
 	soa_struct->Struct.soa_elem = elem;
+	soa_struct->Struct.soa_generic_count = generic_type;
 	soa_struct->Struct.is_polymorphic = is_polymorphic;
 	soa_struct->Struct.node = array_typ_expr;
 
@@ -4871,7 +4897,6 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 
 		soa_struct->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
 		soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
-		soa_struct->Struct.soa_count = 0;
 
 		is_complete = true;
 

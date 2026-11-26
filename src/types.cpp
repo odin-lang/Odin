@@ -152,6 +152,7 @@ struct TypeStruct {
 	Wait_Signal     polymorphic_wait_signal;
 
 	Type *          soa_elem;
+	Type *          soa_generic_count; // `$N` in `#soa[$N]T`
 	i32             soa_count;
 	StructSoaKind   soa_kind;
 	Wait_Signal     fields_wait_signal;
