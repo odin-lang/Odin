@@ -24,5 +24,11 @@ soa_no_rtti :: proc "contextless" (allocator: runtime.Allocator) -> int {
 	defer delete(lanes)
 	lanes[3] = {1, 2, 3, 4}
 
-	return len(ps) + len(lanes)
+	fixed: #soa[dynamic; 8]Particle
+	append(&fixed, Particle{{1, 2, 3}, 4})
+	inject_at(&fixed, 0, Particle{{5, 6, 7}, 8})
+	resize(&fixed, 4)
+	ordered_remove(&fixed, 1)
+
+	return len(ps) + len(lanes) + len(fixed)
 }

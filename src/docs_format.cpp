@@ -84,6 +84,7 @@ enum OdinDocTypeKind : u32 {
 	OdinDocType_SoaPointer                = 24,
 	OdinDocType_BitField                  = 25,
 	OdinDocType_FixedCapacityDynamicArray = 26,
+	OdinDocType_SOAStructFixedCapacityDynamic = 27,
 };
 
 enum OdinDocTypeFlag_Basic : u32 {

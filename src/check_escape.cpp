@@ -4375,7 +4375,7 @@ gb_internal void escape_outer_location(Ast *lhs, EscapeLocation *loc) {
 		escape_outer_location(ie->expr, loc);
 		// the elements of a slice and such are in the memory it points to
 		Type *bt = base_type(ie->expr->tav.type);
-		bool inline_elems = escape_is_inline_array(bt) || (bt != nullptr && bt->kind == Type_Struct && bt->Struct.soa_kind == StructSoa_Fixed);
+		bool inline_elems = escape_is_inline_array(bt) || (bt != nullptr && bt->kind == Type_Struct && soa_has_inline_fields(bt));
 		if (!inline_elems) {
 			loc->path = escape_path_concat(loc->path, escape_path_of(EscapeStep_Deref));
 		}

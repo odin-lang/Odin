@@ -257,7 +257,8 @@ type_is_superset_of :: proc($Super, $Sub: typeid) -> bool ---
 
 type_field_index_of :: proc($T: typeid, $name: string) -> uintptr ---
 
-type_fixed_capacity_dynamic_array_len_offset :: proc($T: typeid/[dynamic; $N]$E) -> uintptr ---
+// T is `[dynamic; N]E` or `#soa[dynamic; N]E`
+type_fixed_capacity_dynamic_array_len_offset :: proc($T: typeid) -> uintptr ---
 
 // A pointer to a read-only table of the element size of each field of the #soa type T, in order
 type_soa_field_sizes :: proc($T: typeid) -> ^[N]int ---

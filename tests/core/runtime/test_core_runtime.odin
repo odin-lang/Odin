@@ -423,6 +423,82 @@ when !testing.INLINE {
 	}
 }
 
+// `#soa[dynamic; N]T` holds its elements inline like `#soa[N]T`, with a length like `[dynamic; N]T`
+@(test)
+test_soa_fixed_capacity_dynamic_array :: proc(t: ^testing.T) {
+	V :: struct {x: f32, y: u8}
+
+	a: #soa[dynamic; 4]V
+	testing.expect_value(t, len(a), 0)
+	testing.expect_value(t, cap(a), 4)
+	testing.expect_value(t, typeid_of(type_of(a.x)), typeid_of([4]f32))
+
+	testing.expect_value(t, append(&a, V{1, 1}), 1)
+	testing.expect_value(t, append(&a, V{2, 2}, V{3, 3}, V{4, 4}, V{5, 5}), 3)
+	testing.expect_value(t, append(&a, V{6, 6}), 0)
+	testing.expect_value(t, len(a), 4)
+	testing.expect_value(t, a[3], V{4, 4})
+
+	testing.expect_value(t, pop(&a), V{4, 4})
+	testing.expect_value(t, pop_front(&a), V{1, 1})
+	testing.expect_value(t, len(a), 2)
+	testing.expect_value(t, a[0], V{2, 2})
+
+	testing.expect(t, inject_at(&a, 0, V{7, 7}))
+	testing.expect(t, !inject_at(&a, 0, V{8, 8}, V{9, 9}))
+	testing.expect_value(t, len(a), 3)
+	testing.expect_value(t, a[0], V{7, 7})
+	testing.expect_value(t, a[1], V{2, 2})
+
+	ordered_remove(&a, 0)
+	testing.expect_value(t, a[0], V{2, 2})
+	testing.expect_value(t, a[1], V{3, 3})
+	unordered_remove(&a, 0)
+	testing.expect_value(t, len(a), 1)
+	testing.expect_value(t, a[0], V{3, 3})
+
+	resize(&a, 3)
+	testing.expect_value(t, len(a), 3)
+	testing.expect_value(t, a[2], V{})
+	resize(&a, 10)
+	testing.expect_value(t, len(a), 4)
+
+	s := a[1:3]
+	testing.expect_value(t, len(s), 2)
+	s.x[0] = 2.5
+	testing.expect_value(t, a.x[1], 2.5)
+
+	sum: f32
+	for v in a {
+		sum += v.x
+	}
+	testing.expect_value(t, sum, 5.5)
+
+	clear(&a)
+	testing.expect_value(t, len(a), 0)
+
+	x := f32(3)
+	b := #soa[dynamic; 4]V{{1, 2}, {x, 4}}
+	testing.expect_value(t, len(b), 2)
+	testing.expect_value(t, b[0], V{1, 2})
+	testing.expect_value(t, b[1], V{3, 4})
+
+	c := #soa[dynamic; 4]V{2 = {5, 6}}
+	testing.expect_value(t, len(c), 3)
+	testing.expect_value(t, c[2], V{5, 6})
+
+	total :: proc(a: ^#soa[dynamic; $N]$T) -> (int, f32) {
+		sum: f32
+		for v in a {
+			sum += v.x
+		}
+		return N, sum
+	}
+	n, total_x := total(&b)
+	testing.expect_value(t, n, 4)
+	testing.expect_value(t, total_x, 4)
+}
+
 @(test)
 test_soa_make_len :: proc(t: ^testing.T) {
 

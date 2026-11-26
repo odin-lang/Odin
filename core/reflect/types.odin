@@ -715,6 +715,12 @@ write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_writt
 			io.write_string(w, "#soa[dynamic]", &n) or_return
 			write_type(w, info.soa_base_type,   &n) or_return
 			return
+		case .Fixed_Capacity_Dynamic:
+			io.write_string(w, "#soa[dynamic; ",   &n) or_return
+			io.write_i64(w, i64(info.soa_len), 10, &n) or_return
+			io.write_byte(w, ']',                  &n) or_return
+			write_type(w, info.soa_base_type,      &n) or_return
+			return
 		}
 
 		io.write_string(w, "struct ", &n) or_return

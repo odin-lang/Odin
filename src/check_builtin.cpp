@@ -3405,12 +3405,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 		} else if (is_type_struct(op_type)) {
 			Type *bt = base_type(op_type);
-			if (bt->Struct.soa_kind == StructSoa_Fixed) {
+			bool constant_cap = bt->Struct.soa_kind == StructSoa_FixedCapacityDynamic && id == BuiltinProc_cap;
+			if (bt->Struct.soa_kind == StructSoa_Fixed || constant_cap) {
 				mode  = Addressing_Constant;
 				value = exact_value_i64(bt->Struct.soa_count);
 				type  = t_untyped_integer;
 			} else if ((bt->Struct.soa_kind == StructSoa_Slice && id == BuiltinProc_len) ||
-			           bt->Struct.soa_kind == StructSoa_Dynamic) {
+			           bt->Struct.soa_kind == StructSoa_Dynamic ||
+			           bt->Struct.soa_kind == StructSoa_FixedCapacityDynamic) {
 				mode = Addressing_Value;
 			}
 		} else if (is_type_simd_vector(op_type)) {
@@ -8805,14 +8807,20 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(ce->args[0], "Expected a fixed capacity dynamic array type for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (!is_type_fixed_capacity_dynamic_array(type)) {
+			bool is_soa = is_type_soa_struct(type) && type->Struct.soa_kind == StructSoa_FixedCapacityDynamic;
+			if (!is_type_fixed_capacity_dynamic_array(type) && !is_soa) {
 				error(ce->args[0], "Expected a fixed capacity dynamic array type for '%.*s'", LIT(builtin_name));
 				return false;
 			}
 
 			i64 sz = type_size_of(type);
 			gb_unused(sz);
-			i64 offset = type_offset_of(type, 1);
+			// NOTE(bill): The length of `#soa[dynamic; N]T` follows its fields.
+			i32 len_index = 1;
+			if (is_soa) {
+				len_index = cast(i32)soa_field_count(type);
+			}
+			i64 offset = type_offset_of(type, len_index);
 
 			operand->mode = Addressing_Constant;
 			operand->value = exact_value_u64(cast(u64)offset);

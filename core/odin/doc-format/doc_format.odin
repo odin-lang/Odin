@@ -195,6 +195,7 @@ Type_Kind :: enum u32le {
 	Soa_Pointer                  = 24,
 	Bit_Field                    = 25,
 	Fixed_Capacity_Dynamic_Array = 26,
+	SOA_Struct_Fixed_Capacity_Dynamic = 27,
 }
 
 Type_Elems_Cap :: 4
@@ -228,6 +229,7 @@ Type :: struct {
 	// .Matrix                       - 2   count: 0=row_count, 1=column_count
 	// .Struct                       - <=2 count: 0=min_field_align, 1=max_field_align
 	// .Fixed_Capacity_Dynamic_Array - 1   count: 0=cap
+	// .SOA_Struct_Fixed_Capacity_Dynamic - 1 count: 0=cap
 	elem_count_len: u32le,
 	elem_counts:    [Type_Elems_Cap]i64le,
 
@@ -258,6 +260,7 @@ Type :: struct {
 	// .Soa_Pointer                  - 1 type:    0=element
 	// .Bit_Field                    - 1 type:    0=backing type
 	// .Fixed_Capacity_Dynamic_Array - 1 type:    0=element (and 1=generic index (if exists))
+	// .SOA_Struct_Fixed_Capacity_Dynamic - 1 type: underlying SOA struct element
 	types: Array(Type_Index),
 
 	// Used by:

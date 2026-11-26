@@ -1300,7 +1300,7 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 	if (is_type_pointer(lb_addr_type(array))) {
 		array = lb_addr(lb_addr_load(p, array));
 	}
-	lbValue count = lb_soa_struct_len(p, lb_addr_load(p, array));
+	lbValue count = lb_soa_struct_len(p, lb_addr_get_ptr(p, array));
 
 
 	lbAddr index = lb_add_local_generated(p, t_int, false);

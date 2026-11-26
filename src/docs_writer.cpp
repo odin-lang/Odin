@@ -657,6 +657,11 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type, bool ca
 			case StructSoa_Dynamic:
 				doc_type.kind = OdinDocType_SOAStructDynamic;
 				break;
+			case StructSoa_FixedCapacityDynamic:
+				doc_type.kind = OdinDocType_SOAStructFixedCapacityDynamic;
+				doc_type.elem_count_len = 1;
+				doc_type.elem_counts[0] = type->Struct.soa_count;
+				break;
 			}
 			doc_type.types = odin_doc_type_as_slice(w, type->Struct.soa_elem);
 		} else {

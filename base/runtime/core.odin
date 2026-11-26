@@ -86,6 +86,7 @@ Type_Info_Struct_Soa_Kind :: enum u8 {
 	Fixed   = 1,
 	Slice   = 2,
 	Dynamic = 3,
+	Fixed_Capacity_Dynamic = 4, // `#soa[dynamic; N]T`, with `soa_len` as the capacity
 }
 
 Type_Info_String_Encoding_Kind :: enum u8 {

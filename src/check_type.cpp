@@ -2609,6 +2609,7 @@ gb_internal Type *subst_apply(CheckerContext *c, Type *pattern, Type *source, Po
 		case StructSoa_Fixed:   return make_soa_struct_fixed(c, nullptr, pattern->Struct.node, elem, count, nullptr);
 		case StructSoa_Slice:   return make_soa_struct_slice(c, nullptr, pattern->Struct.node, elem);
 		case StructSoa_Dynamic: return make_soa_struct_dynamic_array(c, nullptr, pattern->Struct.node, elem);
+		case StructSoa_FixedCapacityDynamic: return make_soa_struct_fixed_capacity_dynamic_array(c, nullptr, pattern->Struct.node, elem, count, nullptr);
 		}
 		GB_PANIC("subst_apply: unhandled soa struct kind");
 		return nullptr;
@@ -4754,6 +4755,7 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 	case StructSoa_Fixed:	extra_field_count = 0; break;
 	case StructSoa_Slice:	extra_field_count = 1; break;
 	case StructSoa_Dynamic:	extra_field_count = 3; break;
+	case StructSoa_FixedCapacityDynamic: extra_field_count = 1; break;
 	}
 
 	Scope *scope = t->Struct.scope;
@@ -4789,7 +4791,7 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 		Entity *old_field = old_struct->Struct.fields[i];
 		if (old_field->kind == Entity_Variable) {
 			Type *field_type = nullptr;
-			if (t->Struct.soa_kind == StructSoa_Fixed) {
+			if (soa_has_inline_fields(t)) {
 				GB_ASSERT(soa_count >= 0);
 				field_type = alloc_type_array(old_field->type, soa_count);
 			} else {
@@ -4799,7 +4801,7 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 			t->Struct.fields[i] = new_field;
 			add_entity(scope, new_field);
 			new_field->flags |= EntityFlag_Used;
-			if (t->Struct.soa_kind != StructSoa_Fixed) {
+			if (!soa_has_inline_fields(t)) {
 				new_field->flags |= EntityFlag_SoaPtrField;
 			}
 		} else {
@@ -4870,6 +4872,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	case StructSoa_Fixed:	extra_field_count = 0; break;
 	case StructSoa_Slice:	extra_field_count = 1; break;
 	case StructSoa_Dynamic:	extra_field_count = 3; break;
+	case StructSoa_FixedCapacityDynamic: extra_field_count = 1; break;
 	}
 
 	soa_struct = alloc_type_struct();
@@ -4916,7 +4919,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 
 		for (isize i = 0; i < cast(isize)old_array->Array.count; i++) {
 			Type *field_type = nullptr;
-			if (soa_kind == StructSoa_Fixed) {
+			if (soa_has_inline_fields(soa_struct)) {
 				GB_ASSERT(count >= 0);
 				field_type = alloc_type_array(old_array->Array.elem, count);
 			} else {
@@ -4929,7 +4932,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 			soa_struct->Struct.fields[i] = new_field;
 			add_entity(ctx, scope, nullptr, new_field);
 			add_entity_use(ctx, nullptr, new_field);
-			if (soa_kind != StructSoa_Fixed) {
+			if (!soa_has_inline_fields(soa_struct)) {
 				new_field->flags |= EntityFlag_SoaPtrField;
 			}
 		}
@@ -4951,7 +4954,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 				Entity *old_field = old_struct->Struct.fields[i];
 				if (old_field->kind == Entity_Variable) {
 					Type *field_type = nullptr;
-					if (soa_kind == StructSoa_Fixed) {
+					if (soa_has_inline_fields(soa_struct)) {
 						GB_ASSERT(count >= 0);
 						field_type = alloc_type_array(old_field->type, count);
 					} else {
@@ -4961,7 +4964,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 					soa_struct->Struct.fields[i] = new_field;
 					add_entity(ctx, scope, nullptr, new_field);
 					add_entity_use(ctx, nullptr, new_field);
-					if (soa_kind != StructSoa_Fixed) {
+					if (!soa_has_inline_fields(soa_struct)) {
 						new_field->flags |= EntityFlag_SoaPtrField;
 					}
 				} else {
@@ -5030,6 +5033,10 @@ gb_internal Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr
 
 gb_internal Type *make_soa_struct_dynamic_array(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem) {
 	return make_soa_struct_internal(ctx, array_typ_expr, elem_expr, elem, -1, nullptr, StructSoa_Dynamic);
+}
+
+gb_internal Type *make_soa_struct_fixed_capacity_dynamic_array(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem, i64 capacity, Type *generic_type) {
+	return make_soa_struct_internal(ctx, array_typ_expr, elem_expr, elem, capacity, generic_type, StructSoa_FixedCapacityDynamic);
 }
 
 gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_type) {
@@ -5445,6 +5452,11 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 		if (dat->tag != nullptr) {
 			GB_ASSERT(dat->tag->kind == Ast_BasicDirective);
 			String name = dat->tag->BasicDirective.name.string;
+			if (name == "soa") {
+				*type = make_soa_struct_fixed_capacity_dynamic_array(ctx, e, dat->elem, elem, capacity, generic_type);
+				set_base_type(named_type, *type);
+				return true;
+			}
 			error(dat->tag, "Invalid tag applied to fixed capacity dynamic array, got #%.*s", LIT(name));
 		}
 		*type = alloc_type_fixed_capacity_dynamic_array(elem, capacity, generic_type);

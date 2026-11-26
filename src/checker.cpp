@@ -2710,6 +2710,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 					/*fallthrough*/
 				case StructSoa_Slice:
 				case StructSoa_Fixed:
+				case StructSoa_FixedCapacityDynamic:
 					add_type_info_type_internal(c, alloc_type_pointer(e->type));
 					break;
 				default:
@@ -3012,6 +3013,7 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 					add_min_dep_type_info(c, t_allocator);
 					/*fallthrough*/
 				case StructSoa_Slice:
+				case StructSoa_FixedCapacityDynamic:
 					add_min_dep_type_info(c, t_int);
 					add_min_dep_type_info(c, t_uint);
 					/*fallthrough*/

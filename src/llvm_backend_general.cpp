@@ -954,7 +954,7 @@ gb_internal lbAddr lb_addr_soa_variable_from_soa_ptr(lbProcedure *p, lbValue soa
 // pointer to the index element of the field_index component
 //
 // the returned pointer type depends on the soa kind (because the field types do):
-// ^T for StructSoa_Fixed (field is [N]T array), but [^]T for the slice and dynamic
+// ^T for the kinds with inline fields (field is [N]T array), but [^]T for the slice and dynamic
 // kinds (field is the [^]T this offsets);
 // loads and stores work with either, but an lbAddr must not hold the multipointer,
 // so use lb_addr_soa_field_elem to build an lbAddr from this
@@ -963,7 +963,7 @@ gb_internal lbValue lb_soa_field_elem_ptr(lbProcedure *p, lbValue soa_ptr, i32 f
 	GB_ASSERT_MSG(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None, "%s", type_to_string(t));
 
 	lbValue field = lb_emit_struct_ep(p, soa_ptr, field_index);
-	if (t->Struct.soa_kind == StructSoa_Fixed) {
+	if (soa_has_inline_fields(t)) {
 		return lb_emit_array_ep(p, field, index);
 	}
 	return lb_emit_ptr_offset(p, lb_emit_load(p, field), index);
@@ -1775,7 +1775,7 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		for (isize i = 0; i < field_count; i++) {
 			lbValue dst = lb_emit_struct_ep(p, addr.addr, cast(i32)i);
 			lbValue src = lb_emit_struct_ev(p, value, cast(i32)i);
-			if (t->Struct.soa_kind == StructSoa_Fixed) {
+			if (soa_has_inline_fields(t)) {
 				dst = lb_emit_array_ep(p, dst, index);
 				lb_emit_store(p, dst, src);
 			} else {
@@ -2409,8 +2409,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		if (t->Struct.soa_kind == StructSoa_Fixed) {
 			len = lb_const_int(p->module, t_int, t->Struct.soa_count);
 		} else {
-			lbValue v = lb_emit_load(p, addr.addr);
-			len = lb_soa_struct_len(p, v);
+			len = lb_soa_struct_len(p, addr.addr);
 		}
 
 		lbAddr res = lb_add_local_generated(p, elem, true);
@@ -2419,8 +2418,8 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), addr.soa.index, len);
 		}
 
-		if (t->Struct.soa_kind == StructSoa_Fixed) {
-			for_array(i, t->Struct.fields) {
+		if (soa_has_inline_fields(t)) {
+			for (isize i = 0; i < soa_field_count(t); i++) {
 				Entity *field = t->Struct.fields[i];
 				Type *base_type = field->type;
 				GB_ASSERT(base_type->kind == Type_Array);

@@ -2533,6 +2533,10 @@ fmt_soa_struct_internal :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime
 		actual_field_count = info.field_count-3 // len, cap, allocator
 
 		n = uintptr((^int)(uintptr(v.data) + info.offsets[actual_field_count])^)
+	} else if info.soa_kind == .Fixed_Capacity_Dynamic {
+		actual_field_count = info.field_count-1 // len
+
+		n = uintptr((^int)(uintptr(v.data) + info.offsets[actual_field_count])^)
 	}
 
 	if hash && n > 0 {
@@ -2579,7 +2583,7 @@ fmt_soa_struct_internal :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime
 			_write_string(fi, name)
 			_write_string(fi, " = ")
 
-			if info.soa_kind == .Fixed {
+			if info.soa_kind == .Fixed || info.soa_kind == .Fixed_Capacity_Dynamic {
 				t := info.types[i].variant.(^runtime.Type_Info_Array).elem
 				t_size := uintptr(t.size)
 				if reflect.is_any(t) {

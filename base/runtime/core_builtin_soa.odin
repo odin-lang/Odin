@@ -186,10 +186,7 @@ resize_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int length: int, l
 	// reused [old_len, min(old_cap, length)) still needs zeroing
 	to_zero_end := min(old_cap, length)
 	if size_of(E) > 0 && to_zero_end > old_len {
-		columns := ([^][^]byte)(array)
-		for size, i in intrinsics.type_soa_field_sizes(T) {
-			mem_zero(&columns[i][size*old_len], size*(to_zero_end - old_len))
-		}
+		_soa_zero(array[:], old_len, to_zero_end - old_len)
 	}
 
 	footer.len = max(length, 0)
@@ -216,6 +213,26 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int capacity: int, loc := #
 @builtin
 non_zero_reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int capacity: int, loc := #caller_location) -> Allocator_Error {
 	return _reserve_soa(array, capacity, false, loc)
+}
+
+// Moves `count` elements of `s` from index `from` to index `to`, field by field
+@(private)
+_soa_move :: proc "contextless" (s: $S/#soa[]$E, to, from, count: int) {
+	s := s
+	columns := ([^][^]byte)(&s)
+	for size, i in intrinsics.type_soa_field_sizes(S) {
+		mem_copy(&columns[i][to*size], &columns[i][from*size], count*size)
+	}
+}
+
+// Zeroes `count` elements of `s` from index `from`, field by field
+@(private)
+_soa_zero :: proc "contextless" (s: $S/#soa[]$E, from, count: int) {
+	s := s
+	columns := ([^][^]byte)(&s)
+	for size, i in intrinsics.type_soa_field_sizes(S) {
+		mem_zero(&columns[i][from*size], count*size)
+	}
 }
 
 // NOTE(bill): Columns starting a multiple of 4 KiB apart, as power-of-two capacities make them, evict each other from the L1 cache.
@@ -446,6 +463,8 @@ _append_soa_elems :: proc(#no_alias array: ^$T/#soa[dynamic]$E, zero_memory: boo
 append_soa :: proc{
 	append_soa_elem,
 	append_soa_elems,
+	append_soa_fixed_capacity_elem,
+	append_soa_fixed_capacity_elems,
 }
 
 
@@ -503,13 +522,10 @@ inject_at_elems_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int index
 	non_zero_resize_soa(array, new_len, loc) or_return
 
 	when size_of(E) != 0 {
-		columns := ([^][^]byte)(array)
-		for size, i in intrinsics.type_soa_field_sizes(T) {
-			if index > old_len {
-				mem_zero(&columns[i][old_len*size], (index - old_len)*size)
-			}
-			mem_copy(&columns[i][(index + m)*size], &columns[i][index*size], (n - index)*size)
+		if index > old_len {
+			_soa_zero(array[:], old_len, index - old_len)
 		}
+		_soa_move(array[:], index + m, index, n - index)
 		intrinsics.soa_copy_from_slice(array, index, args)
 	}
 
@@ -518,7 +534,7 @@ inject_at_elems_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int index
 }
 
 // `inject_at_soa` injects something into a dynamic SOA array at a specified index and moves the previous elements after that index "across"
-@builtin inject_at_soa :: proc{inject_at_elem_soa, inject_at_elems_soa}
+@builtin inject_at_soa :: proc{inject_at_elem_soa, inject_at_elems_soa, inject_at_elem_soa_fixed_capacity, inject_at_elems_soa_fixed_capacity}
 
 @builtin
 delete_soa_slice :: proc(array: $T/#soa[]$E, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
@@ -562,6 +578,7 @@ clear_soa_dynamic_array :: proc(array: ^$T/#soa[dynamic]$E) {
 @builtin
 clear_soa :: proc{
 	clear_soa_dynamic_array,
+	clear_soa_fixed_capacity,
 }
 
 // Converts soa slice into a soa dynamic array without cloning or allocating memory
@@ -667,11 +684,176 @@ ordered_remove_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int index:
 // index must already be known to be in bounds.
 _ordered_remove_soa :: proc "contextless" (#no_alias array: ^$T/#soa[dynamic]$E, index: int) #no_bounds_check {
 	if index+1 < len(array) {
-		l1 := len(array)-1
-		columns := ([^][^]byte)(array)
-		for size, i in intrinsics.type_soa_field_sizes(T) {
-			mem_copy(&columns[i][index*size], &columns[i][(index + 1)*size], (l1 - index)*size)
-		}
+		_soa_move(array[:], index, index + 1, len(array) - 1 - index)
 	}
 	raw_soa_footer_dynamic_array(array).len -= 1
+}
+
+// `#soa[dynamic; N]T` holds its elements inline, as `#soa[N]T` does, and a length.
+// Like `[dynamic; N]T` it never allocates: growing past `N` fails instead.
+
+@(private, require_results)
+_soa_fixed_capacity_len :: #force_inline proc "contextless" (array: ^$T/#soa[dynamic; $N]$E) -> ^int {
+	return (^int)(&([^]byte)(array)[intrinsics.type_fixed_capacity_dynamic_array_len_offset(T)])
+}
+
+@builtin
+clear_soa_fixed_capacity :: proc "contextless" (array: ^$T/#soa[dynamic; $N]$E) {
+	if array != nil {
+		_soa_fixed_capacity_len(array)^ = 0
+	}
+}
+
+// `resize_soa_fixed_capacity` sets the length to `length`, at most `N`, and zeroes any new elements
+@builtin
+resize_soa_fixed_capacity :: proc "contextless" (array: ^$T/#soa[dynamic; $N]$E, #any_int length: int) -> bool {
+	if array == nil {
+		return false
+	}
+	old_len := len(array)
+	new_len := clamp(length, 0, N)
+	_soa_fixed_capacity_len(array)^ = new_len
+	if new_len > old_len {
+		_soa_zero(array[:], old_len, new_len - old_len)
+	}
+	return true
+}
+
+@builtin
+non_zero_resize_soa_fixed_capacity :: proc "contextless" (array: ^$T/#soa[dynamic; $N]$E, #any_int length: int) -> bool {
+	if array == nil {
+		return false
+	}
+	_soa_fixed_capacity_len(array)^ = clamp(length, 0, N)
+	return true
+}
+
+// `append_soa_fixed_capacity_elem` appends an element, and returns 0 when the array is full
+@builtin
+append_soa_fixed_capacity_elem :: proc "contextless" (array: ^$T/#soa[dynamic; $N]$E, #no_broadcast arg: E) -> (num_appended: int) {
+	n := len(array)
+	if n >= N {
+		return 0
+	}
+	_soa_fixed_capacity_len(array)^ = n + 1
+	#no_bounds_check array[n] = arg
+	return 1
+}
+
+// `append_soa_fixed_capacity_elems` appends as many of `args` as fit, and returns how many
+@builtin
+append_soa_fixed_capacity_elems :: proc "contextless" (array: ^$T/#soa[dynamic; $N]$E, #no_broadcast args: ..E) -> (num_appended: int) {
+	n := len(array)
+	num_appended = min(N - n, len(args))
+	_soa_fixed_capacity_len(array)^ = n + num_appended
+	#no_bounds_check for j in 0..<num_appended {
+		array[n + j] = args[j]
+	}
+	return
+}
+
+@builtin
+append_nothing_soa_fixed_capacity :: proc "contextless" (array: ^$T/#soa[dynamic; $N]$E) -> (n: int, ok: bool) {
+	if array == nil {
+		return 0, true
+	}
+	prev_len := len(array)
+	resize_soa_fixed_capacity(array, prev_len+1) or_return
+	return len(array)-prev_len, true
+}
+
+// `inject_at_elem_soa_fixed_capacity` injects an element at `index`, and fails when it does not fit
+@builtin
+inject_at_elem_soa_fixed_capacity :: proc(array: ^$T/#soa[dynamic; $N]$E, #any_int index: int, #no_broadcast arg: E, loc := #caller_location) -> (ok: bool) {
+	return inject_at_elems_soa_fixed_capacity(array, index, arg, loc=loc)
+}
+
+// `inject_at_elems_soa_fixed_capacity` injects elements at `index`, and fails when they do not all fit
+@builtin
+inject_at_elems_soa_fixed_capacity :: proc(array: ^$T/#soa[dynamic; $N]$E, #any_int index: int, #no_broadcast args: ..E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
+	if array == nil {
+		return false
+	}
+	if len(args) == 0 {
+		return true
+	}
+
+	old_len := len(array)
+	n := max(old_len, index)
+	m := len(args)
+	if n + m > N {
+		return false
+	}
+
+	_soa_fixed_capacity_len(array)^ = n + m
+	if index > old_len {
+		_soa_zero(array[:], old_len, index - old_len)
+	}
+	_soa_move(array[:], index + m, index, n - index)
+	for arg, j in args {
+		array[index + j] = arg
+	}
+	return true
+}
+
+@builtin
+pop_soa_fixed_capacity :: proc(array: ^$T/#soa[dynamic; $N]$E, loc := #caller_location) -> (res: E) #no_bounds_check {
+	assert(len(array) > 0, loc=loc)
+	res = array[len(array)-1]
+	_soa_fixed_capacity_len(array)^ -= 1
+	return
+}
+
+@builtin
+pop_safe_soa_fixed_capacity :: proc "contextless" (array: ^$T/#soa[dynamic; $N]$E) -> (res: E, ok: bool) #no_bounds_check {
+	if len(array) == 0 {
+		return
+	}
+	res, ok = array[len(array)-1], true
+	_soa_fixed_capacity_len(array)^ -= 1
+	return
+}
+
+@builtin
+pop_front_soa_fixed_capacity :: proc(array: ^$T/#soa[dynamic; $N]$E, loc := #caller_location) -> (res: E) #no_bounds_check {
+	assert(len(array) > 0, loc=loc)
+	res = array[0]
+	_ordered_remove_soa_fixed_capacity(array, 0)
+	return
+}
+
+@builtin
+pop_front_safe_soa_fixed_capacity :: proc "contextless" (array: ^$T/#soa[dynamic; $N]$E) -> (res: E, ok: bool) #no_bounds_check {
+	if len(array) == 0 {
+		return
+	}
+	res, ok = array[0], true
+	_ordered_remove_soa_fixed_capacity(array, 0)
+	return
+}
+
+@builtin
+unordered_remove_soa_fixed_capacity :: proc(array: ^$T/#soa[dynamic; $N]$E, #any_int index: int, loc := #caller_location) #no_bounds_check {
+	bounds_check_error_loc(loc, index, len(array))
+	if index+1 < len(array) {
+		array[index] = array[len(array)-1]
+	}
+	_soa_fixed_capacity_len(array)^ -= 1
+}
+
+@builtin
+ordered_remove_soa_fixed_capacity :: proc(array: ^$T/#soa[dynamic; $N]$E, #any_int index: int, loc := #caller_location) #no_bounds_check {
+	bounds_check_error_loc(loc, index, len(array))
+	_ordered_remove_soa_fixed_capacity(array, index)
+}
+
+// The unchecked body of ordered_remove_soa_fixed_capacity, shared with the front pops
+_ordered_remove_soa_fixed_capacity :: proc "contextless" (array: ^$T/#soa[dynamic; $N]$E, index: int) #no_bounds_check {
+	if index+1 < len(array) {
+		_soa_move(array[:], index, index + 1, len(array) - 1 - index)
+	}
+	_soa_fixed_capacity_len(array)^ -= 1
 }

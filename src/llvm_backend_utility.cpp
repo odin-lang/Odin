@@ -1750,7 +1750,7 @@ gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection 
 			Type *t = base_type(type_deref(addr.type));
 			GB_ASSERT(is_type_soa_struct(t));
 
-			if (t->Struct.soa_kind == StructSoa_Fixed) {
+			if (soa_has_inline_fields(t)) {
 				e = lb_emit_array_ep(p, arr, soa_index);
 			} else {
 				e = lb_emit_ptr_offset(p, lb_emit_load(p, arr), soa_index);
@@ -2151,7 +2151,8 @@ gb_internal lbValue lb_soa_struct_len(lbProcedure *p, lbValue value) {
 	}
 
 	GB_ASSERT(t->Struct.soa_kind == StructSoa_Slice ||
-	          t->Struct.soa_kind == StructSoa_Dynamic);
+	          t->Struct.soa_kind == StructSoa_Dynamic ||
+	          t->Struct.soa_kind == StructSoa_FixedCapacityDynamic);
 
 	isize n = 0;
 	Type *elem = base_type(t->Struct.soa_elem);
@@ -2179,7 +2180,7 @@ gb_internal lbValue lb_soa_struct_cap(lbProcedure *p, lbValue value) {
 		t = base_type(type_deref(t));
 	}
 
-	if (t->Struct.soa_kind == StructSoa_Fixed) {
+	if (soa_has_inline_fields(t)) {
 		return lb_const_int(p->module, t_int, t->Struct.soa_count);
 	}
 

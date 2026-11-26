@@ -134,6 +134,7 @@ enum StructSoaKind : u8 {
 	StructSoa_Fixed   = 1,
 	StructSoa_Slice   = 2,
 	StructSoa_Dynamic = 3,
+	StructSoa_FixedCapacityDynamic = 4, // `#soa[dynamic; N]T`
 };
 
 struct TypeStruct {
@@ -2080,6 +2081,13 @@ gb_internal isize soa_field_count(Type *t) {
 	}
 	return elem->Struct.fields.count;
 }
+
+// The fields of `#soa[N]T` and `#soa[dynamic; N]T` hold their elements inline, as `[N]T` arrays
+gb_internal bool soa_has_inline_fields(Type *t) {
+	t = base_type(t);
+	return t->Struct.soa_kind == StructSoa_Fixed || t->Struct.soa_kind == StructSoa_FixedCapacityDynamic;
+}
+
 gb_internal bool is_type_soa_dynamic_array(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
@@ -2822,6 +2830,7 @@ gb_internal bool type_has_nil(Type *t) {
 			case StructSoa_Fixed:   return false;
 			case StructSoa_Slice:   return true;
 			case StructSoa_Dynamic: return true;
+			case StructSoa_FixedCapacityDynamic: return false;
 			}
 		}
 		return false;
@@ -5853,6 +5862,7 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 			case StructSoa_Fixed:   str = gb_string_append_fmt(str, "#soa[%d]", cast(int)type->Struct.soa_count); break;
 			case StructSoa_Slice:   str = gb_string_appendc(str,    "#soa[]");                                    break;
 			case StructSoa_Dynamic: str = gb_string_appendc(str,    "#soa[dynamic]");                             break;
+			case StructSoa_FixedCapacityDynamic: str = gb_string_append_fmt(str, "#soa[dynamic; %d]", cast(int)type->Struct.soa_count); break;
 			default: GB_PANIC("Unknown StructSoaKind"); break;
 			}
 			str = write_type_to_string(str, type->Struct.soa_elem, shorthand, allow_polymorphic);

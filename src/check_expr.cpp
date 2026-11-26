@@ -114,6 +114,7 @@ gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key);
 gb_internal Type *make_soa_struct_fixed(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem, i64 count, Type *generic_type);
 gb_internal Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem);
 gb_internal Type *make_soa_struct_dynamic_array(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem);
+gb_internal Type *make_soa_struct_fixed_capacity_dynamic_array(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem, i64 capacity, Type *generic_type);
 
 gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint);
 
@@ -10498,6 +10499,8 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 			case StructSoa_Dynamic:
 				indirection = o->mode != Addressing_Constant;
 				break;
+			case StructSoa_FixedCapacityDynamic:
+				break;
 			}
 			o->type = t->Struct.soa_elem;
 			if (o->mode == Addressing_SoaVariable || o->mode == Addressing_Variable || indirection) {
@@ -12237,7 +12240,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			}
 
 			break;
-		} else if (t->Struct.soa_kind != StructSoa_Fixed) {
+		} else if (!soa_has_inline_fields(t)) {
 			error(node, "#soa slices and dynamic arrays are not supported for compound literals");
 			break;
 		}
@@ -12254,11 +12257,15 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		String context_name = {};
 		i64 max_type_count = -1;
 		if (t->kind == Type_Struct) {
-			GB_ASSERT(t->Struct.soa_kind == StructSoa_Fixed);
+			GB_ASSERT(soa_has_inline_fields(t));
 			elem_type = t->Struct.soa_elem;
 			context_name = str_lit("#soa array literal");
 			if (!is_to_be_determined_array_count) {
 				max_type_count = t->Struct.soa_count;
+			}
+			if (t->Struct.soa_kind == StructSoa_FixedCapacityDynamic) {
+				context_name = str_lit("#soa fixed capacity dynamic array literal");
+				is_constant = false;
 			}
 		} else if (t->kind == Type_Slice) {
 			elem_type = t->Slice.elem;
@@ -12483,6 +12490,12 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				} else if (max > SIMD_ELEMENT_COUNT_MAX) {
 					error(node, "#simd support a maximum element count of %d, got %lld", SIMD_ELEMENT_COUNT_MAX, cast(long long)max);
 				}
+			}
+		} else if (t->kind == Type_Struct && t->Struct.soa_kind == StructSoa_FixedCapacityDynamic) {
+			if (max > t->Struct.soa_count) {
+				error(node, "Expected a maximum of %lld values for this #soa fixed capacity dynamic array, got %lld",
+				      cast(long long)t->Struct.soa_count,
+				      cast(long long)max);
 			}
 		} else if (t->kind == Type_Struct) {
 			GB_ASSERT(t->Struct.soa_kind == StructSoa_Fixed);
@@ -13618,6 +13631,8 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 			valid = true;
 			if (t->Struct.soa_kind == StructSoa_Fixed) {
 				max_count = t->Struct.soa_count;
+			}
+			if (soa_has_inline_fields(t)) {
 				if (o->mode != Addressing_Variable && !is_type_pointer(o->type)) {
 					gbString str = expr_to_string(node);
 					error(node, "Cannot slice #soa array '%s', value is not addressable", str);

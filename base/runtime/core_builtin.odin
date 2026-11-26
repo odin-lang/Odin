@@ -212,6 +212,7 @@ unordered_remove :: proc{
 	unordered_remove_fixed_capacity_dynamic_array,
 
 	unordered_remove_soa,
+	unordered_remove_soa_fixed_capacity,
 }
 
 
@@ -221,6 +222,7 @@ ordered_remove :: proc{
 	ordered_remove_fixed_capacity_dynamic_array,
 
 	ordered_remove_soa,
+	ordered_remove_soa_fixed_capacity,
 }
 
 @builtin
@@ -272,6 +274,7 @@ pop :: proc{
 	pop_fixed_capacity_dynamic_array,
 
 	pop_soa,
+	pop_soa_fixed_capacity,
 }
 
 // `pop_safe_dynamic_array` trys to remove and return the end value of dynamic array `array` and reduces the length of `array` by 1.
@@ -306,6 +309,7 @@ pop_safe :: proc{
 	pop_safe_fixed_capacity_dynamic_array,
 
 	pop_safe_soa,
+	pop_safe_soa_fixed_capacity,
 }
 
 
@@ -347,6 +351,7 @@ pop_front :: proc{
 	pop_front_fixed_capacity_dynamic_array,
 
 	pop_front_soa,
+	pop_front_soa_fixed_capacity,
 }
 
 
@@ -388,6 +393,7 @@ pop_front_safe :: proc {
 	pop_front_safe_fixed_capacity_dynamic_array,
 
 	pop_front_safe_soa,
+	pop_front_safe_soa_fixed_capacity,
 }
 
 
@@ -400,6 +406,7 @@ clear :: proc{
 	clear_fixed_capacity_dynamic_array,
 
 	clear_soa_dynamic_array,
+	clear_soa_fixed_capacity,
 }
 
 // `reserve` will try to reserve memory of a passed dynamic array or map to the requested element count (setting the `cap`).
@@ -425,6 +432,7 @@ resize :: proc{
 	resize_fixed_capacity_dynamic_array,
 
 	resize_soa,
+	resize_soa_fixed_capacity,
 }
 
 @builtin
@@ -433,6 +441,7 @@ non_zero_resize :: proc{
 	non_zero_resize_fixed_capacity_dynamic_array,
 
 	non_zero_resize_soa,
+	non_zero_resize_soa_fixed_capacity,
 }
 
 // Shrinks the capacity of a dynamic array or map down to the current length, or the given capacity.
@@ -1110,6 +1119,8 @@ append :: proc{
 
 	append_soa_elem,
 	append_soa_elems,
+	append_soa_fixed_capacity_elem,
+	append_soa_fixed_capacity_elems,
 }
 
 @builtin
@@ -1124,6 +1135,8 @@ non_zero_append :: proc{
 
 	non_zero_append_soa_elem,
 	non_zero_append_soa_elems,
+	append_soa_fixed_capacity_elem,
+	append_soa_fixed_capacity_elems,
 }
 
 
@@ -1168,6 +1181,8 @@ append_nothing_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[d
 append_nothing :: proc{
 	append_nothing_dynamic_array,
 	append_nothing_fixed_capacity_dynamic_array,
+	append_nothing_soa,
+	append_nothing_soa_fixed_capacity,
 }
 
 
@@ -1341,6 +1356,8 @@ inject_at :: proc{
 
 	inject_at_elem_soa,
 	inject_at_elems_soa,
+	inject_at_elem_soa_fixed_capacity,
+	inject_at_elems_soa_fixed_capacity,
 }
 
 

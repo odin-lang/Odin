@@ -5199,7 +5199,7 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 	case Type_Matrix:          et = bt->Matrix.elem;          break;
 	case Type_FixedCapacityDynamicArray: et = bt->FixedCapacityDynamicArray.elem; break;
 	case Type_Struct:
-		if (bt->Struct.soa_kind == StructSoa_Fixed) {
+		if (soa_has_inline_fields(bt)) {
 			et = bt->Struct.soa_elem;
 		}
 		break;
@@ -5207,12 +5207,15 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 	GB_ASSERT(et != nullptr);
 
 
+	// NOTE(bill): Constant elements were already stored with the rest of the constant, except for these
+	bool store_constants = bt->kind == Type_DynamicArray || (bt->kind == Type_Struct && bt->Struct.soa_kind == StructSoa_FixedCapacityDynamic);
+
 	isize elem_index = 0;
 	// NOTE(bill): Separate value, gep, store into their own chunks
 	for (Ast *elem : elems) {
 		if (elem->kind == Ast_FieldValue) {
 			ast_node(fv, FieldValue, elem);
-			if (bt->kind != Type_DynamicArray && lb_is_elem_const(fv->value, et)) {
+			if (!store_constants && lb_is_elem_const(fv->value, et)) {
 				continue;
 			}
 			if (is_ast_range(fv->field)) {
@@ -5278,7 +5281,7 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 			}
 
 		} else {
-			if (bt->kind != Type_DynamicArray && lb_is_elem_const(elem, et)) {
+			if (!store_constants && lb_is_elem_const(elem, et)) {
 				elem_index++;
 				continue;
 			}
@@ -6036,8 +6039,8 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 			#if 1
 
 			lbAddr dst = lb_add_local_generated(p, type_of_expr(expr), true);
-			if (type->Struct.soa_kind == StructSoa_Fixed) {
-				i32 field_count = cast(i32)type->Struct.fields.count;
+			if (soa_has_inline_fields(type)) {
+				i32 field_count = cast(i32)soa_field_count(type);
 				for (i32 i = 0; i < field_count; i++) {
 					lbValue field_dst = lb_emit_struct_ep(p, dst.addr, i);
 					lbValue field_src = lb_emit_struct_ep(p, lb_addr_get_ptr(p, addr), i);
@@ -6526,11 +6529,17 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 	case Type_Struct:
 		if (is_type_soa_struct(type)) {
-			GB_ASSERT(bt->Struct.soa_kind == StructSoa_Fixed);
+			GB_ASSERT(soa_has_inline_fields(bt));
 			if (cl->elems.count == 0) {
 				break;
 			}
-			lb_build_addr_compound_lit_store_constant(p, v, type, expr);
+			if (bt->Struct.soa_kind == StructSoa_FixedCapacityDynamic) {
+				// NOTE(bill): The length is set first, so the element stores below are within it.
+				lbValue len_ptr = lb_emit_struct_ep(p, v.addr, cast(i32)soa_field_count(bt));
+				lb_emit_store(p, len_ptr, lb_const_int(p->module, t_int, cl->max_count));
+			} else {
+				lb_build_addr_compound_lit_store_constant(p, v, type, expr);
+			}
 
 			auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 			lb_build_addr_compound_lit_populate(p, cl->elems, &temp_data, type);
@@ -7074,7 +7083,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 					lbValue item = {};
 
-					if (t->Struct.soa_kind == StructSoa_Fixed) {
+					if (soa_has_inline_fields(t)) {
 						item = lb_emit_array_ep(p, arr, index);
 					} else {
 						item = lb_emit_ptr_offset(p, lb_emit_load(p, arr), index);
