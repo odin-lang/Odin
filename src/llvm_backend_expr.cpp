@@ -5377,7 +5377,17 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		return lb_addr_soa_variable(val, index, ie->index);
 	}
 
-	if (ie->expr->tav.mode == Addressing_SoaVariable && is_type_multi_pointer(type_of_expr(ie->expr))) {
+	// NOTE(bill): Through a pointer, the checker treats `p.x` as an ordinary variable, but it is still an #soa column.
+	bool soa_column = ie->expr->tav.mode == Addressing_SoaVariable;
+	Ast *column_expr = unparen_expr(ie->expr);
+	if (column_expr->kind == Ast_SelectorExpr) {
+		Entity *column = entity_of_node(column_expr->SelectorExpr.selector);
+		if (column != nullptr && (column->flags & EntityFlag_SoaPtrField) != 0) {
+			soa_column = true;
+		}
+	}
+
+	if (soa_column && is_type_multi_pointer(type_of_expr(ie->expr))) {
 		// soa.x[i], indexing one field's multipointer;
 		// the soa element of array type, soa[i][j] carries Addressing_SoaVariable too but has
 		// no multipointer to index; it is handled in the Type_Array case below

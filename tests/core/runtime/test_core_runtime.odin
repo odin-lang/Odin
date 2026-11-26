@@ -398,6 +398,31 @@ test_grow_like_append :: proc(t: ^testing.T) {
 	testing.expect_value(t, cap(array), 16)
 }
 
+when !testing.INLINE {
+	// Through a pointer, indexing an #soa column is still bounds checked
+	@(test)
+	test_soa_column_index_through_slice_pointer :: proc(t: ^testing.T) {
+		V :: struct {x, y: f32}
+		fixed: #soa[4]V
+		slice := fixed[:]
+		p := &slice
+		n := len(slice)
+		testing.expect_assert(t, "4 is out of range 0..<4")
+		_ = p.x[n]
+	}
+
+	@(test)
+	test_soa_column_index_through_dynamic_pointer :: proc(t: ^testing.T) {
+		V :: struct {x, y: f32}
+		fixed: #soa[4]V
+		array := runtime.into_dynamic_soa(fixed[:])
+		p := &array
+		n := len(array)
+		testing.expect_assert(t, "0 is out of range 0..<0")
+		_ = p.x[n]
+	}
+}
+
 @(test)
 test_soa_make_len :: proc(t: ^testing.T) {
 
