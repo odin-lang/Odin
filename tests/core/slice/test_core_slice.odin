@@ -506,6 +506,7 @@ Sort_Pattern :: enum {
 	Reversed,
 	Descending,
 	Nearly_Sorted,
+	Swapped,
 	Spikes,
 	Organ_Pipe,
 	Sawtooth,
@@ -573,12 +574,14 @@ sort_pattern_keys :: proc(keys: []i64, pattern: Sort_Pattern) {
 		for &k, i in keys {
 			k = i64(n - i + i/64)
 		}
-	case .Nearly_Sorted:
-		// A comparator sort keeps the sorted items in place and merges the others back, across segments once its buffer fills.
+	case .Nearly_Sorted, .Swapped:
+		// With 1% of keys swapped, a comparator sort keeps the sorted items in place and merges the others back, across
+		// segments once its buffer fills. With 7%, it merges natural runs, the input still being sorted at large scale.
 		for &k, i in keys {
 			k = i64(i/3)
 		}
-		for _ in 0..<(n+99)/100 {
+		swaps := (n+99)/100 if pattern == .Nearly_Sorted else n*7/100
+		for _ in 0..<swaps {
 			a, b := rand.int_max(n), rand.int_max(n)
 			keys[a], keys[b] = keys[b], keys[a]
 		}

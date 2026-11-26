@@ -89,6 +89,8 @@ HODGEPODGE_RADIX_SMALL      :: 64
 HODGEPODGE_RUN_MIN          :: 32
 HODGEPODGE_DROP_DESCENTS    :: 16
 HODGEPODGE_DROP_NEW_RUN     :: 16
+HODGEPODGE_FAR_DESCENTS     :: 48
+HODGEPODGE_FAR_FROM         :: 8192
 HODGEPODGE_RADIX_FEW        :: 4
 HODGEPODGE_RADIX_FEW_LANES  :: 32
 HODGEPODGE_RADIX_FEW_BYTES  :: 1 << 20
@@ -1192,6 +1194,18 @@ hodgepodge_nearly_sorted :: proc(a: []$E, call: $P, $KIND: Sort_Kind) -> bool #n
 	return descents < HODGEPODGE_DROP_DESCENTS
 }
 
+// Whether the points of hodgepodge_nearly_sorted's sample have fewer than HODGEPODGE_FAR_DESCENTS descents between each
+// other: sorted at large scale, however disordered between neighbours.
+@(require_results)
+hodgepodge_sorted_at_scale :: proc(a: []$E, call: $P, $KIND: Sort_Kind) -> bool #no_bounds_check {
+	n := len(a)
+	descents := 0
+	for t in 1..<256 {
+		descents += int(hodgepodge_greater(a[(t-1)*(n-1)/256], a[t*(n-1)/256], call, KIND))
+	}
+	return descents < HODGEPODGE_FAR_DESCENTS
+}
+
 // Drop-merge, after Ernerfeldt's drop-merge sort (2017), for input sorted apart from scattered items: a non-decreasing
 // sequence stays in place, and the items that break it are set aside sorted, each with its slot, the number of kept
 // items that came before it. Slots settle ties against kept items when the two merge. A kept item that is a lone spike
@@ -1321,7 +1335,9 @@ hodgepodge_natural_run :: proc(a: []$E, start: int, call: $P, $KIND: Sort_Kind) 
 
 // Merges the natural runs of `a` in the order of Powersort (Munro and Wild, "Nearly-Optimal Mergesorts: Fast, Practical
 // Sorting Methods That Optimally Adapt to Existing Runs", 2018): a boundary between two runs merges before any of
-// higher power. A stretch of runs shorter than HODGEPODGE_RUN_MIN is quadsorted as one run.
+// higher power. Where no run of HODGEPODGE_RUN_MIN items starts, that many items make an unsorted run, after the lazy
+// runs of Glidesort (Orson Peters, 2023). Unsorted runs merge by joining, and are sorted only when they meet a sorted
+// run, or at the end.
 hodgepodge_power_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	// The first bit in which the midpoints of runs [s1, s1+n1) and [s1+n1, s1+n1+n2) differ, as fractions of n.
 	power :: proc "contextless" (s1, n1, n2, n: int) -> int {
@@ -1330,58 +1346,68 @@ hodgepodge_power_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bound
 		return int(intrinsics.count_leading_zeros(x ~ y))
 	}
 
-	// A long run found while scanning a stretch is kept in `ahead`, so it is not scanned twice.
-	next_run :: proc(a, s: []$E, start: int, ahead: ^int, call: $P, $KIND: Sort_Kind) -> int {
-		if ahead^ > start {
-			return ahead^
-		}
-		end := hodgepodge_natural_run(a, start, call, KIND)
-		if end-start >= HODGEPODGE_RUN_MIN {
-			return end
-		}
-		stretch := end
-		for stretch < len(a) {
-			run_end := hodgepodge_natural_run(a, stretch, call, KIND)
-			if run_end-stretch >= HODGEPODGE_RUN_MIN {
-				ahead^ = run_end
-				break
-			}
-			stretch = run_end
-		}
-		hodgepodge_quadsort(a[start:stretch], s, call, KIND)
-		return stretch
-	}
-
 	Run :: struct {
 		start, end, power: int,
+		sorted:            bool,
+	}
+
+	next_run :: proc(a: []$E, start: int, call: $P, $KIND: Sort_Kind) -> Run {
+		end := hodgepodge_natural_run(a, start, call, KIND)
+		if end-start >= HODGEPODGE_RUN_MIN {
+			return {start, end, 0, true}
+		}
+		return {start, builtin.min(start + HODGEPODGE_RUN_MIN, len(a)), 0, false}
+	}
+
+	sort_run :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) {
+		if len(a) <= HODGEPODGE_OUT {
+			hodgepodge_quadsort(a, s, call, KIND)
+		} else {
+			hodgepodge_partition(a, s, call, KIND)
+		}
+	}
+
+	merge :: proc(a, s: []$E, left, right: Run, call: $P, $KIND: Sort_Kind) -> Run {
+		if !left.sorted && !right.sorted {
+			return {left.start, right.end, 0, false}
+		}
+		if !left.sorted {
+			sort_run(a[left.start:left.end], s, call, KIND)
+		}
+		if !right.sorted {
+			sort_run(a[right.start:right.end], s, call, KIND)
+		}
+		hodgepodge_rotate_merge_block(a[left.start:right.end], s, left.end-left.start, right.end-left.end, call, KIND)
+		return {left.start, right.end, 0, true}
 	}
 
 	// Powers on the stack strictly increase, and there are 64 of them.
 	stack: [64]Run
-	top       := 0
-	n         := len(a)
-	ahead     := 0
-	run_start := 0
-	run_end   := next_run(a, s, 0, &ahead, call, KIND)
+	top := 0
+	n   := len(a)
+	run := next_run(a, 0, call, KIND)
 	for {
 		// Past the last run, everything left on the stack merges.
-		next_end, power_here := n, -1
-		if run_end < n {
-			next_end   = next_run(a, s, run_end, &ahead, call, KIND)
-			power_here = power(run_start, run_end-run_start, next_end-run_end, n)
+		next: Run
+		power_here := -1
+		if run.end < n {
+			next       = next_run(a, run.end, call, KIND)
+			power_here = power(run.start, run.end-run.start, next.end-run.end, n)
 		}
 		for top > 0 && stack[top-1].power > power_here {
 			top -= 1
-			left := stack[top]
-			hodgepodge_rotate_merge_block(a[left.start:run_end], s, left.end-left.start, run_end-left.end, call, KIND)
-			run_start = left.start
+			run = merge(a, s, stack[top], run, call, KIND)
 		}
-		if run_end == n {
+		if run.end == n {
+			if !run.sorted {
+				sort_run(a[run.start:run.end], s, call, KIND)
+			}
 			return
 		}
-		stack[top] = {run_start, run_end, power_here}
+		run.power = power_here
+		stack[top] = run
 		top += 1
-		run_start, run_end = run_end, next_end
+		run = next
 	}
 }
 
@@ -1862,8 +1888,8 @@ hodgepodge_analyze :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_ch
 	// counting pass, which beats any use of the order already there.
 	RADIX :: (KIND == .Ordered || KIND == .Ordered_Reverse) && intrinsics.type_is_integer(E) && intrinsics.type_is_endian_platform(E)
 	// Where a comparison is a call, not a few inlined instructions, a quarter with order in it merges its natural runs
-	// instead of being sorted in fixed blocks, and input sorted apart from scattered items takes drop-merge: fewer
-	// comparisons, and merges that follow the data.
+	// instead of being sorted in fixed blocks, input sorted apart from scattered items takes drop-merge, and input sorted
+	// at large scale merges its natural runs: fewer comparisons, and merges that follow the data.
 	CHEAP :: (KIND == .Ordered || KIND == .Ordered_Reverse) && !intrinsics.type_is_string(E) ||
 	         KIND == .Less_Constant || KIND == .Less_Reverse_Constant || KIND == .Cmp_Constant || KIND == .Cmp_Reverse_Constant
 	when RADIX && size_of(E) == 1 {
@@ -1976,6 +2002,12 @@ hodgepodge_analyze :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_ch
 		when !CHEAP {
 			if hodgepodge_nearly_sorted(a, call, KIND) {
 				hodgepodge_drop_merge(a, s, call, KIND)
+				return
+			}
+			// Merging runs of keys from all over interleaves them, and the partition does that for less. Runs of keys
+			// near their place barely overlap.
+			if n >= HODGEPODGE_FAR_FROM && hodgepodge_sorted_at_scale(a, call, KIND) {
+				hodgepodge_power_merge(a, s, call, KIND)
 				return
 			}
 		}
