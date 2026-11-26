@@ -26,8 +26,9 @@ File_Info :: struct {
 
 @(require_results)
 file_info_clone :: proc(fi: File_Info, allocator: runtime.Allocator) -> (cloned: File_Info, err: runtime.Allocator_Error) {
+	fullpath := strings.clone(fi.fullpath, allocator) or_return
 	cloned = fi
-	cloned.fullpath = strings.clone(fi.fullpath, allocator) or_return
+	cloned.fullpath = fullpath
 	_, cloned.name = split_path(cloned.fullpath)
 	return
 }

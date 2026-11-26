@@ -140,9 +140,23 @@ test_dir :: proc(t: ^testing.T) {
 		{"../bin/css",   "../bin"},
 		{"/bin/usr/",    "/bin/usr"},
 		{"W:/Odin/odin", "W:/Odin"},
+		{"",             "."},
+	}
+	when ODIN_OS == .Windows {
+		@static os_dirs := [][2]string{
+			{"W:\\Odin\\odin", "W:\\Odin"},
+			{"W:/odin",        "W:/"},
+		}
+	} else {
+		@static os_dirs := [][2]string{
+			{"/bin", "/"},
+		}
 	}
 
 	for d in dirs {
+		testing.expect_value(t, filepath.dir(d[0]), d[1])
+	}
+	for d in os_dirs {
 		testing.expect_value(t, filepath.dir(d[0]), d[1])
 	}
 }

@@ -330,11 +330,14 @@ rd_valtype :: proc "contextless" (r: ^Reader) -> (t: Value_Type, err: Parse_Erro
 @(private, require_results)
 rd_valtype_vec :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Value_Type, err: Reader_Error) {
 	n := rd_count(r) or_return
-	out = make([]Value_Type, int(n), allocator) or_return
-	for &v in out {
+	vec := make([]Value_Type, int(n), allocator) or_return
+	defer if err != nil {
+		delete(vec, allocator)
+	}
+	for &v in vec {
 		v = rd_valtype(r) or_return
 	}
-	return
+	return vec, nil
 }
 
 @(private, require_results)
@@ -492,21 +495,31 @@ section_rank :: proc "contextless" (id: Section_Id) -> int {
 @(private, require_results)
 parse_types :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Func_Type, err: Reader_Error) {
 	n := rd_count(r) or_return
-	out = make([]Func_Type, int(n), allocator) or_return
-	for &ft in out {
+	types := make([]Func_Type, int(n), allocator) or_return
+	defer if err != nil {
+		for ft in types {
+			delete(ft.params, allocator)
+			delete(ft.results, allocator)
+		}
+		delete(types, allocator)
+	}
+	for &ft in types {
 		form := rd_byte(r) or_return
-		if form != 0x60 { return out, .BAD_TYPE_FORM }
+		if form != 0x60 { return nil, .BAD_TYPE_FORM }
 		ft.params  = rd_valtype_vec(r, allocator) or_return
 		ft.results = rd_valtype_vec(r, allocator) or_return
 	}
-	return
+	return types, nil
 }
 
 @(private, require_results)
 parse_imports :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Import, err: Reader_Error) {
 	n := rd_count(r) or_return
-	out = make([]Import, int(n), allocator) or_return
-	for &imp in out {
+	imports := make([]Import, int(n), allocator) or_return
+	defer if err != nil {
+		delete(imports, allocator)
+	}
+	for &imp in imports {
 		imp.module_name = rd_name(r) or_return
 		imp.field_name  = rd_name(r) or_return
 		imp.kind        = External_Kind(rd_byte(r) or_return)
@@ -516,7 +529,7 @@ parse_imports :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Impor
 		case .TABLE:
 			rt := rd_valtype(r) or_return // reftype
 			if !value_type_is_ref(rt) {
-				return out, .BAD_VALTYPE
+				return nil, .BAD_VALTYPE
 			}
 			_, _, _ = rd_limits(r, true) or_return
 		case .MEMORY:
@@ -524,39 +537,45 @@ parse_imports :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Impor
 		case .GLOBAL:
 			_ = rd_valtype(r) or_return // valtype
 			if (rd_byte(r) or_return) > 1 { // mutability
-				return out, .BAD_MUTABILITY
+				return nil, .BAD_MUTABILITY
 			}
 		case:
-			return out, .BAD_KIND
+			return nil, .BAD_KIND
 		}
 	}
-	return
+	return imports, nil
 }
 
 @(private, require_results)
 parse_function_section :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []u32, err: Reader_Error) {
 	n := rd_count(r) or_return
-	out = make([]u32, int(n), allocator) or_return
-	for &idx in out {
+	typeidx := make([]u32, int(n), allocator) or_return
+	defer if err != nil {
+		delete(typeidx, allocator)
+	}
+	for &idx in typeidx {
 		idx = rd_u32(r) or_return
 	}
-	return
+	return typeidx, nil
 }
 
 @(private, require_results)
 parse_exports :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Export, err: Reader_Error) {
 	n := rd_count(r) or_return
-	out = make([]Export, int(n), allocator) or_return
-	for &e in out {
+	exports := make([]Export, int(n), allocator) or_return
+	defer if err != nil {
+		delete(exports, allocator)
+	}
+	for &e in exports {
 		e.name  = rd_name(r) or_return
 		kind   := rd_byte(r) or_return
 		if kind > u8(max(External_Kind)) {
-			return out, .BAD_KIND
+			return nil, .BAD_KIND
 		}
 		e.kind  = External_Kind(kind)
 		e.index = rd_u32(r) or_return
 	}
-	return
+	return exports, nil
 }
 
 // One code entry's locals (still compressed as `count x type` groups) and the
@@ -577,34 +596,37 @@ Local_Group :: struct {
 @(private, require_results)
 parse_code :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Code_Body, err: Reader_Error) {
 	n := rd_count(r) or_return
-	out = make([]Code_Body, int(n), allocator) or_return
-	for &cb in out {
+	bodies := make([]Code_Body, int(n), allocator) or_return
+	defer if err != nil {
+		for cb in bodies {
+			delete(cb.locals, allocator)
+		}
+		delete(bodies, allocator)
+	}
+	for &cb in bodies {
 		total := rd_u32(r) or_return
 		if total > reader_remaining(r) {
-			return out, .TRUNCATED
+			return nil, .TRUNCATED
 		}
 		body_end := r.off + total
 		body := Reader{data = r.data[:body_end], off = r.off}
 
 		nl := rd_count(&body) or_return
-		locals := make([]Local_Group, int(nl), allocator) or_return
+		cb.locals = make([]Local_Group, int(nl), allocator) or_return
 		local_total: u64
-		for &g in locals {
+		for &g in cb.locals {
 			g.count = rd_u32(&body) or_return
 			g.type  = rd_valtype(&body) or_return
 			local_total += u64(g.count)
 		}
 		if local_total > MAX_FUNCTION_LOCALS {
-			return out, .TOO_MANY_LOCALS
+			return nil, .TOO_MANY_LOCALS
 		}
-		cb = Code_Body{
-			locals      = locals,
-			body_offset = body.off,
-			body_size   = body_end - body.off,
-		}
+		cb.body_offset = body.off
+		cb.body_size   = body_end - body.off
 		r.off = body_end   // jump past the expr to the next entry
 	}
-	return
+	return bodies, nil
 }
 
 
@@ -674,31 +696,42 @@ parse_custom_sections :: proc(m: ^Module, allocator: runtime.Allocator) -> Reade
 
 @(private, require_results)
 parse_name_section :: proc(r: ^Reader, allocator: runtime.Allocator) -> (cname: Custom_Section_Name, err: Reader_Error) {
+	names: Custom_Section_Name
+	defer if err != nil {
+		custom_section_name_destroy(names, allocator)
+	}
 	for r.off < u32(len(r.data)) {
 		id   := rd_byte(r) or_return
 		size := rd_u32(r)  or_return
 		if size > reader_remaining(r) {
-			return cname, .TRUNCATED
+			return {}, .TRUNCATED
 		}
 		sub := Reader{data = r.data[:r.off + size], off = r.off}
 		r.off += size
 
 		switch id {
 		case 0: // module
-			cname.module_name = rd_name(&sub) or_return
+			names.module_name = rd_name(&sub) or_return
 		case 1: // functions
 			count := rd_count(&sub) or_return
-			cname.functions = make([]Custom_Section_Name_Function, count, allocator) or_return
-			for &func in cname.functions {
+			functions := make([]Custom_Section_Name_Function, count, allocator) or_return
+			delete(names.functions, allocator)
+			names.functions = functions
+			for &func in names.functions {
 				func.id   = rd_u32(&sub)  or_return
 				func.name = rd_name(&sub) or_return
 			}
 		case 2: // locals
 			count := rd_count(&sub) or_return
 
-			cname.locals = make([]Custom_Section_Name_Function_Locals, count, allocator) or_return
+			locals := make([]Custom_Section_Name_Function_Locals, count, allocator) or_return
+			for l in names.locals {
+				delete(l.locals, allocator)
+			}
+			delete(names.locals, allocator)
+			names.locals = locals
 
-			for &local_func in cname.locals {
+			for &local_func in names.locals {
 				local_func.func_idx = rd_u32(&sub) or_return
 				local_count := rd_count(&sub) or_return
 				local_func.locals = make([]Custom_Section_Name_Local, local_count, allocator) or_return
@@ -709,19 +742,22 @@ parse_name_section :: proc(r: ^Reader, allocator: runtime.Allocator) -> (cname: 
 			}
 		}
 	}
-	return
+	return names, nil
 }
 
 @(private, require_results)
 parse_target_features :: proc(r: ^Reader, allocator: runtime.Allocator) -> (target_features: Custom_Section_Target_Features, err: Reader_Error) {
 	count := rd_count(r) or_return
-	target_features.features = make([]Custom_Section_Target_Feature, count, allocator) or_return
+	features := make([]Custom_Section_Target_Feature, count, allocator) or_return
+	defer if err != nil {
+		delete(features, allocator)
+	}
 
-	for &feature in target_features.features {
+	for &feature in features {
 		feature.prefix  = Custom_Section_Target_Feature_Prefix(rd_byte(r) or_return)
 		feature.feature = rd_name(r) or_return
 	}
-	return
+	return {features = features}, nil
 }
 
 // =============================================================================
@@ -820,9 +856,13 @@ body_well_nested :: proc(ops: []Operation, allocator: runtime.Allocator) -> bool
 	for op, i in ops {
 		#partial switch Opcode(op.opcode) {
 		case .BLOCK, .LOOP:
-			append(&open_ifs, false)
+			if _, err := append(&open_ifs, false); err != nil {
+				return false
+			}
 		case .IF:
-			append(&open_ifs, true)
+			if _, err := append(&open_ifs, true); err != nil {
+				return false
+			}
 		case .ELSE:
 			if len(open_ifs) == 0 || !open_ifs[len(open_ifs) - 1] {
 				return false
@@ -882,6 +922,14 @@ relocs_for_body :: proc(all: []Relocation, body_off_in_sec, size: u32, allocator
 parse_relocations :: proc(m: Module, allocator: runtime.Allocator) -> (groups_out: []Reloc_Group, err: Reader_Error) {
 	groups: [dynamic]Reloc_Group
 	groups.allocator = allocator
+	out: []Relocation
+	defer if err != nil {
+		delete(out, allocator)
+		for g in groups {
+			delete(g.relocs, allocator)
+		}
+		delete(groups)
+	}
 	for sec in m.sections {
 		if !(sec.id == .CUSTOM && strings.has_prefix(sec.name, "reloc.")) { continue }
 
@@ -889,12 +937,12 @@ parse_relocations :: proc(m: Module, allocator: runtime.Allocator) -> (groups_ou
 		_ = rd_name(&r) or_return                    // step past the custom-section name
 		target_index := rd_u32(&r) or_return
 		if target_index >= u32(len(m.sections)) {
-			return groups[:], .BAD_SECTION
+			return nil, .BAD_SECTION
 		}
 		target := m.sections[target_index].id
 		count  := rd_count(&r) or_return
 
-		out := make([]Relocation, int(count), allocator) or_return
+		out = make([]Relocation, int(count), allocator) or_return
 		w := 0
 		for _ in 0..<count {
 			code   := rd_byte(&r) or_return
@@ -906,7 +954,7 @@ parse_relocations :: proc(m: Module, allocator: runtime.Allocator) -> (groups_ou
 			}
 			t := reloc_type_from_wire(code) or_continue
 			if addend < i64(min(i32)) || addend > i64(max(i32)) {
-				return groups[:], .BAD_SLEB
+				return nil, .BAD_SLEB
 			}
 			out[w] = Relocation{
 				offset   = offset,
@@ -918,9 +966,9 @@ parse_relocations :: proc(m: Module, allocator: runtime.Allocator) -> (groups_ou
 			w += 1
 		}
 		append(&groups, Reloc_Group{target_section = target, relocs = out[:w]}) or_return
+		out = nil
 	}
-	groups_out = groups[:]
-	return
+	return groups[:], nil
 }
 
 // Override function names with the "name" custom section's function-name
@@ -946,7 +994,7 @@ apply_name_section :: proc(m: ^Module) {
 				for _ in 0..<count {
 					fidx := rd_u32(&r)  or_break
 					name := rd_name(&r) or_break
-					if int(fidx) < len(m.base.functions) {
+					if fidx < u32(len(m.base.functions)) {
 						m.base.functions[fidx].name = name
 					}
 				}

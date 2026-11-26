@@ -247,7 +247,7 @@ wat_write_function :: proc(sb: ^strings.Builder, m: Module, func_relocs: []Reloc
 	fmt.sbprintf(sb, " (type %d)", f.signature)
 
 	type := &Func_Type{}
-	if int(f.signature) < len(m.func_types) {
+	if u32(f.signature) < u32(len(m.func_types)) {
 		type = &m.func_types[f.signature]
 	}
 
@@ -267,7 +267,10 @@ wat_write_function :: proc(sb: ^strings.Builder, m: Module, func_relocs: []Reloc
 			strings.write_string(sb, valtype_name(rt))
 		}
 	}
-	locals := m.function_locals[f.id]
+	locals: []Value_Type
+	if u32(f.id) < u32(len(m.function_locals)) {
+		locals = m.function_locals[f.id]
+	}
 	if len(locals) > 0 {
 		strings.write_string(sb, "\n")
 		strings.write_string(sb, "    (local")

@@ -480,6 +480,9 @@ _add_user :: proc(servername: string, username: string, password: string) -> (ok
 @(require_results)
 get_computer_name_and_account_sid :: proc(username: string) -> (computer_name: string, sid := SID{}, ok: bool) {
 	username_w := utf8_to_utf16(username, context.temp_allocator)
+	if len(username_w) == 0 {
+		return "", {}, false
+	}
 	cbsid: DWORD
 	computer_name_size: DWORD
 	pe_use := SID_NAME_USE.SidTypeUser
@@ -498,7 +501,10 @@ get_computer_name_and_account_sid :: proc(username: string) -> (computer_name: s
 		return "", {}, false
 	}
 
-	cname_w := make([]u16, computer_name_size, context.temp_allocator)
+	cname_w, cname_err := make([]u16, computer_name_size, context.temp_allocator)
+	if cname_err != nil {
+		return "", {}, false
+	}
 
 	res = LookupAccountNameW(
 		nil,
@@ -522,6 +528,9 @@ get_computer_name_and_account_sid :: proc(username: string) -> (computer_name: s
 @(require_results)
 get_sid :: proc(username: string, sid: ^SID) -> (ok: bool) {
 	username_w := utf8_to_utf16(username, context.temp_allocator)
+	if len(username_w) == 0 {
+		return false
+	}
 	cbsid: DWORD
 	computer_name_size: DWORD
 	pe_use := SID_NAME_USE.SidTypeUser
@@ -540,7 +549,10 @@ get_sid :: proc(username: string, sid: ^SID) -> (ok: bool) {
 		return false
 	}
 
-	cname_w := make([]u16, computer_name_size, context.temp_allocator)
+	cname_w, cname_err := make([]u16, computer_name_size, context.temp_allocator)
+	if cname_err != nil {
+		return false
+	}
 
 	res = LookupAccountNameW(
 		nil,
@@ -592,6 +604,9 @@ add_del_from_group :: proc(sid: ^SID, group: string) -> (ok: NET_API_STATUS) {
 @(require_results)
 add_user_profile :: proc(username: string) -> (ok: bool, profile_path: string) {
 	username_w := utf8_to_utf16(username, context.temp_allocator)
+	if len(username_w) == 0 {
+		return false, ""
+	}
 
 	sid := SID{}
 	ok = get_sid(username, &sid)
@@ -606,7 +621,10 @@ add_user_profile :: proc(username: string) -> (ok: bool, profile_path: string) {
 	}
 	defer LocalFree(rawptr(sb))
 
-	pszProfilePath := make([]u16, 257, context.temp_allocator)
+	pszProfilePath, profile_err := make([]u16, 257, context.temp_allocator)
+	if profile_err != nil {
+		return false, ""
+	}
 	res2 := CreateProfile(
 		sb,
 		cstring16(&username_w[0]),
@@ -687,9 +705,15 @@ delete_user :: proc(servername: string, username: string) -> (ok: bool) {
 		servername_w = nil
 	} else {
 		server := utf8_to_utf16(servername, context.temp_allocator)
+		if len(server) == 0 {
+			return false
+		}
 		servername_w = wstring(&server[0])
 	}
 	username_w := utf8_to_utf16(username)
+	if len(username_w) == 0 {
+		return false
+	}
 
 	res := NetUserDel(
 		servername_w,
@@ -712,22 +736,21 @@ run_as_user :: proc(username, password, application, commandline: string, pi: ^P
 
 	*/
 
-	username_w    := utf8_to_utf16(username)
-	domain_w      := utf8_to_utf16(".")
-	password_w    := utf8_to_utf16(password)
-	app_w         := utf8_to_utf16(application)
-
-	commandline_w: []u16 = {0}
-	if len(commandline) > 0 {
-		commandline_w = utf8_to_utf16(commandline)
+	username_w    := utf8_to_wstring(username)
+	domain_w      := utf8_to_wstring(".")
+	password_w    := utf8_to_wstring(password)
+	app_w         := utf8_to_wstring(application)
+	commandline_w := utf8_to_wstring(commandline)
+	if username_w == nil || domain_w == nil || password_w == nil || app_w == nil || commandline_w == nil {
+		return false
 	}
 
 	user_token: HANDLE
 
 	ok = bool(LogonUserW(
-		lpszUsername    = wstring(&username_w[0]),
-		lpszDomain      = wstring(&domain_w[0]),
-		lpszPassword    = wstring(&password_w[0]),
+		lpszUsername    = username_w,
+		lpszDomain      = domain_w,
+		lpszPassword    = password_w,
 		dwLogonType     = .NEW_CREDENTIALS,
 		dwLogonProvider = .WINNT50,
 		phToken         = &user_token,
@@ -738,13 +761,14 @@ run_as_user :: proc(username, password, application, commandline: string, pi: ^P
 		// err := GetLastError();
 		// fmt.printf("GetLastError: %v\n", err);
 	}
+	defer CloseHandle(user_token)
 	si := STARTUPINFOW{}
 	si.cb = size_of(STARTUPINFOW)
 
 	ok = bool(CreateProcessAsUserW(
 		user_token,
-		wstring(&app_w[0]),
-		wstring(&commandline_w[0]),
+		app_w,
+		commandline_w,
 		nil,	// lpProcessAttributes,
 		nil,	// lpThreadAttributes,
 		false,	// bInheritHandles,

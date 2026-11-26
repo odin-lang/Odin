@@ -110,6 +110,9 @@ refill_window :: proc(z: ^Context, need: int) -> (err: io.Error) #no_bounds_chec
 		return nil
 	}
 	if is_memory_context(z) || need > len(z.backing) - CONTEXT_HISTORY {
+		if !is_memory_context(z) && z.backing == nil {
+			return .Buffer_Full
+		}
 		return .EOF if len(z.window) == 0 else .Short_Buffer
 	}
 
@@ -327,7 +330,7 @@ skip :: proc(z: ^Context, offset: i64) -> (err: io.Error) #no_bounds_check {
 	}
 
 	for remaining > 0 {
-		refill_window(z, int(min(remaining, i64(len(z.backing) - CONTEXT_HISTORY)))) or_return
+		refill_window(z, max(int(min(remaining, i64(len(z.backing) - CONTEXT_HISTORY))), 1)) or_return
 		n := min(i64(len(z.window)), remaining)
 		z.window   = z.window[n:]
 		remaining -= n

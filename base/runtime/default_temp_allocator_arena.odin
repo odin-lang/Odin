@@ -38,7 +38,7 @@ memory_block_alloc :: proc(allocator: Allocator, capacity: uint, alignment: uint
 	base_offset := align_forward_uint(uint(size_of(Memory_Block)), min_alignment)
 
 	total_size, size_ok := safe_add(capacity, base_offset)
-	if !size_ok {
+	if !size_ok || total_size > uint(max(int)) {
 		return nil, .Out_Of_Memory
 	}
 
@@ -117,6 +117,9 @@ arena_alloc :: proc(arena: ^Arena, size, alignment: uint, loc := #caller_locatio
 			arena.minimum_block_size = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE
 		}
 
+		if size > max(uint) - (align-1) {
+			return nil, .Out_Of_Memory
+		}
 		needed := align_forward_uint(size, align)
 		block_size := max(needed, arena.minimum_block_size)
 

@@ -28,7 +28,8 @@ sign_asn1 :: proc(priv_key: ^Private_Key, hash_algo: hash.Algorithm, msg: []byte
 		sk := &priv_key._impl.(secec.Scalar_p256r1)
 		sign_internal(sk, &r, &s, hash_algo, msg, deterministic)
 
-		return generate_asn1_sig(&r, &s, allocator), true
+		sig := generate_asn1_sig(&r, &s, allocator)
+		return sig, sig != nil
 	case .SECP384R1:
 		SC_SZ :: secec.SC_SIZE_P384R1
 		RAW_SIG_SZ :: 2 * SC_SZ
@@ -36,7 +37,8 @@ sign_asn1 :: proc(priv_key: ^Private_Key, hash_algo: hash.Algorithm, msg: []byte
 		sk := &priv_key._impl.(secec.Scalar_p384r1)
 		sign_internal(sk, &r, &s, hash_algo, msg, deterministic)
 
-		return generate_asn1_sig(&r, &s, allocator), true
+		sig := generate_asn1_sig(&r, &s, allocator)
+		return sig, sig != nil
 	}
 
 	return nil, false

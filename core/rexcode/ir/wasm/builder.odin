@@ -94,7 +94,10 @@ opbuf :: proc(b: ^Builder, ops: ..Operand) -> []Operand {
 
 // Append an operation with the given operands, allocating their backing.
 emit :: proc(b: ^Builder, opcode: Opcode, operands: ..Operand) {
-	append(&b.ops, operation(opcode, opbuf(b, ..operands)))
+	buf := opbuf(b, ..operands)
+	if _, err := append(&b.ops, operation(opcode, buf)); err != nil {
+		delete(buf, b.alloc)
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -135,7 +138,9 @@ emit_br_table :: proc(b: ^Builder, targets: []u32, default_depth: u32) {
 	for t, i in targets {
 		buf[i+1] = op_labelidx(t)
 	}
-	append(&b.ops, operation(.BR_TABLE, buf))
+	if _, err := append(&b.ops, operation(.BR_TABLE, buf)); err != nil {
+		delete(buf, b.alloc)
+	}
 }
 
 emit_return      :: proc(b: ^Builder) { emit(b, .RETURN) }

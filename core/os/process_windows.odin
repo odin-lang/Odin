@@ -64,7 +64,10 @@ _get_processor_core_count :: proc() -> int {
 	thread_count := 0
 	if !result && win32.GetLastError() == 122 && length > 0 {
 		runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-		processors := make([]win32.SYSTEM_LOGICAL_PROCESSOR_INFORMATION, length, context.temp_allocator)
+		processors, processors_err := make([]win32.SYSTEM_LOGICAL_PROCESSOR_INFORMATION, length, context.temp_allocator)
+		if processors_err != nil {
+			return 0
+		}
 
 		result = win32.GetLogicalProcessorInformation(&processors[0], &length)
 		if result {
@@ -87,13 +90,15 @@ _process_list :: proc(allocator: runtime.Allocator) -> (list: []int, err: Error)
 		err = _get_platform_error()
 		return
 	}
+	defer win32.CloseHandle(snap)
 
 	list_d := make([dynamic]int, allocator) or_return
+	defer if err != nil { delete(list_d) }
 
 	entry := win32.PROCESSENTRY32W{dwSize = size_of(win32.PROCESSENTRY32W)}
 	status := win32.Process32FirstW(snap, &entry)
 	for status {
-		append(&list_d, int(entry.th32ProcessID))
+		append(&list_d, int(entry.th32ProcessID)) or_return
 		status = win32.Process32NextW(snap, &entry)
 	}
 	list = list_d[:]
@@ -397,6 +402,7 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 	read_environment: if .Environment in selection {
 		env_block := win32.GetEnvironmentStringsW()
 		assert(env_block != nil)
+		defer win32.FreeEnvironmentStringsW(env_block)
 		info.environment = _parse_environment_block(env_block, allocator) or_return
 		info.fields += {.Environment}
 	}
@@ -452,11 +458,11 @@ _process_open :: proc(pid: int, flags: Process_Open_Flags) -> (process: Process,
 @(private="package")
 _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
-	command_line   := _build_command_line(desc.command, temp_allocator)
+	command_line   := _build_command_line(desc.command, temp_allocator) or_return
 	command_line_w := win32_utf8_to_wstring(command_line, temp_allocator) or_return
 	environment_block_w: []u16
 	if desc.env != nil {
-		environment_block  := _build_environment_block(desc.env, temp_allocator)
+		environment_block  := _build_environment_block(desc.env, temp_allocator) or_return
 		environment_block_w = win32_utf8_to_utf16(environment_block, temp_allocator) or_return
 	}
 
@@ -505,7 +511,10 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		stdin_handle = win32.HANDLE((^File_Impl)(desc.stdin.impl).fd)
 	}
 
-	working_dir_w := (win32_utf8_to_wstring(desc.working_dir, temp_allocator) or_else nil) if len(desc.working_dir) > 0 else nil
+	working_dir_w: cstring16
+	if len(desc.working_dir) > 0 {
+		working_dir_w = win32_utf8_to_wstring(desc.working_dir, temp_allocator) or_return
+	}
 	process_info: win32.PROCESS_INFORMATION
 	ok := win32.CreateProcessW(
 		nil,
@@ -529,6 +538,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		err = _get_platform_error()
 		return
 	}
+	win32.CloseHandle(process_info.hThread)
 	process = {pid = int(process_info.dwProcessId), handle = uintptr(process_info.hProcess)}
 	return
 }
@@ -695,6 +705,7 @@ _get_process_user :: proc(process_handle: win32.HANDLE, allocator: runtime.Alloc
 		err = _get_platform_error()
 		return
 	}
+	defer win32.CloseHandle(token_handle)
 	token_user_size: u32
 	if !win32.GetTokenInformation(token_handle, .TokenUser, nil, 0, &token_user_size) {
 		// Note(flysand): Make sure the buffer too small error comes out, and not any other error
@@ -734,12 +745,12 @@ _parse_command_line :: proc(cmd_line_w: cstring16, allocator: runtime.Allocator)
 	text_w := make([]u16,       text_len, temp_allocator) or_return
 	runtime._windows_split_command_line(cmd_line, raw_data(argv_w), raw_data(text_w))
 
-	argv = make([]string, argc, allocator) or_return
+	args := make([]string, argc, allocator) or_return
 	defer if err != nil {
-		for arg in argv {
+		for arg in args {
 			delete(arg, allocator)
 		}
-		delete(argv, allocator)
+		delete(args, allocator)
 	}
 	for arg_w, i in argv_w {
 		// NOTE(bill): Without `WC_ERR_INVALID_CHARS`, a lone surrogate becomes U+FFFD. `os.args` does the same.
@@ -747,25 +758,27 @@ _parse_command_line :: proc(cmd_line_w: cstring16, allocator: runtime.Allocator)
 		n       := win32.WideCharToMultiByte(win32.CP_UTF8, 0, arg_w, arg_len, nil, 0, nil, nil)
 		buf     := make([]byte, n, allocator) or_return
 		win32.WideCharToMultiByte(win32.CP_UTF8, 0, arg_w, arg_len, raw_data(buf), n, nil, nil)
-		argv[i] = string(buf)
+		args[i] = string(buf)
 	}
-	return
+	return args, nil
 }
 
-_build_command_line :: proc(command: []string, allocator: runtime.Allocator) -> string {
-	_write_byte_n_times :: #force_inline proc(builder: ^strings.Builder, b: byte, n: int) {
+_build_command_line :: proc(command: []string, allocator: runtime.Allocator) -> (command_line: string, err: runtime.Allocator_Error) {
+	_write_byte_n_times :: #force_inline proc(builder: ^strings.Builder, b: byte, n: int) -> runtime.Allocator_Error {
 		for _ in 0 ..< n {
-			strings.write_byte(builder, b)
+			strings.write_byte(builder, b) or_return
 		}
+		return nil
 	}
-	builder := strings.builder_make(allocator)
+	builder := strings.builder_make(allocator) or_return
+	defer if err != nil { strings.builder_destroy(&builder) }
 	for arg, i in command {
 		if i != 0 {
-			strings.write_byte(&builder, ' ')
+			strings.write_byte(&builder, ' ') or_return
 		}
 		j := 0
 		if arg == "" || strings.contains_any(arg, "()[]{}^=;!'+,`~\" \t") {
-			strings.write_byte(&builder, '"')
+			strings.write_byte(&builder, '"') or_return
 			for j < len(arg) {
 				backslashes := 0
 				for j < len(arg) && arg[j] == '\\' {
@@ -773,23 +786,23 @@ _build_command_line :: proc(command: []string, allocator: runtime.Allocator) -> 
 					j += 1
 				}
 				if j == len(arg) {
-					_write_byte_n_times(&builder, '\\', 2*backslashes)
+					_write_byte_n_times(&builder, '\\', 2*backslashes) or_return
 					break
 				} else if arg[j] == '"' {
-					_write_byte_n_times(&builder, '\\', 2*backslashes+1)
-					strings.write_byte(&builder, arg[j])
+					_write_byte_n_times(&builder, '\\', 2*backslashes+1) or_return
+					strings.write_byte(&builder, arg[j]) or_return
 				} else {
-					_write_byte_n_times(&builder, '\\', backslashes)
-					strings.write_byte(&builder, arg[j])
+					_write_byte_n_times(&builder, '\\', backslashes) or_return
+					strings.write_byte(&builder, arg[j]) or_return
 				}
 				j += 1
 			}
-			strings.write_byte(&builder, '"')
+			strings.write_byte(&builder, '"') or_return
 		} else {
-			strings.write_string(&builder, arg)
+			strings.write_string(&builder, arg) or_return
 		}
 	}
-	return strings.to_string(builder)
+	return strings.to_string(builder), nil
 }
 
 _parse_environment_block :: proc(block: [^]u16, allocator: runtime.Allocator) -> (envs: []string, err: Error) {
@@ -811,12 +824,12 @@ _parse_environment_block :: proc(block: [^]u16, allocator: runtime.Allocator) ->
 	// environment block is the number of NUL character minus the
 	// block terminator.
 	env_count := zt_count - 1
-	envs = make([]string, env_count, allocator) or_return
+	list := make([]string, env_count, allocator) or_return
 	defer if err != nil {
-		for env in envs {
+		for env in list {
 			delete(env, allocator)
 		}
-		delete(envs, allocator)
+		delete(list, allocator)
 	}
 
 	env_idx := 0
@@ -827,16 +840,17 @@ _parse_environment_block :: proc(block: [^]u16, allocator: runtime.Allocator) ->
 			idx += 1
 		}
 		env_w := block[last_idx:idx]
-		envs[env_idx] = win32_utf16_to_utf8(env_w, allocator) or_return
+		list[env_idx] = win32_utf16_to_utf8(env_w, allocator) or_return
 		env_idx += 1
 		idx += 1
 		last_idx = idx
 	}
-	return
+	return list, nil
 }
 
-_build_environment_block :: proc(environment: []string, allocator: runtime.Allocator) -> string {
-	builder := strings.builder_make(allocator)
+_build_environment_block :: proc(environment: []string, allocator: runtime.Allocator) -> (block: string, err: runtime.Allocator_Error) {
+	builder := strings.builder_make(allocator) or_return
+	defer if err != nil { strings.builder_destroy(&builder) }
 	loop: #reverse for kv, cur_idx in environment {
 		eq_idx := strings.index_byte(kv, '=')
 		assert(eq_idx >= 0, "Malformed environment string. Expected '=' to separate keys and values")
@@ -847,11 +861,11 @@ _build_environment_block :: proc(environment: []string, allocator: runtime.Alloc
 				continue loop
 			}
 		}
-		strings.write_string(&builder, kv)
-		strings.write_byte(&builder, 0)
+		strings.write_string(&builder, kv) or_return
+		strings.write_byte(&builder, 0) or_return
 	}
 	// Note(flysand): In addition to the NUL-terminator for each string, the
 	// environment block itself is NUL-terminated.
-	strings.write_byte(&builder, 0)
-	return strings.to_string(builder)
+	strings.write_byte(&builder, 0) or_return
+	return strings.to_string(builder), nil
 }

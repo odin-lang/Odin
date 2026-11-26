@@ -12,7 +12,19 @@ _pipe :: proc() -> (r, w: ^File, err: Error) {
 	if !win32.CreatePipe(&p[0], &p[1], &sa, 0) {
 		return nil, nil, _get_platform_error()
 	}
-	return new_file(uintptr(p[0]), ""), new_file(uintptr(p[1]), ""), nil
+	rf, r_err := _new_file(uintptr(p[0]), "", file_allocator())
+	if r_err != nil {
+		win32.CloseHandle(p[0])
+		win32.CloseHandle(p[1])
+		return nil, nil, r_err
+	}
+	wf, w_err := _new_file(uintptr(p[1]), "", file_allocator())
+	if w_err != nil {
+		close(rf)
+		win32.CloseHandle(p[1])
+		return nil, nil, w_err
+	}
+	return rf, wf, nil
 }
 
 @(require_results)

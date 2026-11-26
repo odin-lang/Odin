@@ -76,6 +76,9 @@ parse_package :: proc(pkg: ^ast.Package, p: ^Parser = nil) -> bool {
 		if !parse_file(p, file) {
 			ok = false
 		}
+		if file.pkg_decl == nil {
+			continue
+		}
 		if pkg.name == "" {
 			pkg.name = file.pkg_decl.name
 		} else if pkg.name != file.pkg_decl.name {

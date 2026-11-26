@@ -1273,7 +1273,7 @@ timeout_and_delete :: proc(target: ^Operation) {
 		}
 		filter = .Write
 	case .Send_File:
-		target.send.err = TCP_Send_Error.Timeout
+		target.sendfile.err = TCP_Send_Error.Timeout
 		filter = .Write
 		ident = uintptr(target.sendfile.socket)
 	case .Poll:
@@ -1294,7 +1294,7 @@ timeout_and_delete :: proc(target: ^Operation) {
 		return
 
 	case .Open:
-		target.open.err = .Timeout	
+		target.open.err = FS_Error.Timeout
 		return
 
 	case .Stat:

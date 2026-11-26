@@ -38,7 +38,7 @@ unparse :: proc(v: Value, opt: Marshal_Options = {}, allocator := context.alloca
 @(require_results)
 unparse_to_builder :: proc(b: ^strings.Builder, v: Value, opt: Marshal_Options = {}) -> Unparse_Error {
 	err := unparse_to_writer(strings.to_writer(b), v, opt)
-	if err == io.Error.EOF {
+	if err == io.Error.Short_Write {
 		return .Out_Of_Memory
 	}
 	return err

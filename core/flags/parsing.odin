@@ -49,6 +49,7 @@ parse :: proc(
 	defer {
 		bit_array.destroy(&parser.filled_pos)
 		bit_array.destroy(&parser.fields_set)
+		delete(parser.owned_values)
 	}
 
 	switch style {

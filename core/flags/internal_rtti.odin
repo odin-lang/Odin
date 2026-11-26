@@ -127,20 +127,6 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		case quaternion256: (^quaternion256)(ptr)^ = value
 		}
 
-	case ^runtime.Type_Info_String:
-		assert(specific_type_info.encoding == .UTF_8)
-
-		if specific_type_info.is_cstring {
-			cstr_ptr := (^cstring)(ptr)
-			if cstr_ptr != nil {
-				// Prevent memory leaks from us setting this value multiple times.
-				delete(cstr_ptr^)
-			}
-			cstr_ptr^ = strings.clone_to_cstring(str)
-		} else {
-			(^string)(ptr)^ = str
-		}
-
 	case ^runtime.Type_Info_Boolean:
 		value := strconv.parse_bool(str) or_return
 		switch type_info.id {
@@ -380,7 +366,8 @@ set_unbounded_integer_by_type :: proc(ptr: rawptr, value: $T, data_type: typeid)
 }
 
 @(optimization_mode="favor_size")
-parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runtime.Type_Info, arg_tag: string) -> (error: Error) {
+parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runtime.Type_Info, arg_tag: string, out_owned: ^bool) -> (error: Error) {
+	out_owned^ = false
 	#partial switch specific_type_info in type_info.variant {
 	case ^runtime.Type_Info_Named:
 		if global_custom_type_setter != nil {
@@ -444,7 +431,7 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 				// So far, it's none of the types that we recognize.
 				// Check to see if we can set it by base type, if allowed.
 				if _, is_indistinct := get_struct_subtag(arg_tag, SUBTAG_INDISTINCT); is_indistinct {
-					return parse_and_set_pointer_by_type(ptr, str, specific_type_info.base, arg_tag)
+					return parse_and_set_pointer_by_type(ptr, str, specific_type_info.base, arg_tag, out_owned)
 				}
 			}
 		}
@@ -461,13 +448,13 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 			}
 		}
 		defer delete(elem_backing)
-		parse_and_set_pointer_by_type(raw_data(elem_backing), str, specific_type_info.elem, arg_tag) or_return
+		elem_owned: bool
+		parse_and_set_pointer_by_type(raw_data(elem_backing), str, specific_type_info.elem, arg_tag, &elem_owned) or_return
 
-		if !runtime.__dynamic_array_resize(ptr, specific_type_info.elem.size, specific_type_info.elem.align, ptr.len + 1) {
-			// NOTE: This is purely an assumption that it's OOM.
-			// Regardless, the resize failed.
+		if resize_error := runtime._resize_dynamic_array(ptr, specific_type_info.elem.size, specific_type_info.elem.align, ptr.len + 1, true); resize_error != nil {
+			release_value(specific_type_info.elem, raw_data(elem_backing), elem_owned)
 			return Parse_Error {
-				runtime.Allocator_Error.Out_Of_Memory,
+				resize_error,
 				"Failed to resize dynamic array.",
 			}
 		}
@@ -476,6 +463,7 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 			uintptr(ptr.data) +
 			uintptr((ptr.len - 1) * specific_type_info.elem.size))
 		mem.copy(subptr, raw_data(elem_backing), len(elem_backing))
+		out_owned^ = elem_owned
 
 	case ^runtime.Type_Info_Enum:
 		// This is a nameless enum.
@@ -553,9 +541,29 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 		}
 		error = nil
 
+	case ^runtime.Type_Info_String:
+		assert(specific_type_info.encoding == .UTF_8)
+
+		if specific_type_info.is_cstring {
+			cstr, clone_error := strings.clone_to_cstring(str)
+			if clone_error != nil {
+				return Parse_Error {
+					clone_error,
+					"Failed to allocate cstring.",
+				}
+			}
+			(^cstring)(ptr)^ = cstr
+			out_owned^ = true
+		} else {
+			(^string)(ptr)^ = str
+		}
+
 	case:
 		if type_info.id == ^os.File {
+			old_file := (^^os.File)(ptr)^
 			parse_and_set_pointer_by_named_type(ptr, str, type_info.id, arg_tag, &error)
+			new_file := (^^os.File)(ptr)^
+			out_owned^ = error == nil && new_file != nil && new_file != old_file
 			return
 		}
 
@@ -624,4 +632,69 @@ get_field_by_pos :: proc(model: ^$T, pos: int) -> (result: reflect.Struct_Field,
 	}
 
 	return
+}
+
+owns_value :: proc(type_info: ^runtime.Type_Info) -> bool {
+	base := runtime.type_info_base(type_info)
+	return base.id == cstring || base.id == ^os.File
+}
+
+release_value :: proc(type_info: ^runtime.Type_Info, ptr: rawptr, owned: bool) {
+	base := runtime.type_info_base(type_info)
+	switch base.id {
+	case cstring:
+		if owned {
+			delete((^cstring)(ptr)^)
+		}
+		(^cstring)(ptr)^ = nil
+		return
+	case ^os.File:
+		if file := (^^os.File)(ptr)^; owned && file != nil {
+			os.close(file)
+		}
+		(^^os.File)(ptr)^ = nil
+		return
+	}
+
+	if specific_type_info, ok := base.variant.(^runtime.Type_Info_Dynamic_Array); ok {
+		raw := (^runtime.Raw_Dynamic_Array)(ptr)
+		if owned && owns_value(specific_type_info.elem) {
+			for i in 0..<raw.len {
+				release_value(specific_type_info.elem, rawptr(uintptr(raw.data) + uintptr(i * specific_type_info.elem.size)), owned)
+			}
+		}
+		if raw.data != nil {
+			runtime.mem_free_with_size(raw.data, raw.cap * specific_type_info.elem.size, raw.allocator)
+		}
+		raw^ = {}
+	}
+}
+
+reserve_owned_value :: proc(parser: ^Parser) -> Error {
+	if err := reserve(&parser.owned_values, len(parser.owned_values) + 1); err != nil {
+		return Parse_Error {
+			err,
+			"Failed to allocate space to track an allocated value.",
+		}
+	}
+	return nil
+}
+
+replace_owned_value :: proc(parser: ^Parser, type_info: ^runtime.Type_Info, old_value, new_value: rawptr, new_owned: bool) {
+	if old_value == new_value {
+		return
+	}
+	if old_value != nil {
+		for owned, i in parser.owned_values {
+			if owned == old_value {
+				unordered_remove(&parser.owned_values, i)
+				old := old_value
+				release_value(type_info, &old, true)
+				break
+			}
+		}
+	}
+	if new_owned && new_value != nil {
+		append(&parser.owned_values, new_value)
+	}
 }

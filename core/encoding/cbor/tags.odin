@@ -214,12 +214,12 @@ tag_big_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, tnr: Tag_Number, v
 		defer delete(bytes)
 
 		if err := big.int_from_bytes_big(&dst, bytes); err != nil {
-			return .Bad_Tag_Value
+			return _big_unmarshal_error(err)
 		}
 
 		if tnr ==  TAG_NEGATIVE_BIG_NR {
 			if err := big.int_add_digit(&dst, &dst, 1); err != nil {
-				return .Bad_Tag_Value
+				return _big_unmarshal_error(err)
 			}
 			dst.sign = .Negative
 		}
@@ -228,6 +228,15 @@ tag_big_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, tnr: Tag_Number, v
 	}
 
 	return _unsupported(v, hdr)
+}
+
+@(private)
+_big_unmarshal_error :: proc(err: big.Error) -> Unmarshal_Error {
+	#partial switch err {
+	case .Out_Of_Memory, .Invalid_Pointer, .Invalid_Argument, .Mode_Not_Implemented:
+		return runtime.Allocator_Error(u8(err))
+	}
+	return .Bad_Tag_Value
 }
 
 @(private)
@@ -345,8 +354,11 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, 
 				err = err_from_b64(derr)
 				return
 			}
-			builder := strings.builder_make(0, length+1)
-			b64_decode_into(strings.to_stream(&builder), bytes) or_return
+			builder := strings.builder_make(0, length+1) or_return
+			if derr := b64_decode_into(strings.to_stream(&builder), bytes); derr != nil {
+				strings.builder_destroy(&builder)
+				return _builder_err(derr)
+			}
 
 			raw  := (^cstring)(v.data)
 			raw^  = cstring(raw_data(builder.buf))
@@ -392,9 +404,11 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, 
 		}
 		if decoded_length > t.count { return _unsupported(v, hdr) }
 
-		slice := ([^]byte)(v.data)[:len(bytes)]
+		slice := ([^]byte)(v.data)[:t.count]
 		// TODO: base64 can decode directly into a byte buffer.
-		copy(slice, b64_decode(bytes) or_return)
+		decoded := b64_decode(bytes) or_return
+		defer delete(decoded)
+		copy(slice, decoded)
 		return
 	}
 
@@ -456,5 +470,8 @@ b64_decode :: proc(data: string) -> ([]byte, Unmarshal_Error) {
 
 @(private="file")
 b64_decode_into :: proc(w: io.Writer, data: string) -> Unmarshal_Error {
-	return err_from_b64(base64.decode_into(w, data))
+	if err := base64.decode_into(w, data); err != nil {
+		return err_from_b64(err)
+	}
+	return nil
 }

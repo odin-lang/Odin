@@ -17,6 +17,7 @@
 package jpeg
 
 import "base:intrinsics"
+import "base:runtime"
 import "core:compress"
 import "core:image"
 import "core:io"
@@ -40,6 +41,16 @@ load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context
 }
 
 load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+	img, err = _load_from_context(ctx, options, allocator)
+	if err != nil {
+		destroy(img)
+		return nil, err
+	}
+	return img, nil
+}
+
+@(private)
+_load_from_context :: proc(ctx: ^compress.Context, options: Options, allocator: runtime.Allocator) -> (img: ^Image, err: Error) {
 	context.allocator = allocator
 	options := options
 
@@ -2185,6 +2196,7 @@ parse_app0 :: proc(d: ^Decoder, img: ^Image, segment: []u8, options: Options) ->
 		pixels      := x_thumbnail * y_thumbnail
 		rest        := segment[14:]
 
+		info := get_info(img) or_return
 		app0 := image.JFIF_APP0{
 			version     = read_u16be(segment[5:]),
 			units       = image.JFIF_Unit(segment[7]),
@@ -2201,7 +2213,6 @@ parse_app0 :: proc(d: ^Decoder, img: ^Image, segment: []u8, options: Options) ->
 				app0.greyscale_thumbnail = true
 			}
 		}
-		info := get_info(img) or_return
 		if previous, ok := info.jfif_app0.?; ok {
 			delete(previous.thumbnail)
 		}
@@ -2210,6 +2221,7 @@ parse_app0 :: proc(d: ^Decoder, img: ^Image, segment: []u8, options: Options) ->
 		if .return_metadata not_in options || len(segment) < 6 {
 			return
 		}
+		info := get_info(img) or_return
 		app0 := image.JFXX_APP0{extension_code = image.JFXX_Extension_Code(segment[5])}
 		#partial switch app0.extension_code {
 		case .Thumbnail_JPEG:
@@ -2228,7 +2240,6 @@ parse_app0 :: proc(d: ^Decoder, img: ^Image, segment: []u8, options: Options) ->
 		case:
 			return
 		}
-		info := get_info(img) or_return
 		if previous, ok := info.jfxx_app0.?; ok {
 			delete(previous.thumbnail)
 		}
@@ -2260,7 +2271,10 @@ parse_app1 :: proc(img: ^Image, segment: []u8) -> (err: Error) {
 		return
 	}
 	exif.data = slice.clone(data) or_return
-	append(&info.exif, exif) or_return
+	if _, append_err := append(&info.exif, exif); append_err != nil {
+		delete(exif.data)
+		return append_err
+	}
 	return
 }
 

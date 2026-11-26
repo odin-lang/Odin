@@ -116,7 +116,10 @@ _sys_open_mode :: #force_inline proc(mode: Open_Flags) -> u32 {
 
 @(private)
 clone_to_cstring :: proc(s: string, allocator: runtime.Allocator, loc := #caller_location) -> cstring {
-	c := make([]byte, len(s)+1, allocator, loc)
+	c, err := make([]byte, len(s)+1, allocator, loc)
+	if err != nil {
+		return nil
+	}
 	copy(c, s)
 	c[len(s)] = 0
 	return cstring(&c[0])

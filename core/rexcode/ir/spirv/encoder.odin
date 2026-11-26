@@ -196,8 +196,8 @@ emit_one_type :: proc "contextless" (w: ^Writer, m: ^Module, i: int) {
 		for f in t.fields { w_id(w, tid(m, f)) }
 		op = .OpTypeStruct
 	case .FUNCTION:
-		w_id(w, tid(m, t.fields[t.count]))              // return type
-		for pi in 0 ..< int(t.count) { w_id(w, tid(m, t.fields[pi])) }
+		w_id(w, t.count < u32(len(t.fields)) ? tid(m, t.fields[t.count]) : ID_NONE)   // return type
+		for pi in 0 ..< min(t.count, u32(len(t.fields))) { w_id(w, tid(m, t.fields[pi])) }
 		op = .OpTypeFunction
 	case .OPAQUE:
 		// re-emit the captured instruction verbatim (image/sampler/event/...).
@@ -223,7 +223,8 @@ emit_one_constant :: proc "contextless" (w: ^Writer, m: ^Module, i: int) {
 	w_id(w, c.result.id)
 	#partial switch c.opcode {
 	case .OpConstant:
-		t := m.types[u32(c.result.type)]
+		t: Type
+		if u32(c.result.type) < u32(len(m.types)) { t = m.types[u32(c.result.type)] }
 		w_word(w, u32(c.value))
 		if (t.kind == .INT || t.kind == .FLOAT) && t.bits > 32 {
 			w_word(w, u32(c.value >> 32))   // context-dependent number, second word
@@ -240,7 +241,7 @@ emit_one_global :: proc "contextless" (w: ^Writer, m: ^Module, i: int) {
 	s := inst_begin(w)
 	w_id(w, tid(m, g.type))   // a pointer type
 	w_id(w, i < len(m.global_ids) ? m.global_ids[i] : ID_NONE)
-	w_word(w, u32(m.types[u32(g.type)].aux))   // storage class = the pointer's address space
+	w_word(w, u32(g.type) < u32(len(m.types)) ? u32(m.types[u32(g.type)].aux) : 0)   // storage class = the pointer's address space
 	if g.init != ID_NONE { w_id(w, g.init) }
 	inst_end(w, s, .OpVariable)
 }
@@ -253,9 +254,9 @@ emit_definitions :: proc "contextless" (w: ^Writer, m: ^Module) {
 	if len(m.defs) > 0 {
 		for d in m.defs {
 			switch d.kind {
-			case .TYPE:     emit_one_type(w, m, int(d.index))
-			case .CONSTANT: emit_one_constant(w, m, int(d.index))
-			case .GLOBAL:   emit_one_global(w, m, int(d.index))
+			case .TYPE:     if d.index < u32(len(m.types))     { emit_one_type(w, m, int(d.index)) }
+			case .CONSTANT: if d.index < u32(len(m.constants)) { emit_one_constant(w, m, int(d.index)) }
+			case .GLOBAL:   if d.index < u32(len(m.globals))   { emit_one_global(w, m, int(d.index)) }
 			}
 		}
 		return
@@ -304,9 +305,10 @@ emit_operation :: proc "contextless" (w: ^Writer, m: ^Module, op: ^Operation) {
 @(private="file")
 emit_functions :: proc "contextless" (w: ^Writer, m: ^Module) {
 	for fn, fi in m.functions {
-		sig := m.types[u32(fn.signature)]   // a FUNCTION type: fields = params ++ [result]
+		sig: Type
+		if u32(fn.signature) < u32(len(m.types)) { sig = m.types[u32(fn.signature)] }   // a FUNCTION type: fields = params ++ [result]
 		s := inst_begin(w)
-		w_id(w, tid(m, sig.fields[sig.count]))                          // result = return type
+		w_id(w, sig.count < u32(len(sig.fields)) ? tid(m, sig.fields[sig.count]) : ID_NONE)   // result = return type
 		w_id(w, fi < len(m.function_ids) ? m.function_ids[fi] : ID_NONE)
 		w_word(w, 0)                                                    // FunctionControl (none)
 		w_id(w, tid(m, fn.signature))

@@ -854,6 +854,9 @@ bzip2_stream_init :: proc(r: ^Reader, z: ^compress.Context, expected_output_size
 	if !compress.is_memory_context(z) {
 		r.br.z = z
 	}
+	defer if err != nil {
+		reader_destroy(r)
+	}
 
 	if options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
 		return General_Error.Incompatible_Options

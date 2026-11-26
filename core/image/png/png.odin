@@ -229,11 +229,10 @@ append_chunk :: proc(list: ^[dynamic]image.PNG_Chunk, src: image.PNG_Chunk, allo
 	}
 
 	c := copy_chunk(src, allocator) or_return
-	length := len(list)
-	append(list, c)
-	if len(list) != length + 1 {
+	if _, append_err := append(list, c); append_err != nil {
 		// Resize during append failed.
-		return .Unable_To_Allocate_Or_Resize
+		delete(c.data, allocator)
+		return append_err
 	}
 
 	return

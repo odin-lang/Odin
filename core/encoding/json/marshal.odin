@@ -172,7 +172,7 @@ marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocato
 
 marshal_to_builder :: proc(b: ^strings.Builder, v: any, opt: Marshal_Options = {}) -> Marshal_Error {
 	err := marshal_to_writer(strings.to_writer(b), v, opt)
-	if err == io.Error.EOF {
+	if err == io.Error.Short_Write {
 		return runtime.Allocator_Error.Out_Of_Memory
 	}
 	return err

@@ -269,10 +269,12 @@ arena_alloc_bytes_non_zeroed :: proc(
 	}
 	#no_bounds_check end := &a.data[a.offset]
 	ptr := align_forward(end, uintptr(alignment))
-	total_size := size + ptr_sub((^byte)(ptr), (^byte)(end))
-	if a.offset + total_size > len(a.data) {
+	padding := ptr_sub((^byte)(ptr), (^byte)(end))
+	available := len(a.data) - a.offset
+	if padding < 0 || padding > available || size > available - padding {
 		return nil, .Out_Of_Memory
 	}
+	total_size := size + padding
 	a.offset += total_size
 	a.peak_used = max(a.peak_used, a.offset)
 	result := byte_slice(ptr, size)
@@ -404,7 +406,7 @@ arena_resize_bytes_non_zeroed :: proc(
 		old_ptr := uintptr(old_memory)
 		is_last := begin <= old_ptr && old_ptr+uintptr(old_size) == begin+uintptr(a.offset)
 		switch {
-		case is_last && int(old_ptr-begin)+size <= len(a.data):
+		case is_last && size <= len(a.data) - int(old_ptr-begin):
 			// NOTE(bill): A temporary memory region may have saved an offset inside the tail; therefore keep the tail while one is active.
 			if size > old_size || a.temp_count == 0 {
 				// sanitizer.address_poison(old_data[size:])
@@ -666,10 +668,15 @@ scratch_alloc_bytes_non_zeroed :: proc(
 		if !(context.allocator.procedure != scratch_allocator_proc && context.allocator.data != s) {
 			panic("Cyclic initialization of the scratch allocator with itself.", loc)
 		}
-		scratch_init(s, DEFAULT_BACKING_SIZE)
+		if err := scratch_init(s, DEFAULT_BACKING_SIZE); err != nil {
+			return nil, err
+		}
 	}
 	aligned_size := size
 	if alignment > 1 {
+		if size > max(int) - (alignment - 1) {
+			return nil, .Out_Of_Memory
+		}
 		// It is possible to do this with less bytes, but this is the
 		// mathematically simpler solution, and this being a Scratch allocator,
 		// we don't need to be so strict about every byte.
@@ -677,7 +684,7 @@ scratch_alloc_bytes_non_zeroed :: proc(
 	}
 	if aligned_size <= len(s.data) {
 		offset := uintptr(0)
-		if s.curr_offset+aligned_size <= len(s.data) {
+		if aligned_size <= len(s.data) - s.curr_offset {
 			offset = uintptr(s.curr_offset)
 		} else {
 			// The allocation will cause an overflow past the boundary of the
@@ -705,7 +712,10 @@ scratch_alloc_bytes_non_zeroed :: proc(
 		if err != nil {
 			return ptr, err
 		}
-		append(&s.leaked_allocations, ptr)
+		if _, append_err := append(&s.leaked_allocations, ptr); append_err != nil {
+			free_bytes(ptr, a, loc)
+			return nil, append_err
+		}
 		if logger := context.logger; logger.lowest_level <= .Warning {
 			if logger.procedure != nil {
 				logger.procedure(logger.data, .Warning, "mem.Scratch resorted to backup_allocator" , logger.options, loc)
@@ -889,7 +899,9 @@ scratch_resize_bytes_non_zeroed :: proc(
 		if !(context.allocator.procedure != scratch_allocator_proc && context.allocator.data != s) {
 			panic("Cyclic initialization of the scratch allocator with itself.", loc)
 		}
-		scratch_init(s, DEFAULT_BACKING_SIZE)
+		if err := scratch_init(s, DEFAULT_BACKING_SIZE); err != nil {
+			return nil, err
+		}
 	}
 	if old_memory == nil {
 		return scratch_alloc_bytes_non_zeroed(s, size, alignment, loc)
@@ -902,7 +914,7 @@ scratch_resize_bytes_non_zeroed :: proc(
 	//
 	// Also, the alignments must match, otherwise we must re-allocate to
 	// guarantee the user's request.
-	if s.prev_allocation == old_memory && is_aligned(old_memory, alignment) && old_ptr+uintptr(size) <= end {
+	if s.prev_allocation == old_memory && is_aligned(old_memory, alignment) && uintptr(size) <= end-old_ptr {
 		// ensure_not_poisoned(old_data)
 		// sanitizer.address_poison(old_memory)
 		s.curr_offset = int(old_ptr-begin)+size
@@ -1092,7 +1104,8 @@ stack_alloc_bytes_non_zeroed :: proc(
 		uintptr(alignment),
 		size_of(Stack_Allocation_Header),
 	)
-	if s.curr_offset + padding + size > len(s.data) {
+	available := len(s.data) - s.curr_offset
+	if padding < 0 || padding > available || size > available - padding {
 		return nil, .Out_Of_Memory
 	}
 	old_offset := s.prev_offset
@@ -1325,7 +1338,7 @@ stack_resize_bytes_non_zeroed :: proc(
 	old_memory_size := uintptr(s.curr_offset) - (curr_addr - start)
 	assert(old_memory_size == uintptr(old_size))
 	diff := size - old_size
-	if s.curr_offset + diff > len(s.data) {
+	if diff > len(s.data) - s.curr_offset {
 		return nil, .Out_Of_Memory
 	}
 	s.curr_offset += diff // works for smaller sizes too
@@ -1516,7 +1529,8 @@ small_stack_alloc_bytes_non_zeroed :: proc(
 	}
 	curr_addr := uintptr(raw_data(s.data)) + uintptr(s.offset)
 	padding := calc_padding_with_header(curr_addr, uintptr(alignment), size_of(Small_Stack_Allocation_Header))
-	if s.offset + padding + size > len(s.data) {
+	available := len(s.data) - s.offset
+	if padding > available || size > available - padding {
 		return nil, .Out_Of_Memory
 	}
 	s.offset += padding
@@ -1738,7 +1752,7 @@ small_stack_resize_bytes_non_zeroed :: proc(
 	}
 	is_last := curr_addr+uintptr(old_size) == start+uintptr(s.offset)
 	switch {
-	case is_last && int(curr_addr-start)+size <= len(s.data):
+	case is_last && size <= len(s.data) - int(curr_addr-start):
 		// sanitizer.address_poison(old_data[size:])
 		s.offset    = int(curr_addr-start) + size
 		s.peak_used = max(s.peak_used, s.offset)
@@ -1985,7 +1999,7 @@ dynamic_arena_alloc_bytes_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, align
 	actual_alignment := max(a.minimum_alignment, alignment)
 	n := align_formula(size, actual_alignment)
 	// What doesn't fit a block once aligned goes out-band too, however far below `out_band_size`.
-	if size >= a.out_band_size || n > a.block_size {
+	if size >= a.out_band_size || size > a.block_size || n > a.block_size {
 		assert(a.out_band_allocations.allocator.procedure != nil, "Backing array allocator must be initialized", loc=loc)
 		memory, err := alloc_bytes_non_zeroed(size, actual_alignment, a.out_band_allocations.allocator, loc)
 		if memory != nil {
@@ -2190,7 +2204,7 @@ dynamic_arena_resize_bytes_non_zeroed :: proc(
 		   old_end <= curr_pos                             &&
 		   curr_pos-old_end < uintptr(a.minimum_alignment) {
 			new_pos := uintptr(old_memory) + uintptr(align_formula(size, max(a.minimum_alignment, alignment)))
-			if new_pos <= block_end {
+			if size <= a.block_size && new_pos <= block_end {
 				// sanitizer.address_poison(old_data[size:])
 				a.current_pos = rawptr(new_pos)
 				a.bytes_left  = int(block_end - new_pos)
@@ -2519,6 +2533,9 @@ the allocated memory region.
 @(require_results, no_sanitize_address)
 buddy_allocator_alloc_bytes_non_zeroed :: proc(b: ^Buddy_Allocator, size: uint) -> ([]byte, Allocator_Error) {
 	if size != 0 {
+		if size > uint(uintptr(b.tail) - uintptr(b.head)) {
+			return nil, .Out_Of_Memory
+		}
 		actual_size := buddy_block_size_required(b, size)
 		found := buddy_block_find_best(b.head, b.tail, actual_size)
 		if found == nil {
@@ -2665,6 +2682,9 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	switch mode {
 	case .Alloc, .Alloc_Non_Zeroed:
 		a        := max(alignment, size_of(Header))
+		if size > max(int) - a {
+			return nil, .Out_Of_Memory
+		}
 		req_size := size + a
 		assert(req_size >= 0, "overflow")
 
@@ -2701,6 +2721,9 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		new_alignment := max(header.alignment, alignment)
 
 		a        := max(new_alignment, size_of(header))
+		if size > max(int) - a {
+			return nil, .Out_Of_Memory
+		}
 		req_size := size + a
 		assert(size >= 0, "overflow")
 

@@ -47,8 +47,6 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 		if mem_err != nil { return nil, .Allocator_Error }
 	}
 
-	defer if err != nil { _locations_destroy(out, allocator) }
-
 	// Debug info is needed, if we call with out-of-date debug symbols it will return out-of-date info, so better to short-circuit right away.
 	when !ODIN_DEBUG {
 		for &location, i in out {

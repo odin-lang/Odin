@@ -49,8 +49,8 @@ demo :: proc() {
 						}
 					}
 				case .iTXt, .zTXt, .tEXt:
-					res, ok_text := png.text(c)
-					if ok_text {
+					res, text_err := png.text(c)
+					if text_err == nil {
 						if c.header.type == .iTXt {
 							fmt.printfln("[iTXt] %v (%v:%v): %v", res.keyword, res.language, res.keyword_localized, res.text)
 						} else {
@@ -83,8 +83,8 @@ demo :: proc() {
 						fmt.printfln("[cHRM] %v", res)
 					}
 				case .sPLT:
-					res, ok_splt := png.splt(c)
-					if ok_splt {
+					res, splt_err := png.splt(c)
+					if splt_err == nil {
 						fmt.printfln("[sPLT] %v", res)
 					}
 					png.splt_destroy(res)
@@ -93,8 +93,8 @@ demo :: proc() {
 						fmt.printfln("[sBIT] %v", res)
 					}
 				case .iCCP:
-					res, ok_iccp := png.iccp(c)
-					if ok_iccp {
+					res, iccp_err := png.iccp(c)
+					if iccp_err == nil {
 						fmt.printfln("[iCCP] %v", res)
 					}
 					png.iccp_destroy(res)

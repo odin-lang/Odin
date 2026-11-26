@@ -103,7 +103,8 @@ Resolve the back trace into source code locations, if possible.
 
 Compile with `-debug` (or use `-define:ODIN_TRACE_INSTRUMENTATION_MODE`) for the most useful information.
 
-The result must be destroyed using `locations_destroy`.
+The result must be destroyed using `locations_destroy`, even when an error is returned.
+On error, the locations resolved before it are filled in and the rest are empty.
 */
 resolve :: proc {
 	resolve_n,
@@ -141,6 +142,7 @@ assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code
 		runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 		lines, err := resolve(capture(skip=1), context.temp_allocator, context.temp_allocator)
+		defer locations_destroy(lines, context.temp_allocator)
 		if err != nil {
 			runtime.print_string("could not get backtrace for assertion failure: ")
 			runtime.print_string(resolve_err_string(err))
@@ -148,7 +150,6 @@ assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code
 		} else {
 			runtime.print_string("[back trace]\n")
 			print(lines)
-			locations_destroy(lines, context.temp_allocator)
 		}
 	}
 

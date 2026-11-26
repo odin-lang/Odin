@@ -47,7 +47,7 @@ save_map_to_string :: proc(m: Map, allocator: runtime.Allocator) -> (data: strin
 	_, err = write_map(strings.to_writer(&b), m)
 	if err != nil {
 		strings.builder_destroy(&b)
-		if _, is_io_err := err.(io.Error); is_io_err {
+		if err == io.Error.Short_Write {
 			err = runtime.Allocator_Error.Out_Of_Memory
 		}
 		return "", err

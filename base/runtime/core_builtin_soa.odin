@@ -102,12 +102,7 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, #any_int length, alignment: int, a
 
 	field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 
-	total_size := 0
-	for i in 0..<field_count {
-		type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
-		total_size += type.size * length
-		total_size = align_forward_int(total_size, max_align)
-	}
+	total_size := _soa_total_size(si, field_count, length, max_align) or_return
 
 	allocator := allocator
 	if allocator.procedure == nil {
@@ -163,8 +158,12 @@ make_soa_dynamic_array_len :: proc($T: typeid/#soa[dynamic]$E, #any_int length: 
 @(builtin, require_results)
 make_soa_dynamic_array_len_cap :: proc($T: typeid/#soa[dynamic]$E, #any_int length, capacity: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	context.allocator = allocator
+	array.allocator = allocator
 	reserve_soa(&array, capacity, loc) or_return
-	resize_soa(&array, length, loc) or_return
+	if err = resize_soa(&array, length, loc); err != nil {
+		delete_soa(array, loc)
+		return {}, err
+	}
 	return array, nil
 }
 
@@ -249,6 +248,18 @@ non_zero_reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int capacity: int,
 	return _reserve_soa(array, capacity, false, loc)
 }
 
+@(private, require_results)
+_soa_total_size :: proc(si: ^Type_Info_Struct, field_count: uintptr, count: int, max_align: int) -> (total: int, err: Allocator_Error) {
+	for i in 0..<field_count {
+		type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
+		field_size := _checked_size_mul(type.size, count) or_return
+		total = _checked_size_add(total, field_size) or_return
+		_ = _checked_size_add(total, max_align - 1) or_return
+		total = align_forward_int(total, max_align)
+	}
+	return
+}
+
 
 // Note: capacity and performance
 // Each field is stored in contiguous memory with stride between fields capacity * size_of(field) (+ alignment).
@@ -306,19 +317,9 @@ _reserve_soa :: #force_no_inline proc(array: ^$T/#soa[dynamic]$E, capacity: int,
 	field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
 	assert(footer.cap == old_cap)
 
-	old_size := 0
-	new_size := 0
-
 	max_align :: align_of(E)
-	for i in 0..<field_count {
-		type := si.types[i].variant.(^Type_Info_Multi_Pointer).elem
-
-		old_size += type.size * old_cap
-		new_size += type.size * capacity
-
-		old_size = align_forward_int(old_size, max_align)
-		new_size = align_forward_int(new_size, max_align)
-	}
+	old_size := _soa_total_size(si, field_count, old_cap, max_align) or_return
+	new_size := _soa_total_size(si, field_count, capacity, max_align) or_return
 
 	old_data := (^rawptr)(array)^
 

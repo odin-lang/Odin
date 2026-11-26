@@ -207,6 +207,9 @@ rb_alloc_bytes_non_zeroed :: proc(
 			if stack.block_allocator.procedure == nil {
 				return nil, .Out_Of_Memory
 			}
+			if size > max(int) - size_of(Rollback_Stack_Header) - (alignment - 1) {
+				return nil, .Out_Of_Memory
+			}
 			minimum_size_required := size_of(Rollback_Stack_Header) + size + alignment - 1
 			new_block_size := max(minimum_size_required, stack.block_size)
 			block = rb_make_block(new_block_size, stack.block_allocator) or_return
@@ -217,7 +220,8 @@ rb_alloc_bytes_non_zeroed :: proc(
 		}
 		start := raw_data(block.buffer)[block.offset:]
 		padding := cast(uintptr)calc_padding_with_header(cast(uintptr)start, cast(uintptr)alignment, size_of(Rollback_Stack_Header))
-		if block.offset + padding + cast(uintptr)size > cast(uintptr)len(block.buffer) {
+		available := cast(uintptr)len(block.buffer) - block.offset
+		if padding > available || cast(uintptr)size > available - padding {
 			when !ODIN_DISABLE_ASSERT {
 				if allocated_new_block {
 					panic("Rollback Stack Allocator allocated a new block but did not use it.")
@@ -354,6 +358,9 @@ rb_resize_bytes_non_zeroed :: proc(
 
 @(private="file", require_results, no_sanitize_address)
 rb_make_block :: proc(size: int, allocator: Allocator) -> (block: ^Rollback_Stack_Block, err: Allocator_Error) {
+	if size > max(int) - size_of(Rollback_Stack_Block) {
+		return nil, .Out_Of_Memory
+	}
 	buffer := runtime.mem_alloc(size_of(Rollback_Stack_Block) + size, align_of(Rollback_Stack_Block), allocator) or_return
 	block = cast(^Rollback_Stack_Block)raw_data(buffer)
 	#no_bounds_check block.buffer = buffer[size_of(Rollback_Stack_Block):]

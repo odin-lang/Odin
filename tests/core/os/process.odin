@@ -1,4 +1,5 @@
 #+build !windows
+#+build !wasi
 package tests_core_os
 
 import "core:os"
