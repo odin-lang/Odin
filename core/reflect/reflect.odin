@@ -297,11 +297,7 @@ length :: proc(val: any) -> int {
 		return length({val.data, a.base.id})
 
 	case ^Type_Info_Pointer:
-		ptr := (^rawptr)(val.data)^
-		if ptr == nil {
-			return 0
-		}
-		return length({ptr, a.elem.id})
+		return length(deref(val))
 
 	case ^Type_Info_Array:
 		return a.count
@@ -370,11 +366,7 @@ capacity :: proc(val: any) -> int {
 		return capacity({val.data, a.base.id})
 
 	case ^Type_Info_Pointer:
-		ptr := (^rawptr)(val.data)^
-		if ptr == nil {
-			return 0
-		}
-		return capacity({ptr, a.elem.id})
+		return capacity(deref(val))
 
 	case ^Type_Info_Array:
 		return a.count

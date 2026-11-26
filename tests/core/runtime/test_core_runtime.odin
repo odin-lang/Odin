@@ -647,12 +647,19 @@ test_append_inject_soa_slice :: proc(t: ^testing.T) {
 	testing.expect_value(t, c[2], v(11))
 }
 
-// Elements whose fields are all 4 or 8 bytes are copied in blocks, with the rest one at a time
+// Elements whose fields are all 4 or 8 bytes are copied in blocks, with the rest one at a time.
+// With AVX2 a block is 8 elements of 5 or more 4-byte fields, or 4 of 3 or more 8-byte fields: the issue tests run this with `-microarch:native`.
+// A field count under the block width also reads or writes the next element, so what lies past the copied elements is checked too.
 @(test)
 test_copy_soa_blocks :: proc(t: ^testing.T) {
 	check :: proc(t: ^testing.T, $E: typeid, loc := #caller_location) {
-		for n in 0..=10 {
-			n := n if n < 10 else 100
+		past: E
+		for &b in ([^]u8)(&past)[:size_of(E)] {
+			b = 0xab
+		}
+
+		for n in 0..=25 {
+			n := n if n < 25 else 100
 
 			aos := make([]E, n)
 			defer delete(aos)
@@ -660,43 +667,56 @@ test_copy_soa_blocks :: proc(t: ^testing.T) {
 				b = u8(i*7 + 3)
 			}
 
-			soa := make(#soa[]E, n+1)
+			soa := make(#soa[]E, n+3)
 			defer delete(soa)
+			for i in n..<n+3 {
+				soa[i] = past
+			}
 			testing.expect_value(t, copy(soa, aos), n, loc=loc)
 			for i in 0..<n {
 				if !testing.expect_value(t, soa[i], aos[i], loc=loc) {
 					return
 				}
 			}
-			testing.expect_value(t, soa[n], E{}, loc=loc)
+			for i in n..<n+3 {
+				testing.expect_value(t, soa[i], past, loc=loc)
+			}
 
-			back := make([]E, n+1)
+			back := make([]E, n+3)
 			defer delete(back)
+			for i in n..<n+3 {
+				back[i] = past
+			}
 			testing.expect_value(t, copy(back, soa[:n]), n, loc=loc)
 			for i in 0..<n {
 				if !testing.expect_value(t, back[i], aos[i], loc=loc) {
 					return
 				}
 			}
-			testing.expect_value(t, back[n], E{}, loc=loc)
+			for i in n..<n+3 {
+				testing.expect_value(t, back[i], past, loc=loc)
+			}
 		}
 	}
 
-	Two   :: struct {a, b: u32}
-	Three :: struct {a, b, c: f32}
-	Four  :: struct {a, b, c, d: i32}
-	Six   :: struct {a, b, c, d, e, f: f32}
-	Wide  :: struct {a, b, c: f64}
-	Mixed :: struct {a: f32, b: u8, c: f64}
-
-	check(t, Two)
-	check(t, Three)
-	check(t, Four)
-	check(t, Six)
-	check(t, Wide)
-	check(t, Mixed)
+	check(t, struct {a, b: u32})
+	check(t, struct {a, b, c: f32})
+	check(t, struct {a, b, c, d: i32})
+	check(t, struct {a, b, c, d, e: u32})
+	check(t, struct {a, b, c, d, e, f: f32})
+	check(t, struct {a, b, c, d, e, f, g: u32})
+	check(t, struct {a, b, c, d, e, f, g, h: u32})
+	check(t, struct {a, b, c, d, e, f, g, h, i: u32})
+	check(t, struct {a, b, c, d, e, f, g, h, i, j, k, l: u32})
+	check(t, struct {a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q: u32})
+	check(t, struct {a, b, c: f64})
+	check(t, struct {a, b, c, d: u64})
+	check(t, struct {a, b, c, d, e: u64})
+	check(t, struct {a, b, c, d, e, f: u64})
+	check(t, struct {a: f32, b: u8, c: f64})
 	check(t, [3]f32)
 	check(t, [2]u64)
+	check(t, [4]u64)
 }
 
 // With optimizations `append` copies its elements in blocks, in column loops, or one at a time, depending on their fields and count

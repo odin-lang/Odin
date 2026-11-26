@@ -999,6 +999,35 @@ gb_internal lbValue lb_const_value_using_subtype(lbModule *m, Type *dst, Type *s
 	return lb_emit_conv(m->curr_procedure, res, dst);
 }
 
+// The global holding the elements of a constant slice literal, or of an #soa slice literal
+gb_internal LLVMValueRef lb_add_const_slice_backing(lbModule *m, Type *t, ExactValue value, lbValue backing, lbConstContext const &cc) {
+	u32 id = m->global_array_index.fetch_add(1);
+	gbString str = gb_string_make(temporary_allocator(), "csba$");
+	str = gb_string_appendc(str, m->module_name);
+	str = gb_string_append_fmt(str, "$%x", id);
+
+	String name = make_string(cast(u8 const *)str, gb_string_length(str));
+
+	Entity *e = alloc_entity_constant(nullptr, make_token_ident(name), t, value);
+	LLVMValueRef global = LLVMAddGlobal(m->mod, LLVMTypeOf(backing.value), str);
+	LLVMSetInitializer(global, backing.value);
+
+	if (cc.link_section.len > 0) {
+		LLVMSetSection(global, alloc_cstring(permanent_allocator(), cc.link_section));
+	}
+	if (cc.is_rodata) {
+		LLVMSetGlobalConstant(global, true);
+	}
+
+	lbValue g = {};
+	g.value = LLVMConstPointerCast(global, LLVMPointerType(lb_type(m, t), 0));
+	g.type  = t;
+
+	lb_add_entity(m, e, g);
+	lb_add_member(m, name, g);
+	return g.value;
+}
+
 gb_internal void lb_fill_soa_slice(lbProcedure *p, lbAddr const &slice, lbValue array, i64 count) {
 	Type *type = base_type(lb_addr_type(slice));
 	i32 column_count = cast(i32)soa_field_count(type);
@@ -1028,19 +1057,7 @@ gb_internal lbValue lb_const_soa_slice(lbModule *m, Type *original_type, ExactVa
 		return lb_addr_load(p, slice);
 	}
 
-	u32 id = m->global_array_index.fetch_add(1);
-	gbString name = gb_string_make(temporary_allocator(), "csba$");
-	name = gb_string_appendc(name, m->module_name);
-	name = gb_string_append_fmt(name, "$%x", id);
-
-	LLVMValueRef global = LLVMAddGlobal(m->mod, LLVMTypeOf(backing.value), name);
-	LLVMSetInitializer(global, backing.value);
-	if (cc.link_section.len > 0) {
-		LLVMSetSection(global, alloc_cstring(permanent_allocator(), cc.link_section));
-	}
-	if (cc.is_rodata) {
-		LLVMSetGlobalConstant(global, true);
-	}
+	LLVMValueRef global = lb_add_const_slice_backing(m, backing_type, value, backing, cc);
 
 	Type *type = base_type(original_type);
 	isize column_count = soa_field_count(type);
@@ -1321,38 +1338,11 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					return lb_addr_load(p, slice);
 				}
 			} else {
-				u32 id = m->global_array_index.fetch_add(1);
-				gbString str = gb_string_make(temporary_allocator(), "csba$");
-				str = gb_string_appendc(str, m->module_name);
-				str = gb_string_append_fmt(str, "$%x", id);
+				LLVMValueRef ptr = lb_add_const_slice_backing(m, t, value, backing_array, cc);
+				LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
 
-				String name = make_string(cast(u8 const *)str, gb_string_length(str));
-
-				Entity *e = alloc_entity_constant(nullptr, make_token_ident(name), t, value);
-				array_data = LLVMAddGlobal(m->mod, LLVMTypeOf(backing_array.value), str);
-				LLVMSetInitializer(array_data, backing_array.value);
-
-				if (cc.link_section.len > 0) {
-					LLVMSetSection(array_data, alloc_cstring(permanent_allocator(), cc.link_section));
-				}
-				if (cc.is_rodata) {
-					LLVMSetGlobalConstant(array_data, true);
-				}
-
-				lbValue g = {};
-				g.value = LLVMConstPointerCast(array_data, LLVMPointerType(lb_type(m, t), 0));
-				g.type = t;
-
-				lb_add_entity(m, e, g);
-				lb_add_member(m, name, g);
-
-				{
-					LLVMValueRef ptr = g.value;
-					LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
-
-					res.value = llvm_const_slice_with_type(m, original_type, ptr, len);
-					return res;
-				}
+				res.value = llvm_const_slice_with_type(m, original_type, ptr, len);
+				return res;
 			}
 
 
