@@ -822,7 +822,7 @@ test_read_link :: proc(t: ^testing.T) {
 	if err := os.symlink(target, link); err != nil {
 		log.infof("skipping symlinks, os.symlink failed: %v", err)
 	} else {
-		check(t, link, target)
+		check(t, link, "target" when ODIN_OS == .WASI else target)
 		relative := remove_all_join(root, "relative")
 		testing.expect_value(t, os.symlink("target", relative), nil)
 		check(t, relative, "target")

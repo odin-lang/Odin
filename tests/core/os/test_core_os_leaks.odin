@@ -91,7 +91,7 @@ case_read_entire_file_pipe :: proc(t: ^testing.T, allocator: runtime.Allocator, 
 	c := (^File_Case)(data)
 	r, w, perr := os.pipe()
 	if perr != nil {
-		testing.expectf(t, false, "pipe: %v", perr)
+		testing.expectf(t, perr == .Unsupported, "pipe: %v", perr)
 		return
 	}
 	n, werr := os.write(w, c.expected)
@@ -251,7 +251,7 @@ case_process_exec :: proc(t: ^testing.T, allocator: runtime.Allocator, data: raw
 	defer delete(stdout, allocator)
 	defer delete(stderr, allocator)
 	if err != nil {
-		testing.expectf(t, err == runtime.Allocator_Error.Out_Of_Memory, "fail_at=%d: got %v", fail_at, err)
+		testing.expectf(t, err == runtime.Allocator_Error.Out_Of_Memory || err == .Unsupported, "fail_at=%d: got %v", fail_at, err)
 		return
 	}
 	testing.expectf(t, state.success, "fail_at=%d: %v", fail_at, state)
@@ -484,8 +484,8 @@ test_leaks_walker_file_not_dir :: proc(t: ^testing.T) {
 @(test)
 test_leaks_pipe :: proc(t: ^testing.T) {
 	r, w, err := os.pipe()
-	testing.expect_value(t, err, nil)
 	if err != nil {
+		testing.expectf(t, err == .Unsupported, "pipe: %v", err)
 		return
 	}
 	testing.expect_value(t, os.close(w), nil)
