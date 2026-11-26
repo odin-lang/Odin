@@ -1439,6 +1439,15 @@ gb_internal EscapeValue escape_elems_at(EscapeAnalysis *ea, EscapeValue const &a
 	case Type_DynamicArray:
 	case Type_Map:
 		return escape_load_once(ea, addr, t);
+	case Type_Struct:
+		// the columns of `#soa[N]T` and `#soa[dynamic; N]T` are in the array itself, and the others are pointers
+		if (soa_has_inline_fields(t)) {
+			return escape_pointer_offset(addr, escape_path_of(EscapeStep_AnyElement));
+		}
+		if (t->Struct.soa_kind != StructSoa_None) {
+			return escape_as_pointer(escape_load(ea, addr, t));
+		}
+		break;
 	}
 	return ptr;
 }
@@ -3578,7 +3587,8 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 	if (tav.mode == Addressing_Constant) {
 		ExactValueKind value_kind = tav.value().kind;
 		// String constants are loaded into read-only memory, they do not use the memory of the stack frame.
-		if (tav.type == nullptr || !is_type_slice(tav.type) || value_kind == ExactValue_String || value_kind == ExactValue_String16) {
+		bool is_slice = tav.type != nullptr && (is_type_slice(tav.type) || is_type_soa_slice(tav.type));
+		if (!is_slice || value_kind == ExactValue_String || value_kind == ExactValue_String16) {
 			return escape_value();
 		}
 		if (expr->kind == Ast_CompoundLit && expr->CompoundLit.elems.count == 0) {
@@ -3609,6 +3619,8 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 		if (t == nullptr) {
 			return v;
 		}
+		// the elements of an #soa literal are of its element type, not its fields
+		bool is_soa = is_type_soa_struct(t);
 		for_array(i, cl->elems) {
 			Ast *elem = cl->elems[i];
 			Ast *value = elem;
@@ -3618,7 +3630,9 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 				value = elem->FieldValue.value;
 			}
 
-			if (t->kind == Type_Struct) {
+			if (is_soa) {
+				elem_type = t->Struct.soa_elem;
+			} else if (t->kind == Type_Struct) {
 				isize index = i;
 				if (elem->kind == Ast_FieldValue) {
 					index = escape_field_index(t->Struct.fields, elem->FieldValue.field);
@@ -3644,7 +3658,7 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 			escape_value_add_at(&v, path, escape_convert(ea, escape_expr(ea, value), value, elem_type));
 		}
 
-		if (t->kind == Type_Slice) {
+		if (t->kind == Type_Slice || is_type_soa_slice(t)) {
 			if (cl->elems.count == 0) {
 				return escape_value();
 			}

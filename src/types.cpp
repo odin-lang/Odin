@@ -2111,6 +2111,12 @@ gb_internal Type *soa_using_column_type(Type *parent_type, Type *field_type) {
 	return soa_column_slice_type(field);
 }
 
+gb_internal bool is_type_soa_slice(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	return t->kind == Type_Struct && t->Struct.soa_kind == StructSoa_Slice;
+}
+
 gb_internal bool is_type_soa_dynamic_array(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }

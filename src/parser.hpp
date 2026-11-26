@@ -521,6 +521,7 @@ struct AsmMemClassify {
 		Token open, close; \
 		i64 max_count; \
 		Ast *tag; \
+		Type *soa_backing; /*the #soa[N]T an #soa[]T literal is a slice of*/ \
 	}) \
 	AST_KIND(AsmTemplate, "asm template", struct { \
 		Token        token;            \

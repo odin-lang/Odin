@@ -12045,7 +12045,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					}
 					is_to_be_determined_array_count = true;
 				}
-			} else {
+			} else if (type_expr->ArrayType.tag == nullptr) {
 				type = alloc_type_slice(check_type(c, type_expr->ArrayType.elem));
 			}
 			if (cl->elems.count > 0) {
@@ -12055,11 +12055,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					String name = tag->BasicDirective.name.string;
 					if (name == "soa") {
 						is_soa = true;
-						if (count == nullptr) {
-							error(node, "#soa slices are not supported for compound literals");
-							return kind;
-						} else if (count->kind == Ast_UnaryExpr &&
-						           count->UnaryExpr.op.kind == Token_Question) {
+						if (count != nullptr &&
+						    count->kind == Ast_UnaryExpr &&
+						    count->UnaryExpr.op.kind == Token_Question) {
 							error(node, "#soa fixed length arrays must specify their length and cannot use ?");
 						}
 					}
@@ -12269,8 +12267,8 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			}
 
 			break;
-		} else if (!soa_has_inline_fields(t)) {
-			error(node, "#soa slices and dynamic arrays are not supported for compound literals");
+		} else if (t->Struct.soa_kind == StructSoa_Dynamic) {
+			error(node, "#soa dynamic arrays are not supported for compound literals");
 			break;
 		}
 		/*fallthrough*/
@@ -12286,10 +12284,11 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		String context_name = {};
 		i64 max_type_count = -1;
 		if (t->kind == Type_Struct) {
-			GB_ASSERT(soa_has_inline_fields(t));
 			elem_type = t->Struct.soa_elem;
 			context_name = str_lit("#soa array literal");
-			if (!is_to_be_determined_array_count) {
+			if (t->Struct.soa_kind == StructSoa_Slice) {
+				context_name = str_lit("#soa slice literal");
+			} else if (!is_to_be_determined_array_count) {
 				max_type_count = t->Struct.soa_count;
 			}
 			if (t->Struct.soa_kind == StructSoa_FixedCapacityDynamic) {
@@ -12525,6 +12524,11 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				error(node, "Expected a maximum of %lld values for this #soa fixed capacity dynamic array, got %lld",
 				      cast(long long)t->Struct.soa_count,
 				      cast(long long)max);
+			}
+		} else if (t->kind == Type_Struct && t->Struct.soa_kind == StructSoa_Slice) {
+			// NOTE(bill): An #soa slice literal is a slice of an #soa array of its elements, as a slice literal is of an array.
+			if (max > 0) {
+				cl->soa_backing = make_soa_struct_fixed(c, nullptr, nullptr, elem_type, max, nullptr);
 			}
 		} else if (t->kind == Type_Struct) {
 			GB_ASSERT(t->Struct.soa_kind == StructSoa_Fixed);

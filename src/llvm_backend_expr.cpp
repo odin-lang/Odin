@@ -6293,6 +6293,39 @@ gb_internal void lb_build_addr_struct_compound_lit_populate(lbProcedure *p, Ast 
 	}
 }
 
+gb_internal void lb_build_soa_compound_lit_populate(lbProcedure *p, Ast *expr, lbAddr v, Type *type) {
+	ast_node(cl, CompoundLit, expr);
+	Type *bt = base_type(type);
+	GB_ASSERT(soa_has_inline_fields(bt));
+
+	if (bt->Struct.soa_kind == StructSoa_FixedCapacityDynamic) {
+		lbValue len_ptr = lb_emit_struct_ep(p, v.addr, cast(i32)soa_field_count(bt));
+		lb_emit_store(p, len_ptr, lb_const_int(p->module, t_int, cl->max_count));
+	} else {
+		lb_build_addr_compound_lit_store_constant(p, v, type, expr);
+	}
+
+	auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
+	lb_build_addr_compound_lit_populate(p, cl->elems, &temp_data, type);
+	for (auto const &td : temp_data) {
+		GB_ASSERT(td.value.value != nullptr);
+		lbValue offset = lb_const_int(p->module, t_i32, td.elem_index);
+		if (td.elem_length > 0) {
+			auto loop_data = lb_loop_start(p, cast(isize)td.elem_length, t_i32);
+			{
+				lbValue index = lb_emit_arith(p, Token_Add, offset, loop_data.idx, t_i32);
+				lbAddr dst = lb_addr_soa_variable(v.addr, index, td.expr);
+				lb_addr_store(p, dst, td.value);
+			}
+			lb_loop_end(p, loop_data);
+		} else {
+			lbValue index = offset;
+			lbAddr dst = lb_addr_soa_variable(v.addr, index, td.expr);
+			lb_addr_store(p, dst, td.value);
+		}
+	}
+}
+
 gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 	ast_node(cl, CompoundLit, expr);
 
@@ -6524,37 +6557,16 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 	case Type_Struct:
 		if (is_type_soa_struct(type)) {
-			GB_ASSERT(soa_has_inline_fields(bt));
 			if (cl->elems.count == 0) {
 				break;
 			}
-			if (bt->Struct.soa_kind == StructSoa_FixedCapacityDynamic) {
-				// NOTE(bill): The length is set first, so the element stores below are within it.
-				lbValue len_ptr = lb_emit_struct_ep(p, v.addr, cast(i32)soa_field_count(bt));
-				lb_emit_store(p, len_ptr, lb_const_int(p->module, t_int, cl->max_count));
-			} else {
-				lb_build_addr_compound_lit_store_constant(p, v, type, expr);
+			if (bt->Struct.soa_kind == StructSoa_Slice) {
+				lbAddr array = lb_add_local_generated(p, cl->soa_backing, true);
+				lb_build_soa_compound_lit_populate(p, expr, array, cl->soa_backing);
+				lb_fill_soa_slice(p, v, array.addr, cl->soa_backing->Struct.soa_count);
+				break;
 			}
-
-			auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
-			lb_build_addr_compound_lit_populate(p, cl->elems, &temp_data, type);
-			for (auto const &td : temp_data) {
-				GB_ASSERT(td.value.value != nullptr);
-				lbValue offset = lb_const_int(p->module, t_i32, td.elem_index);
-				if (td.elem_length > 0) {
-					auto loop_data = lb_loop_start(p, cast(isize)td.elem_length, t_i32);
-					{
-						lbValue index = lb_emit_arith(p, Token_Add, offset, loop_data.idx, t_i32);
-						lbAddr dst = lb_addr_soa_variable(v.addr, index, td.expr);
-						lb_addr_store(p, dst, td.value);
-					}
-					lb_loop_end(p, loop_data);
-				} else {
-					lbValue index = offset;
-					lbAddr dst = lb_addr_soa_variable(v.addr, index, td.expr);
-					lb_addr_store(p, dst, td.value);
-				}
-			}
+			lb_build_soa_compound_lit_populate(p, expr, v, type);
 		} else {
 			lb_build_addr_struct_compound_lit_populate(p, expr, type, v, struct_consts);
 		}
