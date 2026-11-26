@@ -2536,16 +2536,10 @@ parent_field :: proc(state: ^Info_State, name: string) -> any {
 	return nil
 }
 
-// Formats an #soa array as the array of its elements, each formatted from where its fields are
-@(private)
-fmt_soa :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Struct) {
-	fmt_soa_items(fi, v, verb, info, reflect.soa_field_count(v.id), reflect.length(v), -1)
-}
-
-// Formats `n` items of an #soa array as an array.
+// Formats `n` items of an #soa array as an array, each formatted from where its fields are.
 // The items are its elements, or the lanes of its element `lanes_of` when its elements are arrays.
 @(private)
-fmt_soa_items :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Struct, field_count, n, lanes_of: int) {
+fmt_soa :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Struct, field_count, n, lanes_of: int) {
 	_write_byte(fi, '[' if verb != 'w' else '{')
 	defer _write_byte(fi, ']' if verb != 'w' else '}')
 	if n <= 0 {
@@ -2582,7 +2576,7 @@ fmt_soa_items :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Str
 			data, type := struct_field(v, info, lanes_of, i)
 			_fmt_arg(fi, data, type.id, type, verb)
 		case elem_is_array:
-			fmt_soa_items(fi, v, verb, info, field_count, field_count, i)
+			fmt_soa(fi, v, verb, info, field_count, field_count, i)
 		case:
 			_write_string(fi, elem_name)
 			fmt_struct_fields(fi, v, i, verb, info, field_count)
@@ -2622,7 +2616,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 
 	_write_string(fi, type_name)
 	if info.soa_kind != .None {
-		fmt_soa(fi, v, the_verb, info)
+		fmt_soa(fi, v, the_verb, info, reflect.soa_field_count(v.id), reflect.length(v), -1)
 		return
 	}
 	fmt_struct_fields(fi, v, 0, the_verb, info, int(info.field_count))

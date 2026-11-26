@@ -2164,6 +2164,14 @@ gb_internal bool is_soa_inline_column_of_value(Entity *e) {
 	return is_type_soa_struct(soa) && soa->Struct.soa_kind == StructSoa_FixedCapacityDynamic;
 }
 
+gb_internal void error_soa_column_not_addressable(Operand *o, Ast *node) {
+	gbString str = expr_to_string(node);
+	error(node, "Cannot take the column '%s' of an #soa array, value is not addressable", str);
+	gb_string_free(str);
+	o->mode = Addressing_Invalid;
+	o->type = t_invalid;
+}
+
 gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Type *type_hint, bool allow_import_name) {
 	GB_ASSERT(n->kind == Ast_Ident);
 	o->mode = Addressing_Invalid;
@@ -2316,9 +2324,7 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 			o->mode = Addressing_Value;
 		}
 		if (is_soa_inline_column_of_value(e)) {
-			error(o->expr, "Cannot take the column '%.*s' of an #soa array, value is not addressable", LIT(name));
-			o->mode = Addressing_Invalid;
-			o->type = t_invalid;
+			error_soa_column_not_addressable(o, n);
 		}
 		break;
 
@@ -6935,11 +6941,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			// The columns of `#soa[dynamic; N]T` are stored inline, so it must be addressable, as when it is sliced.
 			Type *column = base_type(entity->type);
 			if (column->kind == Type_Array && !sel.indirect && operand->mode != Addressing_Variable) {
-				gbString str = expr_to_string(node);
-				error(node, "Cannot take the column '%s' of an #soa array, value is not addressable", str);
-				gb_string_free(str);
-				operand->mode = Addressing_Invalid;
-				operand->type = t_invalid;
+				error_soa_column_not_addressable(operand, node);
 				break;
 			}
 			se->is_soa_column = true;

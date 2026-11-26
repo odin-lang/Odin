@@ -286,14 +286,15 @@ shrink_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int new_cap := -1,
 	return
 }
 
-// Moves `count` elements of `s` from index `from` to index `to`, field by field
+// Makes room for `m` elements at `index` in `s`, whose first `old_len` elements are in use.
+// The elements from `index` move along by `m`, and any gap between `old_len` and `index` is zeroed.
 @(private)
-_soa_move :: proc "contextless" (s: $S/#soa[]$E, to, from, count: int) {
-	s := s
-	columns := ([^][^]byte)(&s)
-	for size, i in intrinsics.type_soa_field_sizes(S) {
-		mem_copy(&columns[i][to*size], &columns[i][from*size], count*size)
+_soa_make_room :: proc "contextless" (s: $S/#soa[]$E, old_len, index, m: int) #no_bounds_check {
+	n := max(old_len, index)
+	if index > old_len {
+		_soa_zero(s, old_len, index - old_len)
 	}
+	copy_soa(s[index+m:], s[index:n])
 }
 
 // Zeroes `count` elements of `s` from index `from`, field by field
@@ -865,13 +866,8 @@ inject_at_elems_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int index
 	_grow_soa(array, new_len, false, loc) or_return
 	non_zero_resize_soa(array, new_len, loc) or_return
 
-	when size_of(E) != 0 {
-		if index > old_len {
-			_soa_zero(array[:], old_len, index - old_len)
-		}
-		_soa_move(array[:], index + m, index, n - index)
-		intrinsics.soa_copy_from_slice(array, index, args)
-	}
+	_soa_make_room(array[:], old_len, index, m)
+	copy_soa_from_slice(array[index:], args)
 
 	ok = true
 	return
@@ -900,10 +896,7 @@ inject_at_slice_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int index
 	_grow_soa(array, n + m, false, loc) or_return
 	non_zero_resize_soa(array, n + m, loc) or_return
 
-	if index > old_len {
-		_soa_zero(array[:], old_len, index - old_len)
-	}
-	_soa_move(array[:], index + m, index, n - index)
+	_soa_make_room(array[:], old_len, index, m)
 	_soa_copy_injected(array[:], elems, index, from)
 
 	ok = true
@@ -1068,9 +1061,7 @@ ordered_remove_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int index:
 // the unchecked body of ordered_remove_soa, shared with the front pops.
 // index must already be known to be in bounds.
 _ordered_remove_soa :: proc "contextless" (#no_alias array: ^$T/#soa[dynamic]$E, index: int) #no_bounds_check {
-	if index+1 < len(array) {
-		_soa_move(array[:], index, index + 1, len(array) - 1 - index)
-	}
+	copy_soa(array[index:], array[index+1:])
 	raw_soa_footer_dynamic_array(array).len -= 1
 }
 
@@ -1131,9 +1122,7 @@ append_soa_fixed_capacity_elems :: proc "contextless" (array: ^$T/#soa[dynamic; 
 	n := len(array)
 	num_appended = min(N - n, len(args))
 	_soa_fixed_capacity_len(array)^ = n + num_appended
-	#no_bounds_check for j in 0..<num_appended {
-		array[n + j] = args[j]
-	}
+	copy_soa_from_slice(array[n:], args[:num_appended])
 	return
 }
 
@@ -1184,13 +1173,8 @@ inject_at_elems_soa_fixed_capacity :: proc(array: ^$T/#soa[dynamic; $N]$E, #any_
 	}
 
 	_soa_fixed_capacity_len(array)^ = n + m
-	if index > old_len {
-		_soa_zero(array[:], old_len, index - old_len)
-	}
-	_soa_move(array[:], index + m, index, n - index)
-	for arg, j in args {
-		array[index + j] = arg
-	}
+	_soa_make_room(array[:], old_len, index, m)
+	copy_soa_from_slice(array[index:], args)
 	return true
 }
 
@@ -1217,10 +1201,7 @@ inject_at_slice_soa_fixed_capacity :: proc(array: ^$T/#soa[dynamic; $N]$E, #any_
 	from := _soa_index_in(array[:], elems)
 
 	_soa_fixed_capacity_len(array)^ = n + m
-	if index > old_len {
-		_soa_zero(array[:], old_len, index - old_len)
-	}
-	_soa_move(array[:], index + m, index, n - index)
+	_soa_make_room(array[:], old_len, index, m)
 	_soa_copy_injected(array[:], elems, index, from)
 	return true
 }
@@ -1278,8 +1259,6 @@ ordered_remove_soa_fixed_capacity :: proc(array: ^$T/#soa[dynamic; $N]$E, #any_i
 
 // The unchecked body of ordered_remove_soa_fixed_capacity, shared with the front pops
 _ordered_remove_soa_fixed_capacity :: proc "contextless" (array: ^$T/#soa[dynamic; $N]$E, index: int) #no_bounds_check {
-	if index+1 < len(array) {
-		_soa_move(array[:], index, index + 1, len(array) - 1 - index)
-	}
+	copy_soa(array[index:], array[index+1:])
 	_soa_fixed_capacity_len(array)^ -= 1
 }
