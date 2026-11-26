@@ -1337,9 +1337,9 @@ ginger_partition_lanes :: #force_inline proc(src, lows, highs: ^$E, pivot: E, ca
 // Moves the items FRONT selects to the front, keeping their order and that of the rest.
 @(require_results)
 ginger_stable_partition :: proc(a, s: []$E, pivot: E, call: $P, $KIND: Sort_Kind, $FRONT: Ginger_Front) -> (count: int) #no_bounds_check {
-	// Integers in their own order take ginger_radix_sort instead. Only floats come here to use lanes.
-	FLOAT :: intrinsics.type_is_float(E) && intrinsics.type_is_endian_platform(E)
-	LANES :: 4 when GINGER_PARTITION_SIMD && (KIND == .Ordered || KIND == .Ordered_Reverse) && FLOAT && size_of(E) == 4 else 1
+	// Integers in their own order take ginger_radix_sort instead. Only f32 comes here to use lanes.
+	F32   :: intrinsics.type_is_float(E) && intrinsics.type_is_endian_platform(E) && size_of(E) == 4
+	LANES :: 4 when GINGER_PARTITION_SIMD && (KIND == .Ordered || KIND == .Ordered_Reverse) && F32 else 1
 
 	n := len(a)
 	if n <= len(s) {
@@ -1490,19 +1490,6 @@ ginger_radix_sort :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_che
 	SIGN :: K(0) when intrinsics.type_is_unsigned(E) else K(1) << (8*size_of(K) - 1)
 	FLIP :: SIGN when KIND == .Ordered else ~SIGN
 
-	// The highest bit any two keys differ in is where sorting starts.
-	first  := K(a[0])
-	differ := K(0)
-	for x in a {
-		differ |= K(x) ~ first
-	}
-	if differ != 0 {
-		top := uint(8*size_of(K) - 1 - int(intrinsics.count_leading_zeros(differ))) &~ 7
-		ginger_radix_level(a, s, top, K, FLIP, call, KIND)
-	}
-}
-
-ginger_radix_level :: proc(a, s: []$E, top: uint, $K: typeid, $FLIP: K, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	digit :: #force_inline proc "contextless" (x: E, shift: uint) -> int {
 		return int(((K(x) ~ FLIP) >> shift) & 0xFF)
 	}
@@ -1513,75 +1500,75 @@ ginger_radix_level :: proc(a, s: []$E, top: uint, $K: typeid, $FLIP: K, call: $P
 		return
 	}
 
-	// A byte every key shares sorts nothing.
-	shift  := top
-	counts: [256]int
-	for {
-		counts = {}
-		for x in a {
-			counts[digit(x, shift)] += 1
-		}
-		if counts[digit(a[0], shift)] != n {
-			break
-		}
-		if shift == 0 {
-			return
-		}
-		shift -= 8
+	// Sorting starts at the highest byte any two keys differ in. Bytes they all share sort nothing.
+	differ := K(0)
+	for x in a {
+		differ |= K(x) ~ K(a[0])
+	}
+	if differ == 0 {
+		return
+	}
+	shift := uint(8*size_of(K) - 1 - int(intrinsics.count_leading_zeros(differ))) &~ 7
+
+	// Each bucket's count, until a prefix sum in place makes it the bucket's end.
+	ends: [256]int
+	for x in a {
+		ends[digit(x, shift)] += 1
 	}
 
 	// On the last byte the keys share every other byte. Equal integers being the same bits, the counts say what goes where.
 	if shift == 0 {
 		prefix := (K(a[0]) ~ FLIP) &~ 0xFF
 		i := 0
-		for c, b in counts {
+		for c, b in ends {
 			fill(a[i:][:c], E((prefix | K(b)) ~ FLIP))
 			i += c
 		}
 		return
 	}
 
-	heads, ends: [256]int
+	// Summed in place, with the starts copied after. A loop storing to one stack array while loading from another
+	// exactly 2 KB away stalls on Zen 4: whole sorts ran 3x slower.
 	sum := 0
-	for c, b in counts {
-		heads[b] = sum
-		sum += c
-		ends[b] = sum
+	for &end in ends {
+		sum += end
+		end = sum
 	}
+	nexts: [256]int
+	copy(nexts[1:], ends[:255])
 
 	// From a copy in the buffer the stores are independent. In place, each item goes straight to its bucket
 	// and the item it displaces moves next, until the cycle closes: every step waits on the one before.
 	if n <= len(s) {
 		copy(s, a)
 		for x in s[:n] {
-			d := digit(x, shift)
-			a[heads[d]] = x
-			heads[d] += 1
+			next := &nexts[digit(x, shift)]
+			a[next^] = x
+			next^ += 1
 		}
 	} else {
 		for b in 0..<256 {
-			for heads[b] < ends[b] {
-				x := a[heads[b]]
+			for nexts[b] < ends[b] {
+				x := a[nexts[b]]
 				d := digit(x, shift)
 				for d != b {
-					y := a[heads[d]]
-					a[heads[d]] = x
-					heads[d] += 1
-					x = y
+					next := &nexts[d]
+					a[next^], x = x, a[next^]
+					next^ += 1
 					d = digit(x, shift)
 				}
-				a[heads[b]] = x
-				heads[b] += 1
+				a[nexts[b]] = x
+				nexts[b] += 1
 			}
 		}
 	}
 
 	start := 0
-	for c in counts {
-		if c > 1 {
-			ginger_radix_level(a[start:][:c], s, shift - 8, K, FLIP, call, KIND)
+	for end in ends {
+		if end - start > 1 {
+			ginger_radix_sort(a[start:end], s, call, KIND)
 		}
-		start += c
+		start = end
 	}
 }
 
