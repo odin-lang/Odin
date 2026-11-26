@@ -1604,15 +1604,24 @@ index_rune :: proc(s: string, r: rune) -> (res: int) {
 // Same as `index_rune`, runs through the string in reverse
 @(require_results)
 last_index_rune :: proc(s: string, r: rune) -> (res: int) {
-	// TODO: Probably possible to search better based on needle rune utf8 width
-	for i := len(s); i > 0; {
-		c, size := utf8.decode_last_rune_in_string(s[:i])
-		i -= size
-		if c == r {
-			return i
+	switch {
+	case u32(r) < utf8.RUNE_SELF:
+		return last_index_byte(s, byte(r))
+
+	case r == utf8.RUNE_ERROR:
+		#reverse for c, i in s {
+			if c == utf8.RUNE_ERROR {
+				return i
+			}
 		}
+		return -1
+
+	case !utf8.valid_rune(r):
+		return -1
 	}
-	return -1
+
+	b, w := utf8.encode_rune(r)
+	return last_index(s, string(b[:w]))
 }
 
 @private PRIME_RABIN_KARP :: 16777619
