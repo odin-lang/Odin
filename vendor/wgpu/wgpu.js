@@ -42,6 +42,7 @@ const ENUMS = {
 	ToneMappingMode: [undefined, "standard", "extended"],
 	FeatureLevel: [undefined, "compatibility", "core"],
 	TextureViewDimensions: [undefined, "1d", "2d", "2d-array", "cube", "cube-array", "3d"],
+	SurfaceGetCurrentTextureStatus: [undefined, "SuccessOptimal", "SuccessSuboptimal", "Timeout", "Outdated", "Lost", "Error"],
 
 	// WARN: used with indexOf to pass to WASM, if we would pass to JS, this needs to use official naming convention (not like Odin enums) like the ones above.
 	BackendType: [undefined, null, "WebGPU", "D3D11", "D3D12", "Metal", "Vulkan", "OpenGL", "OpenGLES"],
@@ -3216,13 +3217,20 @@ class WebGPUInterface {
 			 */
 			wgpuSurfaceGetCurrentTexture: (surfaceIdx, texturePtr) => {
 				const surface = this.surfaces.get(surfaceIdx);
-				const context = surface.getContext('webgpu');
-				const texture = context.getCurrentTexture();
+  			const context = surface.getContext('webgpu');
 
-				const textureIdx = this.textures.create(texture);
-				this.mem.storeI32(texturePtr + 4, textureIdx);
+  			try {
+  				const texture = context.getCurrentTexture();
+  				const textureIdx = this.textures.create(texture);
 
-				// TODO: determine status somehow?
+  				this.mem.storeI32(texturePtr + 4, textureIdx);
+  				this.mem.storeI32(texturePtr + 8, ENUMS.SurfaceGetCurrentTextureStatus.indexOf("SuccessOptimal"));
+  			} catch (e) {
+          this.mem.storeI32(texturePtr + 4, 0);
+  				this.mem.storeI32(texturePtr + 8, ENUMS.SurfaceGetCurrentTextureStatus.indexOf("Error"));
+
+          console.error(e)
+        }
 			},
 
 			/**
