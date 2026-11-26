@@ -12063,17 +12063,6 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					}
 				}
 			}
-		} else if (type_expr->kind == Ast_DynamicArrayType && type_expr->DynamicArrayType.tag != nullptr) {
-			if (cl->elems.count > 0) {
-				Ast *tag = type_expr->DynamicArrayType.tag;
-				GB_ASSERT(tag->kind == Ast_BasicDirective);
-				String name = tag->BasicDirective.name.string;
-				if (name == "soa") {
-					is_soa = true;
-					error(node, "#soa dynamic arrays are not supported for compound literals");
-					return kind;
-				}
-			}
 		}
 
 		if (type == nullptr) {
@@ -12268,7 +12257,15 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 			break;
 		} else if (t->Struct.soa_kind == StructSoa_Dynamic) {
-			error(node, "#soa dynamic arrays are not supported for compound literals");
+			// NOTE(bill): An #soa dynamic array is built up at run time, and a literal is a fixed set of elements.
+			// A fixed set is an #soa slice or #soa array, and `append` adds one to a dynamic array.
+			ERROR_BLOCK();
+			gbString type_str = type_to_string(type);
+			gbString elem_str = type_to_string(t->Struct.soa_elem);
+			error(node, "'%s' cannot be a compound literal: an #soa dynamic array is built up at run time", type_str);
+			error_line("\tSuggestion: Write a fixed set of elements as '#soa[]%s{...}' or '#soa[N]%s{...}', and 'append' it, e.g. 'append(&d, #soa[]%s{...})'\n", elem_str, elem_str, elem_str);
+			gb_string_free(elem_str);
+			gb_string_free(type_str);
 			break;
 		}
 		/*fallthrough*/
