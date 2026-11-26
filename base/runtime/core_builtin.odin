@@ -455,6 +455,7 @@ non_zero_resize :: proc{
 @builtin
 shrink :: proc{
 	shrink_dynamic_array,
+	shrink_soa,
 	shrink_map where MAP_ENABLED,
 }
 

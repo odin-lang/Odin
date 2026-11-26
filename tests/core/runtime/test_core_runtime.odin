@@ -497,6 +497,57 @@ test_copy_soa :: proc(t: ^testing.T) {
 	testing.expect_value(t, copy(aos, empty), 0)
 }
 
+// `shrink` moves the elements of an #soa dynamic array into a layout for the smaller capacity
+@(test)
+test_shrink_soa :: proc(t: ^testing.T) {
+	V :: struct {
+		a: f32,
+		b: u8,
+		c: f64,
+	}
+	v :: proc(i: int) -> V {
+		return {f32(i), u8(i), f64(i)}
+	}
+	expect_elements :: proc(t: ^testing.T, d: #soa[dynamic]V, loc := #caller_location) {
+		for i in 0..<len(d) {
+			if !testing.expect_value(t, d[i], v(i), loc=loc) {
+				return
+			}
+		}
+	}
+
+	d: #soa[dynamic]V
+	defer delete(d)
+	for i in 0..<3000 {
+		append(&d, v(i))
+	}
+	resize(&d, 1000)
+
+	did_shrink, err := shrink(&d)
+	testing.expect(t, did_shrink)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, cap(d), 1000)
+	expect_elements(t, d)
+
+	did_shrink, _ = shrink(&d, 2000)
+	testing.expect(t, !did_shrink)
+
+	did_shrink, _ = shrink(&d, 300)
+	testing.expect(t, did_shrink)
+	testing.expect_value(t, len(d), 300)
+	testing.expect_value(t, cap(d), 300)
+	expect_elements(t, d)
+
+	append(&d, v(300))
+	expect_elements(t, d)
+
+	did_shrink, _ = shrink(&d, 0)
+	testing.expect(t, did_shrink)
+	testing.expect_value(t, cap(d), 0)
+	append(&d, v(0))
+	expect_elements(t, d)
+}
+
 // `append` and `inject_at` take the elements of an #soa slice, which may be a part of the array itself
 @(test)
 test_append_inject_soa_slice :: proc(t: ^testing.T) {

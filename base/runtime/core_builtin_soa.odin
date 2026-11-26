@@ -215,6 +215,77 @@ non_zero_reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int capacity: int,
 	return _reserve_soa(array, capacity, false, loc)
 }
 
+// Shrinks the capacity of an #soa dynamic array down to the current length, or the given capacity.
+//
+// If `new_cap` is negative, then `len(array)` is used.
+//
+// Returns false if `cap(array) < new_cap`, or the allocator report failure.
+//
+// If `len(array) < new_cap`, then `len(array)` will be left unchanged.
+//
+// Note: Prefer the procedure group `shrink`
+@builtin
+shrink_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int new_cap := -1, loc := #caller_location) -> (did_shrink: bool, err: Allocator_Error) {
+	if array == nil {
+		return
+	}
+
+	footer  := raw_soa_footer(array)
+	new_cap := new_cap if new_cap >= 0 else footer.len
+	old_cap := footer.cap
+	if new_cap > old_cap {
+		return
+	}
+	keep := min(new_cap, footer.len)
+	if new_cap == old_cap || size_of(E) == 0 {
+		footer.len = keep
+		footer.cap = new_cap
+		return true, nil
+	}
+
+	FIELD_COUNT :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+	max_align   :: align_of(E)
+
+	// NOTE(bill): The layout of the columns depends on the capacity, so the elements are copied to new memory.
+	sizes := intrinsics.type_soa_field_sizes(T)
+	old_offsets, new_offsets: [FIELD_COUNT]int
+	old_size := _soa_layout(sizes[:], old_cap, max_align, old_offsets[:]) or_return
+	new_size := _soa_layout(sizes[:], new_cap, max_align, new_offsets[:]) or_return
+
+	columns  := ([^]rawptr)(array)
+	old_data := columns[0]
+	new_data: [^]byte
+	if new_cap > 0 {
+		new_bytes := array.allocator.procedure(
+			array.allocator.data, .Alloc_Non_Zeroed, new_size, max_align,
+			nil, 0, loc,
+		) or_return
+		new_data = raw_data(new_bytes)
+	}
+
+	for size, i in sizes {
+		column: rawptr
+		if new_data != nil {
+			column = &new_data[new_offsets[i]]
+			mem_copy_non_overlapping(column, columns[i], size*keep)
+		}
+		columns[i] = column
+	}
+	footer.len = keep
+	footer.cap = new_cap
+
+	// NOTE(bill): An allocator that cannot free, such as an arena, keeps the old memory, as it would after a resize.
+	did_shrink = true
+	_, free_err := array.allocator.procedure(
+		array.allocator.data, .Free, 0, max_align,
+		old_data, old_size, loc,
+	)
+	if free_err != .Mode_Not_Implemented {
+		err = free_err
+	}
+	return
+}
+
 // Moves `count` elements of `s` from index `from` to index `to`, field by field
 @(private)
 _soa_move :: proc "contextless" (s: $S/#soa[]$E, to, from, count: int) {

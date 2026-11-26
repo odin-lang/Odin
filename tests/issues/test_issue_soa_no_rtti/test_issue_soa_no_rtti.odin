@@ -44,5 +44,7 @@ soa_no_rtti :: proc "contextless" (allocator: runtime.Allocator) -> int {
 	n += append(&fixed, ps[:1])
 	inject_at(&fixed, 0, fixed[1:2])
 
+	shrink(&ps)
+
 	return len(ps) + len(lanes) + len(fixed) + n
 }
