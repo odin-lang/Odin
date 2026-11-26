@@ -555,11 +555,29 @@ string16_eq :: proc "contextless" (lhs, rhs: string16) -> bool {
 	return #force_inline memory_equal(x.data, y.data, x.len*size_of(u16))
 }
 
+// Compares `n` UTF-16 code units by value. Their bytes compare in another order on little-endian targets, low byte first.
+// Four units at a time are checked for equality as one 64-bit load. The first that differ are compared as numbers.
+@(private)
+memory_compare_u16 :: #force_inline proc "contextless" (a, b: [^]u16, n: int) -> int #no_bounds_check {
+	i := 0
+	for /**/; n-i >= 4; i += 4 {
+		if intrinsics.unaligned_load(cast(^u64)&a[i]) != intrinsics.unaligned_load(cast(^u64)&b[i]) {
+			break
+		}
+	}
+	for /**/; i < n; i += 1 {
+		if a[i] != b[i] {
+			return -1 if a[i] < b[i] else +1
+		}
+	}
+	return 0
+}
+
 string16_cmp :: proc "contextless" (a, b: string16) -> int {
 	x := transmute(Raw_String16)a
 	y := transmute(Raw_String16)b
 
-	ret := memory_compare(x.data, y.data, min(x.len, y.len)*size_of(u16))
+	ret := memory_compare_u16(x.data, y.data, min(x.len, y.len))
 	if ret == 0 && x.len != y.len {
 		return -1 if x.len < y.len else +1
 	}
@@ -969,7 +987,7 @@ cstring16_cmp :: proc "contextless" (lhs, rhs: cstring16) -> int {
 	}
 	xn := cstring16_len(lhs)
 	yn := cstring16_len(rhs)
-	ret := memory_compare(x, y, min(xn, yn)*size_of(u16))
+	ret := memory_compare_u16(x, y, min(xn, yn))
 	if ret == 0 && xn != yn {
 		return -1 if xn < yn else +1
 	}

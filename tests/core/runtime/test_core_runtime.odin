@@ -1373,6 +1373,57 @@ test_string_cmp :: proc(t: ^testing.T) {
 	}
 }
 
+// UTF-16 code units order by value. Each pair below orders the other way by little-endian bytes, low byte first.
+@(test)
+test_string16_cmp :: proc(t: ^testing.T) {
+	reference :: proc(a, b: []u16) -> int {
+		for i in 0..<min(len(a), len(b)) {
+			if a[i] != b[i] {
+				return -1 if a[i] < b[i] else +1
+			}
+		}
+		return -1 if len(a) < len(b) else +1 if len(a) > len(b) else 0
+	}
+	pairs := [?][2]u16{{0x00FF, 0x0100}, {0x01FF, 0x0200}, {0x7FFF, 0x8000}, {0x0080, 0xD800}}
+
+	data: [16]u16
+	cmp:  [16]u16
+	zdata: [17]u16
+	zcmp:  [17]u16
+	for i in 0..<len(data) {
+		data[i] = u16(0x0041 + i)
+		cmp[i]  = data[i]
+	}
+	for pair in pairs {
+		for la in 0..=13 {
+			for lb in max(la-1, 0)..=min(la+1, 13) {
+				for diff in -1..<min(la, lb) {
+					if diff >= 0 {
+						data[diff], cmp[diff] = pair[0], pair[1]
+					}
+					a, b := string16(data[:la]), string16(cmp[:lb])
+					want := reference(data[:la], cmp[:lb])
+					copy(zdata[:], data[:la])
+					copy(zcmp[:], cmp[:lb])
+					zdata[la], zcmp[lb] = 0, 0
+					za, zb := cstring16(&zdata[0]), cstring16(&zcmp[0])
+					ok := testing.expectf(t, runtime.string16_cmp(a, b) == want, "string16 %x vs %x, len %d and %d, first difference %d", pair[0], pair[1], la, lb, diff) &&
+					      testing.expectf(t, runtime.string16_cmp(b, a) == -want, "string16 reversed, %x vs %x, len %d and %d, first difference %d", pair[0], pair[1], la, lb, diff) &&
+					      testing.expectf(t, runtime.cstring16_cmp(za, zb) == want, "cstring16 %x vs %x, len %d and %d, first difference %d", pair[0], pair[1], la, lb, diff) &&
+					      testing.expectf(t, runtime.cstring16_cmp(zb, za) == -want, "cstring16 reversed, %x vs %x, len %d and %d, first difference %d", pair[0], pair[1], la, lb, diff)
+					if diff >= 0 {
+						data[diff] = u16(0x0041 + diff)
+						cmp[diff]  = data[diff]
+					}
+					if !ok {
+						return
+					}
+				}
+			}
+		}
+	}
+}
+
 @(test)
 test_memory_prefix_length :: proc(t: ^testing.T) {
 	data: [256]u8
