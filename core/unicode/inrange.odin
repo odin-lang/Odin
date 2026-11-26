@@ -1,7 +1,17 @@
 package unicode
 
 /*
-Check to see if the rune `r` is in `range`
+Returns whether the rune `r` falls inside `range`.
+
+This is the lookup used by the `is_*` procedures to test membership in one of
+the Unicode property tables.
+
+Inputs:
+- r: The rune to look for.
+- range: The set of runes to search.
+
+Returns:
+`true` when `r` is in `range`, `false` otherwise.
 */
 in_range :: proc(r: rune, range: Range) -> bool {
 
