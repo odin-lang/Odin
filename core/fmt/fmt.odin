@@ -2515,7 +2515,10 @@ fmt_soa :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Struct) {
 	field_count := int(info.field_count)
 	n := int(info.soa_len)
 	switch info.soa_kind {
-	case .None, .Fixed:
+	case .None:
+		unreachable("this is not an #soa type")
+	case .Fixed:
+		// intrinsic length
 	case .Slice, .Fixed_Capacity_Dynamic:
 		field_count -= 1 // len
 	case .Dynamic:
@@ -2535,6 +2538,7 @@ fmt_soa :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Struct) {
 
 	elem := info.soa_base_type
 	base := runtime.type_info_base(elem)
+
 	// alloca only takes a constant alignment, so the element's is applied by hand
 	data := ([^]byte)(mem.align_forward(intrinsics.alloca(elem.size + elem.align, 1), uintptr(elem.align)))
 	inline_fields := info.soa_kind == .Fixed || info.soa_kind == .Fixed_Capacity_Dynamic
