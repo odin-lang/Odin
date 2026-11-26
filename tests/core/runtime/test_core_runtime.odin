@@ -421,6 +421,38 @@ when !testing.INLINE {
 		testing.expect_assert(t, "0 is out of range 0..<0")
 		_ = p.x[n]
 	}
+
+	// A field of `#soa[dynamic; N]T` is indexed within its length, not its capacity
+	@(test)
+	test_soa_fixed_capacity_field_index :: proc(t: ^testing.T) {
+		V :: struct {x, y: f32}
+		array := #soa[dynamic; 8]V{{1, 2}, {3, 4}}
+		n := len(array)
+		testing.expect_assert(t, "2 is out of range 0..<2")
+		array.y[n] = 1
+	}
+
+	@(test)
+	test_soa_fixed_capacity_field_slice :: proc(t: ^testing.T) {
+		V :: struct {x, y: f32}
+		array := #soa[dynamic; 8]V{{1, 2}, {3, 4}}
+		testing.expect_value(t, len(array.x[:]), 2)
+		hi := 3
+		testing.expect_assert(t, "0:3 is out of range 0..<2")
+		_ = array.x[0:hi]
+	}
+
+	// A field of an #soa slice is sliced within the slice's length
+	@(test)
+	test_soa_slice_field_slice :: proc(t: ^testing.T) {
+		V :: struct {x, y: f32}
+		fixed: #soa[4]V
+		slice := fixed[:2]
+		testing.expect_value(t, len(slice.x[0:2]), 2)
+		hi := 3
+		testing.expect_assert(t, "0:3 is out of range 0..<2")
+		_ = slice.x[0:hi]
+	}
 }
 
 // `#soa[dynamic; N]T` holds its elements inline like `#soa[N]T`, with a length like `[dynamic; N]T`

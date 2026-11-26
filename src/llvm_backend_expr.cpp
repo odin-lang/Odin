@@ -5361,6 +5361,29 @@ gb_internal lbAddr lb_build_addr_soa_elem_index(lbProcedure *p, Ast *expr, lbAdd
 	return lb_addr_soa_field_elem(lb_soa_array_component_elem_ptr(p, soa_addr.addr, index, soa_addr.soa.index, component_count));
 }
 
+gb_internal lbValue lb_soa_field_len(lbProcedure *p, Ast *expr) {
+	Ast *se_expr = unparen_expr(expr);
+	if (se_expr->kind != Ast_SelectorExpr) {
+		return {};
+	}
+	Type *type = base_type(type_deref(type_of_expr(se_expr->SelectorExpr.expr)));
+	if (!is_type_soa_struct(type)) {
+		return {};
+	}
+	if (type->Struct.soa_kind == StructSoa_Fixed) {
+		return lb_const_int(p->module, t_int, type->Struct.soa_count);
+	}
+	lbAddr *found = map_get(&p->selector_addr, se_expr);
+	if (found == nullptr) {
+		return {};
+	}
+	lbValue parent = lb_addr_get_ptr(p, *found);
+	if (is_type_pointer(type_deref(parent.type))) {
+		parent = lb_emit_load(p, parent);
+	}
+	return lb_soa_struct_len(p, parent);
+}
+
 gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 	ast_node(ie, IndexExpr, expr);
 	bool proven = (expr->state_flags & StateFlag_bounds_check_proven) != 0; // see check_escape.cpp
@@ -5397,34 +5420,9 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		lbValue field = lb_build_expr(p, ie->expr);
 		lbValue index = lb_build_expr(p, ie->index);
 
-		if (!build_context.no_bounds_check) {
-			Ast *se_expr = unparen_expr(ie->expr);
-			if (se_expr->kind == Ast_SelectorExpr) {
-				ast_node(se, SelectorExpr, se_expr);
-				lbValue len = {};
-
-				Type *type = base_type(type_deref(type_of_expr(se->expr)));
-				GB_ASSERT_MSG(is_type_soa_struct(type), "%s", type_to_string(type));
-				if (type->Struct.soa_kind == StructSoa_Fixed) {
-					len = lb_const_int(p->module, t_int, type->Struct.soa_count);
-				} else {
-					lbAddr *found = map_get(&p->selector_addr, se_expr);
-					if (found) {
-						lbAddr addr = *found;
-						lbValue parent = lb_addr_get_ptr(p, addr);
-						if (is_type_pointer(type_deref(parent.type))) {
-							parent = lb_emit_load(p, parent);
-						}
-						len = lb_soa_struct_len(p, parent);
-					}
-				}
-
-				if (len.value) {
-					lb_emit_bounds_check(p, ast_token(ie->index), index, len);
-				}
-			} else {
-				// TODO(bill): how do you even do bounds checking here?
-			}
+		lbValue len = lb_soa_field_len(p, ie->expr);
+		if (len.value != nullptr) {
+			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 		}
 		lbValue val = lb_emit_ptr_offset(p, field, index);
 		// make sure it's ^T and not [^]T
@@ -5481,8 +5479,12 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		index = lb_emit_conv(p, index, t_int);
 		lbValue elem = lb_emit_array_ep(p, array, index);
 
+		// NOTE(bill): Only the first `len` elements of a field of `#soa[dynamic; N]T` are in use, not all `N`.
+		lbValue soa_len = lb_soa_field_len(p, ie->expr);
 		auto index_tv = type_and_value_of_expr(ie->index);
-		if (index_tv.mode != Addressing_Constant && !proven) {
+		if (soa_len.value != nullptr && !lb_is_const(soa_len)) {
+			lb_emit_bounds_check(p, ast_token(ie->index), index, soa_len);
+		} else if (index_tv.mode != Addressing_Constant && !proven) {
 			lbValue len = lb_const_int(p->module, t_int, t->Array.count);
 			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 		}
@@ -5838,7 +5840,11 @@ gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 		low = lb_emit_conv(p, low, t_int);
 		high = lb_emit_conv(p, high, t_int);
 
-		if (!proven) {
+		// NOTE(bill): A field of an #soa slice or dynamic array is sliced within the array's length.
+		lbValue soa_len = lb_soa_field_len(p, se->expr);
+		if (soa_len.value != nullptr) {
+			lb_emit_slice_bounds_check(p, se->open, low, high, soa_len, se->low != nullptr);
+		} else if (!proven) {
 			lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
 		}
 
@@ -5926,6 +5932,14 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 
 	case Type_MultiPointer: {
 		lbAddr res = lb_add_local_generated(p, type_of_expr(expr), false);
+		lbValue soa_len = lb_soa_field_len(p, se->expr);
+		if (soa_len.value != nullptr) {
+			if (high.value == nullptr) {
+				lb_emit_slice_bounds_check(p, se->open, low, soa_len, soa_len, true);
+			} else {
+				lb_emit_slice_bounds_check(p, se->open, low, high, soa_len, se->low != nullptr);
+			}
+		}
 		if (se->high == nullptr) {
 			lbValue offset = base;
 			LLVMValueRef indices[1] = {low.value};
@@ -5935,7 +5949,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 			low = lb_emit_conv(p, low, t_int);
 			high = lb_emit_conv(p, high, t_int);
 
-			if (!proven) {
+			if (!proven && soa_len.value == nullptr) {
 				lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
 			}
 
@@ -5955,12 +5969,23 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		Type *slice_type = alloc_type_slice(type->Array.elem);
 		lbValue len = lb_const_int(p->module, t_int, type->Array.count);
 
+		// NOTE(bill): A field of `#soa[dynamic; N]T` is sliced within its length, not all `N` elements.
+		lbValue soa_len = lb_soa_field_len(p, se->expr);
+		bool soa_dynamic = soa_len.value != nullptr && !lb_is_const(soa_len);
+		if (soa_dynamic) {
+			len = soa_len;
+		}
+
 		if (high.value == nullptr) high = len;
 
 		bool low_const  = type_and_value_of_expr(se->low).mode  == Addressing_Constant;
 		bool high_const = type_and_value_of_expr(se->high).mode == Addressing_Constant;
 
-		if (!low_const || !high_const) {
+		if (soa_dynamic) {
+			if (!no_indices) {
+				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
+			}
+		} else if (!low_const || !high_const) {
 			if (!no_indices && !proven) {
 				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 			}
