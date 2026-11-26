@@ -332,3 +332,53 @@ test_simd_vectors :: proc(t: ^testing.T) {
 		testing.expect(t, reflect.length(v)   == 64)
 	}
 }
+
+@test
+test_soa :: proc(t: ^testing.T) {
+	P :: struct {
+		x: f32,
+		y: u8,
+	}
+	Particles :: #soa[dynamic]P
+
+	fixed: #soa[4]P
+	testing.expect_value(t, reflect.length(fixed), 4)
+	testing.expect_value(t, reflect.capacity(fixed), 4)
+	testing.expect_value(t, reflect.soa_field_count(type_of(fixed)), 2)
+
+	d: Particles
+	defer delete(d)
+	reserve(&d, 16)
+	append(&d, P{1, 2}, P{3, 4})
+	testing.expect_value(t, reflect.length(d), 2)
+	testing.expect_value(t, reflect.capacity(d), cap(d))
+	testing.expect_value(t, reflect.soa_field_count(Particles), 2)
+
+	s := d[1:]
+	testing.expect_value(t, reflect.length(s), 1)
+	testing.expect_value(t, reflect.capacity(s), 0)
+
+	c: #soa[dynamic; 8]P
+	append(&c, P{5, 6})
+	testing.expect_value(t, reflect.length(c), 1)
+	testing.expect_value(t, reflect.capacity(c), 8)
+
+	testing.expect_value(t, reflect.soa_field_count(P), 0)
+	testing.expect_value(t, reflect.soa_field_count(#soa[][3]f32), 3)
+
+	y := reflect.soa_field_value(d, 1, 1)
+	testing.expect_value(t, y.id, typeid_of(u8))
+	testing.expect_value(t, (^u8)(y.data)^, 4)
+
+	(^f32)(reflect.soa_field_value(d, 0, 0).data)^ = 10
+	testing.expect_value(t, d[0].x, 10)
+
+	testing.expect_value(t, (^f32)(reflect.soa_field_value(s, 0, 0).data)^, 3)
+	testing.expect_value(t, (^u8)(reflect.soa_field_value(c, 0, 1).data)^, 6)
+
+	lanes: #soa[2][3]f32
+	lanes[1] = {7, 8, 9}
+	testing.expect_value(t, (^f32)(reflect.soa_field_value(lanes, 1, 2).data)^, 9)
+
+	testing.expect(t, reflect.soa_field_value(P{}, 0, 0) == nil)
+}

@@ -2501,22 +2501,6 @@ __handle_raw_union_tag :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.
 	return false
 }
 
-// The number of fields of an #soa array that hold the fields of its elements
-@(private)
-soa_field_count :: proc(info: runtime.Type_Info_Struct) -> int {
-	switch info.soa_kind {
-	case .None:
-		unreachable() // this is not an #soa type
-	case .Fixed:
-		return int(info.field_count)
-	case .Slice, .Fixed_Capacity_Dynamic:
-		return int(info.field_count) - 1 // len
-	case .Dynamic:
-		return int(info.field_count) - 3 // len, cap, allocator
-	}
-	return 0
-}
-
 // The address and type of field `i` of `parent`, a struct, or of its element `index` when it is an #soa array
 @(private)
 struct_field :: proc(parent: any, info: runtime.Type_Info_Struct, index, i: int) -> (data: rawptr, type: ^runtime.Type_Info) {
@@ -2544,10 +2528,9 @@ parent_field :: proc(state: ^Info_State, name: string) -> any {
 	if !ok || info.soa_kind == .None {
 		return reflect.struct_field_value_by_name(parent, name, true)
 	}
-	for field_name, i in info.names[:soa_field_count(info^)] {
+	for field_name, i in info.names[:reflect.soa_field_count(parent.id)] {
 		if field_name == name {
-			data, type := struct_field(parent, info^, state.parent_soa_index, i)
-			return any{data, type.id}
+			return reflect.soa_field_value(parent, state.parent_soa_index, i)
 		}
 	}
 	return nil
@@ -2556,12 +2539,7 @@ parent_field :: proc(state: ^Info_State, name: string) -> any {
 // Formats an #soa array as the array of its elements, each formatted from where its fields are
 @(private)
 fmt_soa :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Struct) {
-	field_count := soa_field_count(info)
-	n := int(info.soa_len) // the intrinsic length of #soa[N]T
-	if info.soa_kind != .Fixed {
-		n = (^int)(uintptr(v.data) + info.offsets[field_count])^
-	}
-	fmt_soa_items(fi, v, verb, info, field_count, n, -1)
+	fmt_soa_items(fi, v, verb, info, reflect.soa_field_count(v.id), reflect.length(v), -1)
 }
 
 // Formats `n` items of an #soa array as an array.
