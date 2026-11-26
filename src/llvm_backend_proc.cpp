@@ -411,6 +411,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		TypeTuple *params = &pt->Proc.params->Tuple;
 		isize parameter_index = 0;   // 0-based position among the Odin proc params in the LLVM function signature
 		isize ft_args_index = 0;     // index into ft->args
+		bool  is_odin_cc = is_calling_convention_odin(ft->calling_convention);
 		for (isize i = 0; i < pt->Proc.param_count; i++) {
 			Entity *e = params->variables[i];
 			if (e->kind != Entity_Variable) {
@@ -432,6 +433,11 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 			}
 
 			if (e->flags&EntityFlag_NoAlias) {
+				lb_add_proc_attribute_at_index(p, offset+parameter_index, "noalias");
+			} else if (arg->kind == lbArg_Indirect && !arg->is_byval && is_odin_cc &&
+			           !build_context.internal_by_reference && type_size_of(e->type) > 16) {
+				// NOTE(bill): The caller copies such an argument whenever something could write it during the call.
+				// Stores elsewhere then never force a reload through it, e.g. of a by-value `#soa[]`'s column pointers.
 				lb_add_proc_attribute_at_index(p, offset+parameter_index, "noalias");
 			}
 			if (e->flags&EntityFlag_NoCapture) {
@@ -989,6 +995,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 // The caller copies an indirect Odin argument when something could write it during the call.
 // It passes the original address of a constant, a temporary, or a local whose address never escapes.
 // The callee keeps each indirect parameter in a local copy, and forwarding that local follows the same rule.
+// The callee's parameter is `noalias`: nothing but the callee reaches that memory during the call.
 // A copy is made up front and dropped at the end of the procedure if its local's address did not escape.
 // A parameter whose address escapes keeps its copy: writes through that address never reach the caller.
 // An `any` boxed from a value straight into a call is not an escape: the value is only reachable through it during that call.
