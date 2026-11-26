@@ -45,6 +45,8 @@ Info_State :: struct {
 	indent:    int,
 
 	parent_struct: any,
+	// When `parent_struct` is an #soa array, the index of the element whose fields are being formatted
+	parent_soa_index: int,
 }
 
 
@@ -2277,9 +2279,9 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 // Handles struct tag processing for formatting
 //
 // Inputs:
-// - data: A raw pointer to the data being processed
-// - info: Type information about the struct
-// - idx: The index of the tag in the struct
+// - state: The state the field is formatted with, whose `parent_struct` is the struct the field is in
+// - tag: The tag of the field
+// - type: The type of the field
 // - verb: A mutable pointer to the rune representing the format verb
 // - optional_len: A mutable pointer to an integer holding the optional length (if applicable)
 // - use_nul_termination: A mutable pointer to a boolean flag indicating if NUL termination is used
@@ -2287,25 +2289,16 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 // Returns: A boolean value indicating whether to continue processing the tag
 //
 @(private)
-handle_tag :: proc(state: ^Info_State, data: rawptr, info: reflect.Type_Info_Struct, idx: int, verb: ^rune, optional_len: ^int, use_nul_termination: ^bool) -> (do_continue: bool) {
-	handle_optional_len :: proc(data: rawptr, info: reflect.Type_Info_Struct, field_name: string, optional_len: ^int) {
+handle_tag :: proc(state: ^Info_State, tag: string, type: ^runtime.Type_Info, verb: ^rune, optional_len: ^int, use_nul_termination: ^bool) -> (do_continue: bool) {
+	handle_optional_len :: proc(state: ^Info_State, field_name: string, optional_len: ^int) {
 		if optional_len == nil {
 			return
 		}
-		for f, i in info.names[:info.field_count] {
-			if f != field_name {
-				continue
-			}
-			ptr := rawptr(uintptr(data) + info.offsets[i])
-			field := any{ptr, info.types[i].id}
-			if new_len, iok := reflect.as_int(field); iok {
-				optional_len^ = max(new_len, 0)
-			}
-			break
+		if new_len, ok := reflect.as_int(parent_field(state, field_name)); ok {
+			optional_len^ = max(new_len, 0)
 		}
 	}
 
-	tag := info.tags[idx]
 	if vt, ok := reflect.struct_tag_lookup(reflect.Struct_Tag(tag), "fmt"); ok {
 		value := strings.trim_space(string(vt))
 		switch value {
@@ -2370,11 +2363,11 @@ handle_tag :: proc(state: ^Info_State, data: rawptr, info: reflect.Type_Info_Str
 			} else {
 				switch r {
 				case 's', 'q':
-					handle_optional_len(data, info, field_name, optional_len)
+					handle_optional_len(state, field_name, optional_len)
 				case 'v', 'w':
-					#partial switch reflect.type_kind(info.types[idx].id) {
+					#partial switch reflect.type_kind(type.id) {
 					case .String, .Multi_Pointer, .Array, .Slice, .Dynamic_Array:
-						handle_optional_len(data, info, field_name, optional_len)
+						handle_optional_len(state, field_name, optional_len)
 					}
 				}
 			}
@@ -2408,7 +2401,7 @@ __handle_raw_union_tag :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.
 		return false
 	}
 
-	tag := reflect.struct_field_value_by_name(fi.state.parent_struct, tag_name, true)
+	tag := parent_field(&fi.state, tag_name)
 	if tag == nil {
 		// try the current type just in case the tag is also stored here
 		tag = reflect.struct_field_value_by_name(v, tag_name, false)
@@ -2508,26 +2501,73 @@ __handle_raw_union_tag :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.
 	return false
 }
 
-// Formats an #soa array as the array of its elements.
-// Each element is gathered from the fields into one value, which is formatted like any other.
+// The number of fields of an #soa array that hold the fields of its elements
 @(private)
-fmt_soa :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Struct) {
-	field_count := int(info.field_count)
-	n := int(info.soa_len)
+soa_field_count :: proc(info: runtime.Type_Info_Struct) -> int {
 	switch info.soa_kind {
 	case .None:
-		unreachable("this is not an #soa type")
+		unreachable() // this is not an #soa type
 	case .Fixed:
-		// intrinsic length
+		return int(info.field_count)
 	case .Slice, .Fixed_Capacity_Dynamic:
-		field_count -= 1 // len
+		return int(info.field_count) - 1 // len
 	case .Dynamic:
-		field_count -= 3 // len, cap, allocator
+		return int(info.field_count) - 3 // len, cap, allocator
 	}
+	return 0
+}
+
+// The address and type of field `i` of `parent`, a struct, or of its element `index` when it is an #soa array
+@(private)
+struct_field :: proc(parent: any, info: runtime.Type_Info_Struct, index, i: int) -> (data: rawptr, type: ^runtime.Type_Info) {
+	ptr := uintptr(parent.data) + info.offsets[i]
+	switch info.soa_kind {
+	case .None:
+		return rawptr(ptr), info.types[i]
+	case .Fixed, .Fixed_Capacity_Dynamic:
+		type = info.types[i].variant.(^runtime.Type_Info_Array).elem
+	case .Slice, .Dynamic:
+		type = info.types[i].variant.(^runtime.Type_Info_Multi_Pointer).elem
+		ptr = (^uintptr)(ptr)^
+	}
+	return rawptr(ptr + uintptr(index*type.size)), type
+}
+
+// The field `name` of the struct whose fields are being formatted, for tags that name another field
+@(private)
+parent_field :: proc(state: ^Info_State, name: string) -> any {
+	parent := state.parent_struct
+	if parent == nil {
+		return nil
+	}
+	info, ok := runtime.type_info_base(type_info_of(parent.id)).variant.(^runtime.Type_Info_Struct)
+	if !ok || info.soa_kind == .None {
+		return reflect.struct_field_value_by_name(parent, name, true)
+	}
+	for field_name, i in info.names[:soa_field_count(info^)] {
+		if field_name == name {
+			data, type := struct_field(parent, info^, state.parent_soa_index, i)
+			return any{data, type.id}
+		}
+	}
+	return nil
+}
+
+// Formats an #soa array as the array of its elements, each formatted from where its fields are
+@(private)
+fmt_soa :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Struct) {
+	field_count := soa_field_count(info)
+	n := int(info.soa_len) // the intrinsic length of #soa[N]T
 	if info.soa_kind != .Fixed {
 		n = (^int)(uintptr(v.data) + info.offsets[field_count])^
 	}
+	fmt_soa_items(fi, v, verb, info, field_count, n, -1)
+}
 
+// Formats `n` items of an #soa array as an array.
+// The items are its elements, or the lanes of its element `lanes_of` when its elements are arrays.
+@(private)
+fmt_soa_items :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Struct, field_count, n, lanes_of: int) {
 	_write_byte(fi, '[' if verb != 'w' else '{')
 	defer _write_byte(fi, ']' if verb != 'w' else '}')
 	if n <= 0 {
@@ -2536,12 +2576,11 @@ fmt_soa :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Struct) {
 	fi.record_level += 1
 	defer fi.record_level -= 1
 
-	elem := info.soa_base_type
-	base := runtime.type_info_base(elem)
-
-	// alloca only takes a constant alignment, so the element's is applied by hand
-	data := ([^]byte)(mem.align_forward(intrinsics.alloca(elem.size + elem.align, 1), uintptr(elem.align)))
-	inline_fields := info.soa_kind == .Fixed || info.soa_kind == .Fixed_Capacity_Dynamic
+	elem_name: string
+	if named, ok := info.soa_base_type.variant.(^runtime.Type_Info_Named); ok {
+		elem_name = named.name
+	}
+	_, elem_is_array := runtime.type_info_base(info.soa_base_type).variant.(^runtime.Type_Info_Array)
 
 	hash   := fi.hash
 	indent := fi.indent
@@ -2554,30 +2593,22 @@ fmt_soa :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Struct) {
 		fmt_write_indent(fi)
 	}
 
-	for index in 0..<n {
-		for i in 0..<field_count {
-			field_type:   ^runtime.Type_Info
-			field_offset: uintptr
-			#partial switch b in base.variant {
-			case ^runtime.Type_Info_Struct:
-				field_type, field_offset = b.types[i], b.offsets[i]
-			case ^runtime.Type_Info_Array:
-				field_type, field_offset = b.elem, uintptr(i*b.elem_size)
-			}
-
-			column := uintptr(v.data) + info.offsets[i]
-			if !inline_fields {
-				column = (^uintptr)(column)^
-			}
-			intrinsics.mem_copy_non_overlapping(&data[field_offset], rawptr(column + uintptr(index*field_type.size)), field_type.size)
-		}
-
+	for i in 0..<n {
 		if hash {
 			fmt_write_indent(fi)
-		} else if index > 0 {
+		} else if i > 0 {
 			_write_string(fi, ", ")
 		}
-		fmt_arg(fi, any{data, elem.id}, verb)
+		switch {
+		case lanes_of >= 0:
+			data, type := struct_field(v, info, lanes_of, i)
+			_fmt_arg(fi, data, type.id, type, verb)
+		case elem_is_array:
+			fmt_soa_items(fi, v, verb, info, field_count, field_count, i)
+		case:
+			_write_string(fi, elem_name)
+			fmt_struct_fields(fi, v, i, verb, info, field_count)
+		}
 		if hash {
 			_write_string(fi, ",\n")
 		}
@@ -2616,7 +2647,12 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 		fmt_soa(fi, v, the_verb, info)
 		return
 	}
+	fmt_struct_fields(fi, v, 0, the_verb, info, int(info.field_count))
+}
 
+// Formats the first `count` fields of `parent`, a struct, or of its element `index` when it is an #soa array
+@(private)
+fmt_struct_fields :: proc(fi: ^Info, parent: any, index: int, the_verb: rune, info: runtime.Type_Info_Struct, count: int) {
 	_write_byte(fi, '{')
 	fi.record_level += 1
 	defer fi.record_level -= 1
@@ -2628,7 +2664,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 	// fi.hash = false;
 	fi.indent += 1
 
-	is_empty := info.field_count == 0
+	is_empty := count == 0
 
 	if hash && !is_empty {
 		_write_byte(fi, '\n')
@@ -2641,18 +2677,20 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 	}
 
 	field_count := -1
-	for name, i in info.names[:info.field_count] {
+	for name, i in info.names[:count] {
 		optional_len: int = -1
 		use_nul_termination: bool = false
 		verb := the_verb if the_verb == 'w' else 'v'
+		data, type := struct_field(parent, info, index, i)
 
 		// NOTE(bill): Most fields have no tag. Those only need `parent_struct` set while they are formatted.
 		has_tag := info.tags[i] != ""
 		new_state: Info_State = ---
 		if has_tag {
 			new_state = fi.state
-			new_state.parent_struct = v
-			if handle_tag(&new_state, v.data, info, i, &verb, &optional_len, &use_nul_termination) {
+			new_state.parent_struct    = parent
+			new_state.parent_soa_index = index
+			if handle_tag(&new_state, info.tags[i], type, &verb, &optional_len, &use_nul_termination) {
 				continue
 			}
 		}
@@ -2677,17 +2715,17 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 		_write_string(fi, name)
 		_write_string(fi, " = ")
 
-		if t := info.types[i]; reflect.is_any(t) {
+		if reflect.is_any(type) {
 			_write_string(fi, "any{}")
 		} else {
 			prev_state := fi.state
 			if has_tag {
 				fi.state = new_state
 			} else {
-				fi.parent_struct = v
+				fi.parent_struct    = parent
+				fi.parent_soa_index = index
 			}
-			data := rawptr(uintptr(v.data) + info.offsets[i])
-			_fmt_arg(fi, data, t.id, t, verb)
+			_fmt_arg(fi, data, type.id, type, verb)
 			fi.state = prev_state
 		}
 
