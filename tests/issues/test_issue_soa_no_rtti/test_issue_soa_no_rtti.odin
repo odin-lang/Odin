@@ -30,5 +30,10 @@ soa_no_rtti :: proc "contextless" (allocator: runtime.Allocator) -> int {
 	resize(&fixed, 4)
 	ordered_remove(&fixed, 1)
 
-	return len(ps) + len(lanes) + len(fixed)
+	aos: [4]Particle
+	n := copy(ps[:], fixed[:])
+	n += copy(aos[:], ps[:])
+	n += copy(ps[:], aos[:])
+
+	return len(ps) + len(lanes) + len(fixed) + n
 }

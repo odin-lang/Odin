@@ -109,10 +109,17 @@ copy_from_string16 :: #force_inline proc "contextless" (dst: $T/[]$E/u16, src: $
 }
 
 // `copy` is a built-in procedure that copies elements from a source slice/string `src` to a destination slice `dst`.
-// The source and destination may overlap. Copy returns the number of elements copied, which will be the minimum
-// of len(src) and len(dst).
+// Either may be an #soa slice. The source and destination may overlap, unless one is an #soa slice and the other is not.
+// Copy returns the number of elements copied, which will be the minimum of len(src) and len(dst).
 @builtin
-copy :: proc{copy_slice, copy_from_string, copy_from_string16}
+copy :: proc{
+	copy_slice,
+	copy_from_string,
+	copy_from_string16,
+	copy_soa,
+	copy_soa_from_slice,
+	copy_slice_from_soa,
+}
 
 
 

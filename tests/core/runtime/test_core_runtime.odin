@@ -455,6 +455,48 @@ when !testing.INLINE {
 	}
 }
 
+// `copy` copies between #soa slices, and between a slice and an #soa slice, up to the shorter length
+@(test)
+test_copy_soa :: proc(t: ^testing.T) {
+	V :: struct {
+		a: f32,
+		b: u8,
+		c: f64,
+	}
+
+	aos := []V{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}
+	soa := make(#soa[]V, 4)
+	defer delete(soa)
+
+	testing.expect_value(t, copy(soa, aos), 3)
+	testing.expect_value(t, soa[2], V{7, 8, 9})
+	testing.expect_value(t, soa[3], V{})
+
+	back: [2]V
+	testing.expect_value(t, copy(back[:], soa), 2)
+	testing.expect_value(t, back, [2]V{{1, 2, 3}, {4, 5, 6}})
+
+	other := make(#soa[]V, 2)
+	defer delete(other)
+	testing.expect_value(t, copy(other, soa[1:]), 2)
+	testing.expect_value(t, other[0], V{4, 5, 6})
+	testing.expect_value(t, other[1], V{7, 8, 9})
+
+	// Overlapping #soa slices are copied as if through a temporary
+	testing.expect_value(t, copy(soa[1:], soa[:3]), 3)
+	testing.expect_value(t, soa[1], V{1, 2, 3})
+	testing.expect_value(t, soa[3], V{7, 8, 9})
+
+	lanes: #soa[dynamic; 4][3]f32
+	resize(&lanes, 2)
+	testing.expect_value(t, copy(lanes[:], [][3]f32{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}), 2)
+	testing.expect_value(t, lanes[1], [3]f32{4, 5, 6})
+
+	empty: #soa[]V
+	testing.expect_value(t, copy(empty, aos), 0)
+	testing.expect_value(t, copy(aos, empty), 0)
+}
+
 // `#soa[dynamic; N]T` holds its elements inline like `#soa[N]T`, with a length like `[dynamic; N]T`
 @(test)
 test_soa_fixed_capacity_dynamic_array :: proc(t: ^testing.T) {

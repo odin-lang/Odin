@@ -235,6 +235,54 @@ _soa_zero :: proc "contextless" (s: $S/#soa[]$E, from, count: int) {
 	}
 }
 
+// `copy_soa` is a built-in procedure that copies elements from a source #soa slice `src` to a destination #soa slice `dst`.
+// The source and destination may overlap. Copy returns the number of elements copied, which will be the minimum
+// of len(src) and len(dst).
+//
+// Prefer the procedure group `copy`.
+@builtin
+copy_soa :: proc "contextless" (dst, src: $S/#soa[]$E) -> int {
+	n := min(len(dst), len(src))
+	if n <= 0 {
+		return 0
+	}
+	dst, src := dst, src
+	dst_columns := ([^][^]byte)(&dst)
+	src_columns := ([^][^]byte)(&src)
+	for size, i in intrinsics.type_soa_field_sizes(S) {
+		mem_copy(dst_columns[i], src_columns[i], n*size)
+	}
+	return n
+}
+
+// `copy_soa_from_slice` is a built-in procedure that copies elements from a source slice `src` to a destination #soa slice `dst`.
+// The source and destination must not overlap. Copy returns the number of elements copied, which will be the minimum
+// of len(src) and len(dst).
+//
+// Prefer the procedure group `copy`.
+@builtin
+copy_soa_from_slice :: proc "contextless" (dst: $S/#soa[]$E, src: []E) -> int #no_bounds_check {
+	n := min(len(dst), len(src))
+	for i in 0..<n {
+		dst[i] = src[i]
+	}
+	return n
+}
+
+// `copy_slice_from_soa` is a built-in procedure that copies elements from a source #soa slice `src` to a destination slice `dst`.
+// The source and destination must not overlap. Copy returns the number of elements copied, which will be the minimum
+// of len(src) and len(dst).
+//
+// Prefer the procedure group `copy`.
+@builtin
+copy_slice_from_soa :: proc "contextless" (dst: []$E, src: $S/#soa[]E) -> int #no_bounds_check {
+	n := min(len(dst), len(src))
+	for i in 0..<n {
+		dst[i] = src[i]
+	}
+	return n
+}
+
 // NOTE(bill): Columns starting a multiple of 4 KiB apart, as power-of-two capacities make them, evict each other from the L1 cache.
 // A column starting within 128 bytes of an earlier one, modulo 4 KiB, moves forward to a 128-byte boundary that does not.
 // 128 bytes also covers the cache lines of Apple Silicon.
