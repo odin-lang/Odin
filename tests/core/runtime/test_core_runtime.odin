@@ -531,6 +531,37 @@ test_soa_fixed_capacity_dynamic_array :: proc(t: ^testing.T) {
 	testing.expect_value(t, total_x, 4)
 }
 
+// Ranging over a field of `#soa[dynamic; N]T` stops at its length, as ranging over the array does
+@(test)
+test_soa_fixed_capacity_field_range :: proc(t: ^testing.T) {
+	V :: struct {x: f32, y: u8}
+	array := #soa[dynamic; 8]V{{1, 1}, {2, 2}, {3, 3}}
+
+	count := 0
+	for _ in array.x {
+		count += 1
+	}
+	testing.expect_value(t, count, 3)
+
+	last: f32
+	#reverse for v in array.x {
+		last = v
+	}
+	testing.expect_value(t, last, 1)
+
+	p := &array
+	for &v in p.y {
+		v += 10
+	}
+	testing.expect_value(t, array.y[2], 13)
+
+	count = 0
+	#unroll(2) for _ in array.x {
+		count += 1
+	}
+	testing.expect_value(t, count, 3)
+}
+
 @(test)
 test_soa_make_len :: proc(t: ^testing.T) {
 

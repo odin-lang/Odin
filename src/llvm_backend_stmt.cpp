@@ -450,7 +450,9 @@ gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_
 	}
 	switch (expr_type->kind) {
 	case Type_Array:
-		count = lb_const_int(m, t_int, expr_type->Array.count);
+		if (count_ptr.value == nullptr) {
+			count = lb_const_int(m, t_int, expr_type->Array.count);
+		}
 		break;
 	}
 
@@ -1523,9 +1525,15 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 				break;
 			}
 
-			lbAddr count_ptr = lb_add_local_generated(p, t_int, false);
-			lb_addr_store(p, count_ptr, lb_const_int(p->module, t_int, et->Array.count));
-			lb_build_range_indexed(p, array, val0_type, count_ptr.addr, &val, &key, &loop, &done, rs->reverse, 0, soa_elem);
+			// NOTE(bill): A field of `#soa[dynamic; N]T` is ranged over up to its length, not all `N` elements.
+			// Other arrays range over their constant length.
+			lbValue count_ptr = {};
+			lbValue soa_len = lb_soa_field_len(p, expr);
+			if (soa_len.value != nullptr && !lb_is_const(soa_len)) {
+				count_ptr = lb_add_local_generated(p, t_int, false).addr;
+				lb_emit_store(p, count_ptr, soa_len);
+			}
+			lb_build_range_indexed(p, array, val0_type, count_ptr, &val, &key, &loop, &done, rs->reverse, 0, soa_elem);
 			break;
 		}
 		case Type_EnumeratedArray: {
@@ -1892,8 +1900,12 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 
 			case Type_Array: {
 				lbValue array = lb_build_expr(p, expr);
+				lbValue count = lb_soa_field_len(p, expr);
+				if (count.value == nullptr) {
+					count = lb_const_int(p->module, t_int, t->Array.count);
+				}
 				count_ptr = lb_add_local_generated(p, t_int, false).addr;
-				lb_emit_store(p, count_ptr, lb_const_int(p->module, t_int, t->Array.count));
+				lb_emit_store(p, count_ptr, count);
 
 				if (!is_type_pointer(array.type)) {
 					array = lb_address_from_load_or_generate_local(p, array);

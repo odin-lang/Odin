@@ -930,6 +930,16 @@ gb_internal void error_var_decl_identifier(Ast *name) {
 	}
 }
 
+// Whether `expr` selects a field of `#soa[dynamic; N]T`, whose length is only known at run time
+gb_internal bool is_soa_fixed_capacity_dynamic_field(Ast *expr) {
+	expr = unparen_expr(expr);
+	if (expr == nullptr || expr->kind != Ast_SelectorExpr) {
+		return false;
+	}
+	Type *t = base_type(type_deref(type_of_expr(expr->SelectorExpr.expr)));
+	return is_type_soa_struct(t) && t->Struct.soa_kind == StructSoa_FixedCapacityDynamic;
+}
+
 gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	ast_node(irs, UnrollRangeStmt, node);
 	check_open_scope(ctx, node);
@@ -1032,6 +1042,9 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 				}
 				break;
 			case Type_Array:
+				if (unroll_count <= 0 && is_soa_fixed_capacity_dynamic_field(operand.expr)) {
+					break;
+				}
 				val0 = t->Array.elem;
 				val1 = t_int;
 				inline_for_depth = unroll_count > 0 ? exact_value_i64(unroll_count) : exact_value_i64(t->Array.count);
@@ -1077,7 +1090,8 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 			defer (gb_string_free(t));
 			error(operand.expr, "Cannot iterate over '%s' of type '%s' in an '#unroll for' statement", s, t);
 
-			if (is_type_slice(operand.type) || is_type_dynamic_array(operand.type) || is_type_fixed_capacity_dynamic_array(operand.type)) {
+			if (is_type_slice(operand.type) || is_type_dynamic_array(operand.type) || is_type_fixed_capacity_dynamic_array(operand.type) ||
+			    is_soa_fixed_capacity_dynamic_field(operand.expr)) {
 				error_line("\tSuggestion: An unroll count `#unroll(N)` must be specified with an array of a runtime-known length\n");
 			}
 
