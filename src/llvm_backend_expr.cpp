@@ -4387,7 +4387,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 		GB_ASSERT(t->kind == Type_Map);
 		ast_node(ie, IndexExpr, ue_expr);
 
-		lbValue map_val = lb_build_addr_ptr(p, ie->expr);
+		lbValue map_val = lb_addr_get_ptr_or_zero(p, lb_build_addr(p, ie->expr));
 		if (deref) {
 			map_val = lb_emit_load(p, map_val);
 		}
@@ -4417,7 +4417,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 			return lb_soa_variable_make_pointer(p, lb_get_soa_variable_addr(p, e));
 		}
 		ast_node(ie, IndexExpr, ue_expr);
-		lbValue addr = lb_build_addr_ptr(p, ie->expr);
+		lbValue addr = lb_addr_get_ptr_or_zero(p, lb_build_addr(p, ie->expr));
 
 		if (is_type_pointer(type_deref(addr.type))) {
 			addr = lb_emit_load(p, addr);
@@ -5368,7 +5368,7 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 	t = base_type(type_deref(t));
 	if (is_type_soa_struct(t)) {
 		// SOA STRUCTURES!!!!
-		lbValue val = lb_build_addr_ptr(p, ie->expr);
+		lbValue val = lb_addr_get_ptr_or_zero(p, lb_build_addr(p, ie->expr));
 		if (deref) {
 			val = lb_emit_load(p, val);
 		}
@@ -5427,7 +5427,7 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		key = lb_emit_conv(p, key, t->Map.key);
 
 		Type *result_type = type_of_expr(expr);
-		lbValue map_ptr = lb_addr_get_ptr(p, map_addr);
+		lbValue map_ptr = lb_addr_get_ptr_or_zero(p, map_addr);
 		if (is_type_pointer(type_deref(map_ptr.type))) {
 			map_ptr = lb_emit_load(p, map_ptr);
 		}
@@ -5460,7 +5460,7 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 			array_addr = lb_addr(lb_address_from_load_or_generate_local(p, lb_addr_load(p, array_addr)));
 			break;
 		}
-		lbValue array = lb_addr_get_ptr(p, array_addr);
+		lbValue array = lb_addr_get_ptr_or_zero(p, array_addr);
 		if (deref) {
 			array = lb_emit_load(p, array);
 		}
@@ -5478,7 +5478,7 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 
 	case Type_FixedCapacityDynamicArray: {
 		lbValue array = {};
-		array = lb_build_addr_ptr(p, ie->expr);
+		array = lb_addr_get_ptr_or_zero(p, lb_build_addr(p, ie->expr));
 		if (deref) {
 			array = lb_emit_load(p, array);
 		}
@@ -5497,7 +5497,7 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 
 	case Type_EnumeratedArray: {
 		lbValue array = {};
-		array = lb_build_addr_ptr(p, ie->expr);
+		array = lb_addr_get_ptr_or_zero(p, lb_build_addr(p, ie->expr));
 		if (deref) {
 			array = lb_emit_load(p, array);
 		}
@@ -5581,7 +5581,7 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 
 	case Type_Matrix: {
 		lbValue matrix = {};
-		matrix = lb_build_addr_ptr(p, ie->expr);
+		matrix = lb_addr_get_ptr_or_zero(p, lb_build_addr(p, ie->expr));
 		if (deref) {
 			matrix = lb_emit_load(p, matrix);
 		}
@@ -6968,7 +6968,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 						return lb_addr_swizzle_large(addr.addr, type, indices);
 					}
 					}
-					a = lb_addr_get_ptr(p, addr);
+					a = lb_addr_get_ptr_or_zero(p, addr);
 				}
 
 				Type *type = type_deref(expr->tav.type);
@@ -7010,7 +7010,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				Selection sub_sel = sel;
 				sub_sel.index.count -= 1;
 
-				lbValue ptr = lb_addr_get_ptr(p, addr);
+				lbValue ptr = lb_addr_get_ptr_or_zero(p, addr);
 				if (sub_sel.index.count > 0) {
 					ptr = lb_emit_deep_field_gep(p, ptr, sub_sel);
 				}
@@ -7163,7 +7163,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 		t = base_type(type_deref(t));
 
 		lbValue m = {};
-		m = lb_build_addr_ptr(p, ie->expr);
+		m = lb_addr_get_ptr_or_zero(p, lb_build_addr(p, ie->expr));
 		if (deref) {
 			m = lb_emit_load(p, m);
 		}

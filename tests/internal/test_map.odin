@@ -540,6 +540,117 @@ map_range_over_map_index :: proc(t: ^testing.T) {
 }
 
 @test
+map_index_into_map_index :: proc(t: ^testing.T) {
+	i := 1
+	{
+		m: map[int][2]string
+		defer delete(m)
+		testing.expect_value(t, m[2][1], "")
+		testing.expect_value(t, m[2][i], "")
+		m[2] = {"a", "b"}
+		testing.expect_value(t, m[2][1], "b")
+		testing.expect_value(t, m[2][i], "b")
+		testing.expect_value(t, m[3][i], "")
+	}
+	{
+		Side :: enum { Engine, Bridge }
+		m: map[int][Side]string
+		defer delete(m)
+		testing.expect_value(t, m[2][.Bridge], "")
+		m[2] = {.Engine = "e", .Bridge = "b"}
+		testing.expect_value(t, m[2][.Bridge], "b")
+	}
+	{
+		S :: struct { a: int, b: [3]string }
+		m: map[int]S
+		defer delete(m)
+		testing.expect_value(t, m[2].a, 0)
+		testing.expect_value(t, m[2].b[i], "")
+		m[2] = {a = 1, b = {"x", "y", "z"}}
+		testing.expect_value(t, m[2].a, 1)
+		testing.expect_value(t, m[2].b[i], "y")
+	}
+	{
+		m: map[int][2][3]int
+		defer delete(m)
+		testing.expect_value(t, m[2][1][2], 0)
+		testing.expect_value(t, m[2][i][i], 0)
+		m[2] = {{1, 2, 3}, {4, 5, 6}}
+		testing.expect_value(t, m[2][1][2], 6)
+		testing.expect_value(t, m[2][i][i], 5)
+	}
+	{
+		m: map[int]matrix[2, 2]f32
+		defer delete(m)
+		testing.expect_value(t, m[2][1, 0], 0)
+		testing.expect_value(t, m[2][1][0], 0)
+		m[2] = {1, 2, 3, 4}
+		testing.expect_value(t, m[2][1, 0], 3)
+		testing.expect_value(t, m[2][1][0], 2)
+	}
+	{
+		m: map[int][3]f32
+		defer delete(m)
+		testing.expect_value(t, m[2].x, 0)
+		testing.expect_value(t, m[2].zy, [2]f32{})
+		m[2] = {1, 2, 3}
+		testing.expect_value(t, m[2].x, 1)
+		testing.expect_value(t, m[2].zy, [2]f32{3, 2})
+	}
+	{
+		BF :: bit_field u16 { x: u8 | 4, y: u8 | 4 }
+		m: map[int]BF
+		defer delete(m)
+		testing.expect_value(t, m[2].y, 0)
+		m[2] = {x = 1, y = 2}
+		testing.expect_value(t, m[2].y, 2)
+	}
+	{
+		S :: struct { a, b: int }
+		m: map[int]#soa[4]S
+		defer delete(m)
+		testing.expect_value(t, m[2][1].b, 0)
+		testing.expect_value(t, m[2][i].b, 0)
+		v: #soa[4]S
+		v[1] = {3, 4}
+		m[2] = v
+		testing.expect_value(t, m[2][1].b, 4)
+		testing.expect_value(t, m[2][i].b, 4)
+	}
+	{
+		m: map[int][dynamic; 4]int
+		defer delete(m)
+		testing.expect_value(t, len(m[2]), 0)
+		m[2] = {7, 8}
+		testing.expect_value(t, m[2][i], 8)
+	}
+	{
+		m: map[int]map[int]int
+		defer {
+			for _, inner in m {
+				delete(inner)
+			}
+			delete(m)
+		}
+		testing.expect_value(t, m[1][2], 0)
+		testing.expect(t, &m[1][2] == nil)
+		m[1] = {}
+		inner := &m[1]
+		inner[2] = 3
+		testing.expect_value(t, m[1][2], 3)
+		testing.expect_value(t, m[9][2], 0)
+	}
+	{
+		mm: map[int][2]string
+		defer delete(mm)
+		m := &mm
+		testing.expect_value(t, m[2][1], "")
+		m[2] = {"a", "b"}
+		testing.expect_value(t, m[2][1], "b")
+	}
+}
+
+@test
 map_reserve_negative :: proc(t: ^testing.T) {
 	m: map[int]int
 	err_reserve := reserve_map(&m, -10)
