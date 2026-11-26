@@ -734,6 +734,52 @@ test_sort_integers :: proc(t: ^testing.T) {
 	check(t, u128)
 }
 
+// Long ascending and descending runs, the descending ones with an equal pair every 64 items: a comparator sort merges
+// the natural runs, and only a strictly descending run may be reversed, or equal keys would swap.
+@test
+test_sort_runs_stable :: proc(t: ^testing.T) {
+	for n in ([?]int{5000, 40000, 200000}) {
+		items := make([]Sort_Item, n)
+		defer delete(items)
+
+		check :: proc(t: ^testing.T, items: []Sort_Item, api: string) -> bool {
+			for i in 1..<len(items) {
+				a, b := items[i-1], items[i]
+				if a.key > b.key || a.key == b.key && a.index > b.index {
+					return testing.expectf(t, false, "%s, n = %d: out of order at %d", api, len(items), i)
+				}
+			}
+			return true
+		}
+		fill :: proc(items: []Sort_Item) {
+			start, run := 0, 0
+			for start < len(items) {
+				length := 200 + (run*97) % 600
+				for j in 0..<min(length, len(items)-start) {
+					key := i64(j) if run % 2 == 0 else i64(2*(length - j))
+					if run % 2 == 1 && j % 64 == 63 {
+						key = items[start+j-1].key
+					}
+					items[start+j] = {key, i64(start + j)}
+				}
+				start += length
+				run   += 1
+			}
+		}
+
+		fill(items)
+		slice.sort_by(items, proc(a, b: Sort_Item) -> bool { return a.key < b.key })
+		if !check(t, items, "sort_by") {
+			return
+		}
+		fill(items)
+		slice.sort_by_cmp(items, proc(a, b: Sort_Item) -> slice.Ordering { return slice.cmp(a.key, b.key) })
+		if !check(t, items, "sort_by_cmp") {
+			return
+		}
+	}
+}
+
 @test
 test_reverse_sorts :: proc(t: ^testing.T) {
 	rand.reset(t.seed)

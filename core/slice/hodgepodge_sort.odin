@@ -85,6 +85,7 @@ HODGEPODGE_NETWORK_BYTES    :: 16
 HODGEPODGE_PARTITION_BLOCKS :: 4096
 HODGEPODGE_PARTITION_HALVES :: 4
 HODGEPODGE_RADIX_SMALL      :: 64
+HODGEPODGE_RUN_MIN          :: 32
 HODGEPODGE_RADIX_FEW        :: 4
 HODGEPODGE_RADIX_FEW_LANES  :: 32
 HODGEPODGE_RADIX_FEW_BYTES  :: 1 << 20
@@ -1176,6 +1177,93 @@ hodgepodge_quadsort :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_c
 	}
 }
 
+// The end of the natural run at `start`: non-descending, or strictly descending and then reversed.
+@(require_results)
+hodgepodge_natural_run :: proc(a: []$E, start: int, call: $P, $KIND: Sort_Kind) -> int #no_bounds_check {
+	n   := len(a)
+	end := start + 1
+	if end == n {
+		return end
+	}
+	if hodgepodge_greater(a[start], a[end], call, KIND) {
+		for end < n-1 && hodgepodge_greater(a[end], a[end+1], call, KIND) {
+			end += 1
+		}
+		hodgepodge_reverse(a[start:end+1])
+	} else {
+		for end < n-1 && !hodgepodge_greater(a[end], a[end+1], call, KIND) {
+			end += 1
+		}
+	}
+	return end + 1
+}
+
+// Merges the natural runs of `a` in the order of Powersort (Munro and Wild, "Nearly-Optimal Mergesorts: Fast, Practical
+// Sorting Methods That Optimally Adapt to Existing Runs", 2018): a boundary between two runs merges before any of
+// higher power. A stretch of runs shorter than HODGEPODGE_RUN_MIN is quadsorted as one run.
+hodgepodge_power_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+	// The first bit in which the midpoints of runs [s1, s1+n1) and [s1+n1, s1+n1+n2) differ, as fractions of n.
+	power :: proc "contextless" (s1, n1, n2, n: int) -> int {
+		x := u64((u128(2*s1 + n1) << 63) / u128(n))
+		y := u64((u128(2*s1 + 2*n1 + n2) << 63) / u128(n))
+		return int(intrinsics.count_leading_zeros(x ~ y))
+	}
+
+	// A long run found while scanning a stretch is kept in `ahead`, so it is not scanned twice.
+	next_run :: proc(a, s: []$E, start: int, ahead: ^int, call: $P, $KIND: Sort_Kind) -> int {
+		if ahead^ > start {
+			return ahead^
+		}
+		end := hodgepodge_natural_run(a, start, call, KIND)
+		if end-start >= HODGEPODGE_RUN_MIN {
+			return end
+		}
+		stretch := end
+		for stretch < len(a) {
+			run_end := hodgepodge_natural_run(a, stretch, call, KIND)
+			if run_end-stretch >= HODGEPODGE_RUN_MIN {
+				ahead^ = run_end
+				break
+			}
+			stretch = run_end
+		}
+		hodgepodge_quadsort(a[start:stretch], s, call, KIND)
+		return stretch
+	}
+
+	Run :: struct {
+		start, end, power: int,
+	}
+
+	// Powers on the stack strictly increase, and there are 64 of them.
+	stack: [64]Run
+	top       := 0
+	n         := len(a)
+	ahead     := 0
+	run_start := 0
+	run_end   := next_run(a, s, 0, &ahead, call, KIND)
+	for {
+		// Past the last run, everything left on the stack merges.
+		next_end, power_here := n, -1
+		if run_end < n {
+			next_end   = next_run(a, s, run_end, &ahead, call, KIND)
+			power_here = power(run_start, run_end-run_start, next_end-run_end, n)
+		}
+		for top > 0 && stack[top-1].power > power_here {
+			top -= 1
+			left := stack[top]
+			hodgepodge_rotate_merge_block(a[left.start:run_end], s, left.end-left.start, run_end-left.end, call, KIND)
+			run_start = left.start
+		}
+		if run_end == n {
+			return
+		}
+		stack[top] = {run_start, run_end, power_here}
+		top += 1
+		run_start, run_end = run_end, next_end
+	}
+}
+
 @(require_results)
 hodgepodge_binary_median :: proc(pa, pb: []$E, length: int, call: $P, $KIND: Sort_Kind) -> E #no_bounds_check {
 	a := 0
@@ -1652,6 +1740,10 @@ hodgepodge_analyze :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_ch
 	// Integers in their own order take a radix sort where a partition would go. Single bytes need one
 	// counting pass, which beats any use of the order already there.
 	RADIX :: (KIND == .Ordered || KIND == .Ordered_Reverse) && intrinsics.type_is_integer(E) && intrinsics.type_is_endian_platform(E)
+	// Where a comparison is a call, not a few inlined instructions, a quarter with order in it merges its natural runs
+	// instead of being sorted in fixed blocks: fewer comparisons, and merges that follow the data.
+	CHEAP :: (KIND == .Ordered || KIND == .Ordered_Reverse) && !intrinsics.type_is_string(E) ||
+	         KIND == .Less_Constant || KIND == .Less_Reverse_Constant || KIND == .Cmp_Constant || KIND == .Cmp_Reverse_Constant
 	when RADIX && size_of(E) == 1 {
 		hodgepodge_radix_sort(a, s, call, KIND)
 		return
@@ -1777,7 +1869,11 @@ hodgepodge_analyze :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_ch
 			unordered_from = -1
 		}
 		if k < 4 && balance[k] != 0 {
-			hodgepodge_quadsort(a[bounds[k]:bounds[k+1]], s, call, KIND)
+			when CHEAP {
+				hodgepodge_quadsort(a[bounds[k]:bounds[k+1]], s, call, KIND)
+			} else {
+				hodgepodge_power_merge(a[bounds[k]:bounds[k+1]], s, call, KIND)
+			}
 		}
 	}
 
