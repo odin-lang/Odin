@@ -1311,6 +1311,91 @@ test_memory_compare_empty :: proc(t: ^testing.T) {
 	testing.expect_value(t, runtime.memory_compare(&data[0], nil, 0), 0)
 }
 
+// The first differing byte decides, even when a later one differs the other way: in the same vector,
+// the same eight-byte chunk, or the overlapping last chunk.
+@(test)
+test_memory_compare_first_difference :: proc(t: ^testing.T) {
+	data: [128]u8
+	cmp:  [128]u8
+
+	for n in 1..=100 {
+		for first in 0..<n {
+			for later in first+1..<n {
+				slice.fill(data[:n], 0x40)
+				slice.fill(cmp[:n], 0x40)
+				data[first], cmp[first] = 0x7F, 0x80
+				data[later], cmp[later] = 0xFF, 0x00
+				if !testing.expectf(t, runtime.memory_compare(&data[0], &cmp[0], n) == -1, "n = %d, first = %d, later = %d", n, first, later) ||
+				   !testing.expectf(t, runtime.memory_compare(&cmp[0], &data[0], n) == +1, "n = %d, first = %d, later = %d", n, first, later) {
+					return
+				}
+			}
+		}
+	}
+}
+
+// The first differing byte decides, whichever eight-byte chunk it falls in, and a string that is a prefix
+// of the other comes first.
+@(test)
+test_string_cmp :: proc(t: ^testing.T) {
+	reference :: proc(a, b: string) -> int {
+		for i in 0..<min(len(a), len(b)) {
+			if a[i] != b[i] {
+				return -1 if a[i] < b[i] else +1
+			}
+		}
+		return -1 if len(a) < len(b) else +1 if len(a) > len(b) else 0
+	}
+
+	data: [80]u8
+	cmp:  [80]u8
+	for i in 0..<len(data) {
+		data[i] = u8(i*7 + 0x41)
+		cmp[i]  = data[i]
+	}
+	for la in 0..=72 {
+		for lb in max(la-2, 0)..=min(la+2, 72) {
+			for diff in -1..<min(la, lb) {
+				if diff >= 0 {
+					cmp[diff] ~= 0x80
+				}
+				a, b := string(data[:la]), string(cmp[:lb])
+				ok := testing.expectf(t, runtime.string_cmp(a, b) == reference(a, b), "len %d and %d, first difference %d", la, lb, diff) &&
+				      testing.expectf(t, runtime.string_cmp(b, a) == reference(b, a), "len %d and %d, first difference %d", lb, la, diff)
+				if diff >= 0 {
+					cmp[diff] ~= 0x80
+				}
+				if !ok {
+					return
+				}
+			}
+		}
+	}
+}
+
+@(test)
+test_memory_prefix_length :: proc(t: ^testing.T) {
+	data: [256]u8
+	cmp:  [256]u8
+
+	for offset in 0..<64 {
+		subdata := data[offset:]
+		subcmp  := cmp[offset:]
+		for n in 0..=100 {
+			if !testing.expect_value(t, runtime.memory_prefix_length(&subdata[0], &subcmp[0], n), n) {
+				return
+			}
+			for idx in 0..<n {
+				subcmp[idx] = 0xFF
+				if !testing.expect_value(t, runtime.memory_prefix_length(&subdata[0], &subcmp[0], n), idx) {
+					return
+				}
+				subcmp[idx] = 0
+			}
+		}
+	}
+}
+
 @(test)
 test_memory_compare_zero :: proc(t: ^testing.T) {
 	data: [256]u8
