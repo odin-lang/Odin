@@ -599,6 +599,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		u8 swizzle_count; /*maximum of 4 components, if set, count >= 2*/ \
 		u8 swizzle_indices; /*2 bits per component*/ \
 		bool is_bit_field; \
+		bool is_soa_column; \
 	}) \
 	AST_KIND(ImplicitSelectorExpr, "implicit selector expression",    struct { Token token; Ast *selector; }) \
 	AST_KIND(SelectorCallExpr, "selector call expression", struct { \

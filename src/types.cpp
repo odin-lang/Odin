@@ -2088,6 +2088,29 @@ gb_internal bool soa_has_inline_fields(Type *t) {
 	return t->Struct.soa_kind == StructSoa_Fixed || t->Struct.soa_kind == StructSoa_FixedCapacityDynamic;
 }
 
+// The type of a column of an #soa array other than `#soa[N]T`: a slice of its `len` elements, made from its pointer or inline array
+gb_internal Type *soa_column_slice_type(Type *column_type) {
+	Type *column = base_type(column_type);
+	if (column->kind == Type_Array) {
+		return alloc_type_slice(column->Array.elem);
+	}
+	GB_ASSERT(column->kind == Type_MultiPointer);
+	return alloc_type_slice(column->MultiPointer.elem);
+}
+
+// A column reached through `using` is a slice of its `len` elements, as `s.x` is
+gb_internal Type *soa_using_column_type(Type *parent_type, Type *field_type) {
+	Type *soa = base_type(type_deref(parent_type));
+	if (soa == nullptr || !is_type_soa_struct(soa) || soa->Struct.soa_kind == StructSoa_Fixed) {
+		return nullptr;
+	}
+	Type *field = base_type(field_type);
+	if (field->kind != Type_MultiPointer && field->kind != Type_Array) {
+		return nullptr;
+	}
+	return soa_column_slice_type(field);
+}
+
 gb_internal bool is_type_soa_dynamic_array(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }

@@ -45,6 +45,8 @@ set ODIN_FULL=%CD%\..\..\..\odin.exe
 %ODIN% check "..\test_issue_soa_no_rtti" -target:freestanding_amd64_sysv -no-rtti -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_soa_field_unroll" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_soa_of_soa" %COMMON% 2>&1 | find /c "Error:" | findstr /x "8" || exit /b
+%ODIN% check "..\test_issue_soa_column_not_addressable" %COMMON% 2>&1 | find /c "value is not addressable" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_soa_column_escape" %COMMON% 2>&1 | find /c "It is unsafe to return" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_7199" %COMMON% 2>&1 | find /c "..19988 chars.." | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_7260" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_7304" %COMMON% 2>&1 | find /c "9223372036854775808 is not representable by int" | findstr /x "1" || exit /b

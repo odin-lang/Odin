@@ -2148,6 +2148,22 @@ gb_internal Type *check_in_progress_type_alias(CheckerContext *c, Entity *e) {
 	return t;
 }
 
+// Whether `e` is a column of `#soa[dynamic; N]T` reached through `using` on a value, which is not addressable
+gb_internal bool is_soa_inline_column_of_value(Entity *e) {
+	if ((e->flags & EntityFlag_Using) == 0 || e->using_parent == nullptr) {
+		return false;
+	}
+	if (!is_type_slice(e->type)) {
+		return false;
+	}
+	Entity *parent = e->using_parent;
+	if ((parent->flags & EntityFlag_Value) == 0 || is_type_pointer(parent->type)) {
+		return false;
+	}
+	Type *soa = base_type(parent->type);
+	return is_type_soa_struct(soa) && soa->Struct.soa_kind == StructSoa_FixedCapacityDynamic;
+}
+
 gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Type *type_hint, bool allow_import_name) {
 	GB_ASSERT(n->kind == Ast_Ident);
 	o->mode = Addressing_Invalid;
@@ -2298,6 +2314,11 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		o->mode = Addressing_Variable;
 		if (e->flags & EntityFlag_Value) {
 			o->mode = Addressing_Value;
+		}
+		if (is_soa_inline_column_of_value(e)) {
+			error(o->expr, "Cannot take the column '%.*s' of an #soa array, value is not addressable", LIT(name));
+			o->mode = Addressing_Invalid;
+			o->type = t_invalid;
 		}
 		break;
 
@@ -6909,14 +6930,29 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		if (sel.is_bit_field) {
 			se->is_bit_field = true;
 		}
+		if (entity->flags & EntityFlag_SoaPtrField) {
+			// NOTE(bill): A column of an #soa array other than `#soa[N]T` is a slice of its `len` elements.
+			// The columns of `#soa[dynamic; N]T` are stored inline, so it must be addressable, as when it is sliced.
+			Type *column = base_type(entity->type);
+			if (column->kind == Type_Array && !sel.indirect && operand->mode != Addressing_Variable) {
+				gbString str = expr_to_string(node);
+				error(node, "Cannot take the column '%s' of an #soa array, value is not addressable", str);
+				gb_string_free(str);
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				break;
+			}
+			se->is_soa_column = true;
+			operand->type = soa_column_slice_type(entity->type);
+			operand->mode = Addressing_Value;
+			break;
+		}
 		if (sel.indirect) {
 			operand->mode = Addressing_Variable;
 		} else if (operand->mode == Addressing_Context) {
 			// Do nothing
 		} else if (operand->mode == Addressing_MapIndex) {
 			operand->mode = Addressing_Value;
-		} else if (entity->flags & EntityFlag_SoaPtrField) {
-			operand->mode = Addressing_SoaVariable;
 		} else if (operand->mode == Addressing_OptionalOk || operand->mode == Addressing_OptionalOkPtr) {
 			operand->mode = Addressing_Value;
 		} else if (operand->mode == Addressing_SoaVariable) {
@@ -10384,7 +10420,7 @@ gb_internal void check_expr_with_type_hint(CheckerContext *c, Operand *o, Ast *e
 	}
 }
 
-gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count, Type *original_type) {
+gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count) {
 	switch (t->kind) {
 	case Type_Basic:
 		if (t->Basic.kind == Basic_string) {
@@ -10511,15 +10547,6 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 			return true;
 		}
 		return false;
-	}
-
-	if (is_type_pointer(original_type) && indirection) {
-		Type *ptr = base_type(original_type);
-		if (ptr->kind == Type_MultiPointer && o->mode == Addressing_SoaVariable) {
-			o->type = ptr->MultiPointer.elem;
-			o->mode = Addressing_Value;
-			return true;
-		}
 	}
 
 	return false;
@@ -13435,7 +13462,7 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 	}
 
 	i64 max_count = -1;
-	bool valid = check_set_index_data(o, t, is_ptr, &max_count, o->type);
+	bool valid = check_set_index_data(o, t, is_ptr, &max_count);
 
 	if (is_const) {
 		if (is_type_array(t)) {

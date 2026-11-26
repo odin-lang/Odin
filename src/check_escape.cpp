@@ -3664,6 +3664,13 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 		if (Entity *g = escape_package_selector(expr)) {
 			return escape_ident_value(ea, g);
 		}
+		if (se->is_soa_column) {
+			// a column of `#soa[dynamic; N]T` is a slice of the array's own storage
+			Entity *column = entity_of_node(se->selector);
+			if (column != nullptr && is_type_array(column->type)) {
+				return escape_elems_at(ea, escape_addr(ea, expr), base_type(column->type));
+			}
+		}
 		EscapePath path = {};
 		if (!escape_selector_path(expr, &path)) {
 			break;

@@ -56,7 +56,7 @@ enum EntityFlag : u64 {
 
 	EntityFlag_ImplicitReference = 1ull<<19, // NOTE(bill): equivalent to `const &` in C++
 
-	EntityFlag_SoaPtrField   = 1ull<<20, // to allow s.x[0] where `s.x` is a pointer rather than a slice
+	EntityFlag_SoaPtrField   = 1ull<<20, // a column of `#soa[]T` or `#soa[dynamic]T`, or the value of a for-in loop over an #soa array
 
 	EntityFlag_ProcBodyChecked = 1ull<<21,
 
@@ -503,15 +503,24 @@ gb_internal Entity *alloc_entity_variable(Scope *scope, Token token, Type *type,
 	return entity;
 }
 
+gb_internal Type *soa_using_column_type(Type *parent_type, Type *field_type);
+
 gb_internal Entity *alloc_entity_using_variable(Entity *parent, Token token, Type *type, Ast *using_expr) {
 	GB_ASSERT(parent != nullptr);
 	token.pos = parent->token.pos;
+	Type *column_type = soa_using_column_type(parent->type, type);
+	if (column_type != nullptr) {
+		type = column_type;
+	}
 	Entity *entity = alloc_entity(Entity_Variable, parent->scope, token, type);
 	entity->using_parent = parent;
 	entity->parent_proc_decl.store(parent->parent_proc_decl, std::memory_order_relaxed);
 	entity->using_expr = using_expr;
 	entity->flags |= EntityFlag_Using;
 	entity->flags |= EntityFlag_Used;
+	if (column_type != nullptr) {
+		entity->flags |= EntityFlag_Value;
+	}
 	entity->state = EntityState_Resolved;
 	return entity;
 }

@@ -463,7 +463,7 @@ test_soa_fixed_capacity_dynamic_array :: proc(t: ^testing.T) {
 	a: #soa[dynamic; 4]V
 	testing.expect_value(t, len(a), 0)
 	testing.expect_value(t, cap(a), 4)
-	testing.expect_value(t, typeid_of(type_of(a.x)), typeid_of([4]f32))
+	testing.expect_value(t, typeid_of(type_of(a.x)), typeid_of([]f32))
 
 	testing.expect_value(t, append(&a, V{1, 1}), 1)
 	testing.expect_value(t, append(&a, V{2, 2}, V{3, 3}, V{4, 4}, V{5, 5}), 3)

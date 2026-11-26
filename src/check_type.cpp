@@ -4801,7 +4801,7 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 			t->Struct.fields[i] = new_field;
 			add_entity(scope, new_field);
 			new_field->flags |= EntityFlag_Used;
-			if (!soa_has_inline_fields(t)) {
+			if (t->Struct.soa_kind != StructSoa_Fixed) {
 				new_field->flags |= EntityFlag_SoaPtrField;
 			}
 		} else {
@@ -4938,7 +4938,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 			soa_struct->Struct.fields[i] = new_field;
 			add_entity(ctx, scope, nullptr, new_field);
 			add_entity_use(ctx, nullptr, new_field);
-			if (!soa_has_inline_fields(soa_struct)) {
+			if (soa_struct->Struct.soa_kind != StructSoa_Fixed) {
 				new_field->flags |= EntityFlag_SoaPtrField;
 			}
 		}
@@ -4970,7 +4970,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 					soa_struct->Struct.fields[i] = new_field;
 					add_entity(ctx, scope, nullptr, new_field);
 					add_entity_use(ctx, nullptr, new_field);
-					if (!soa_has_inline_fields(soa_struct)) {
+					if (soa_struct->Struct.soa_kind != StructSoa_Fixed) {
 						new_field->flags |= EntityFlag_SoaPtrField;
 					}
 				} else {

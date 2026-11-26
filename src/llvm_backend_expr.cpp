@@ -4627,6 +4627,8 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 	return lb_build_addr_ptr(p, ue->expr);
 }
 
+gb_internal lbValue lb_soa_column(lbProcedure *p, lbValue parent, Selection const &sel, Type *slice_type);
+gb_internal lbValue lb_build_soa_column(lbProcedure *p, Ast *expr);
 gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr);
 gb_internal lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	u16 prev_state_flags = p->state_flags;
@@ -4771,6 +4773,9 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	case_ast_node(se, SelectorExpr, expr);
 		TypeAndValue tav = type_and_value_of_expr(expr);
 		GB_ASSERT(tav.mode != Addressing_Invalid);
+		if (se->is_soa_column) {
+			return lb_build_soa_column(p, expr);
+		}
 		return lb_addr_load(p, lb_build_addr(p, expr));
 	case_end;
 
@@ -5065,7 +5070,12 @@ gb_internal lbValue lb_get_using_variable(lbProcedure *p, Entity *e) {
 	}
 	GB_ASSERT(v.value != nullptr);
 	GB_ASSERT_MSG(is_soa || parent->type == type_deref(v.type), "%s %s", type_to_string(parent->type), type_to_string(v.type));
-	lbValue ptr = lb_emit_deep_field_gep(p, v, sel);
+	lbValue ptr = {};
+	if ((sel.entity->flags & EntityFlag_SoaPtrField) != 0 && is_type_slice(e->type)) {
+		ptr = lb_address_from_load_or_generate_local(p, lb_soa_column(p, v, sel, e->type));
+	} else {
+		ptr = lb_emit_deep_field_gep(p, v, sel);
+	}
 	if (parent->scope) {
 		if ((parent->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
 			lb_add_debug_local_variable(p, ptr.value, e->type, e->token);
@@ -5361,27 +5371,41 @@ gb_internal lbAddr lb_build_addr_soa_elem_index(lbProcedure *p, Ast *expr, lbAdd
 	return lb_addr_soa_field_elem(lb_soa_array_component_elem_ptr(p, soa_addr.addr, index, soa_addr.soa.index, component_count));
 }
 
-gb_internal lbValue lb_soa_field_len(lbProcedure *p, Ast *expr) {
-	Ast *se_expr = unparen_expr(expr);
-	if (se_expr->kind != Ast_SelectorExpr) {
-		return {};
+// `parent` points to what the column is selected from, along `sel`
+gb_internal lbValue lb_soa_column(lbProcedure *p, lbValue parent, Selection const &sel, Type *slice_type) {
+	GB_ASSERT(sel.index.count > 0);
+	i32 column_index = sel.index[sel.index.count-1];
+
+	Selection soa_sel = sel;
+	soa_sel.index.count -= 1;
+
+	lbValue soa = parent;
+	if (soa_sel.index.count > 0) {
+		soa = lb_emit_deep_field_gep(p, soa, soa_sel);
 	}
-	Type *type = base_type(type_deref(type_of_expr(se_expr->SelectorExpr.expr)));
-	if (!is_type_soa_struct(type)) {
-		return {};
+	if (is_type_pointer(type_deref(soa.type))) {
+		soa = lb_emit_load(p, soa);
 	}
-	if (type->Struct.soa_kind == StructSoa_Fixed) {
-		return lb_const_int(p->module, t_int, type->Struct.soa_count);
+
+	lbValue column = lb_emit_struct_ep(p, soa, column_index);
+	lbValue data   = {};
+	if (soa_has_inline_fields(type_deref(soa.type))) {
+		data = lb_emit_array_epi(p, column, 0);
+	} else {
+		data = lb_emit_load(p, column);
 	}
-	lbAddr *found = map_get(&p->selector_addr, se_expr);
-	if (found == nullptr) {
-		return {};
-	}
-	lbValue parent = lb_addr_get_ptr(p, *found);
-	if (is_type_pointer(type_deref(parent.type))) {
-		parent = lb_emit_load(p, parent);
-	}
-	return lb_soa_struct_len(p, parent);
+	lbValue len = lb_soa_struct_len(p, soa);
+
+	lbAddr slice = lb_add_local_generated(p, slice_type, false);
+	lb_fill_slice(p, slice, data, len);
+	return lb_addr_load(p, slice);
+}
+
+gb_internal lbValue lb_build_soa_column(lbProcedure *p, Ast *expr) {
+	ast_node(se, SelectorExpr, expr);
+	Selection sel = lookup_field(type_of_expr(se->expr), unparen_expr(se->selector)->Ident.interned, false);
+	GB_ASSERT(sel.entity != nullptr);
+	return lb_soa_column(p, lb_build_addr_ptr(p, se->expr), sel, type_of_expr(expr));
 }
 
 gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
@@ -5401,33 +5425,6 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 
 		lbValue index = lb_build_expr(p, ie->index);
 		return lb_addr_soa_variable(val, index, ie->index);
-	}
-
-	// NOTE(bill): Through a pointer, the checker treats `p.x` as an ordinary variable, but it is still an #soa column.
-	bool soa_column = ie->expr->tav.mode == Addressing_SoaVariable;
-	Ast *column_expr = unparen_expr(ie->expr);
-	if (column_expr->kind == Ast_SelectorExpr) {
-		Entity *column = entity_of_node(column_expr->SelectorExpr.selector);
-		if (column != nullptr && (column->flags & EntityFlag_SoaPtrField) != 0) {
-			soa_column = true;
-		}
-	}
-
-	if (soa_column && is_type_multi_pointer(type_of_expr(ie->expr))) {
-		// soa.x[i], indexing one field's multipointer;
-		// the soa element of array type, soa[i][j] carries Addressing_SoaVariable too but has
-		// no multipointer to index; it is handled in the Type_Array case below
-		lbValue field = lb_build_expr(p, ie->expr);
-		lbValue index = lb_build_expr(p, ie->index);
-
-		lbValue len = lb_soa_field_len(p, ie->expr);
-		if (len.value != nullptr) {
-			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
-		}
-		lbValue val = lb_emit_ptr_offset(p, field, index);
-		// make sure it's ^T and not [^]T
-		val.type = alloc_type_multi_pointer_to_pointer(val.type);
-		return lb_addr(val);
 	}
 
 	GB_ASSERT_MSG(is_type_indexable(t), "%s %s", type_to_string(t), expr_to_string(expr));
@@ -5479,12 +5476,8 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		index = lb_emit_conv(p, index, t_int);
 		lbValue elem = lb_emit_array_ep(p, array, index);
 
-		// NOTE(bill): Only the first `len` elements of a field of `#soa[dynamic; N]T` are in use, not all `N`.
-		lbValue soa_len = lb_soa_field_len(p, ie->expr);
 		auto index_tv = type_and_value_of_expr(ie->index);
-		if (soa_len.value != nullptr && !lb_is_const(soa_len)) {
-			lb_emit_bounds_check(p, ast_token(ie->index), index, soa_len);
-		} else if (index_tv.mode != Addressing_Constant && !proven) {
+		if (index_tv.mode != Addressing_Constant && !proven) {
 			lbValue len = lb_const_int(p->module, t_int, t->Array.count);
 			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 		}
@@ -5837,14 +5830,10 @@ gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 		Type *elem_type = type->MultiPointer.elem;
 		Type *slice_type = alloc_type_slice(elem_type);
 
-		low = lb_emit_conv(p, low, t_int);
+		low  = lb_emit_conv(p, low,  t_int);
 		high = lb_emit_conv(p, high, t_int);
 
-		// NOTE(bill): A field of an #soa slice or dynamic array is sliced within the array's length.
-		lbValue soa_len = lb_soa_field_len(p, se->expr);
-		if (soa_len.value != nullptr) {
-			lb_emit_slice_bounds_check(p, se->open, low, high, soa_len, se->low != nullptr);
-		} else if (!proven) {
+		if (!proven) {
 			lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
 		}
 
@@ -5932,14 +5921,6 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 
 	case Type_MultiPointer: {
 		lbAddr res = lb_add_local_generated(p, type_of_expr(expr), false);
-		lbValue soa_len = lb_soa_field_len(p, se->expr);
-		if (soa_len.value != nullptr) {
-			if (high.value == nullptr) {
-				lb_emit_slice_bounds_check(p, se->open, low, soa_len, soa_len, true);
-			} else {
-				lb_emit_slice_bounds_check(p, se->open, low, high, soa_len, se->low != nullptr);
-			}
-		}
 		if (se->high == nullptr) {
 			lbValue offset = base;
 			LLVMValueRef indices[1] = {low.value};
@@ -5949,7 +5930,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 			low = lb_emit_conv(p, low, t_int);
 			high = lb_emit_conv(p, high, t_int);
 
-			if (!proven && soa_len.value == nullptr) {
+			if (!proven) {
 				lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
 			}
 
@@ -5969,23 +5950,12 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		Type *slice_type = alloc_type_slice(type->Array.elem);
 		lbValue len = lb_const_int(p->module, t_int, type->Array.count);
 
-		// NOTE(bill): A field of `#soa[dynamic; N]T` is sliced within its length, not all `N` elements.
-		lbValue soa_len = lb_soa_field_len(p, se->expr);
-		bool soa_dynamic = soa_len.value != nullptr && !lb_is_const(soa_len);
-		if (soa_dynamic) {
-			len = soa_len;
-		}
-
 		if (high.value == nullptr) high = len;
 
 		bool low_const  = type_and_value_of_expr(se->low).mode  == Addressing_Constant;
 		bool high_const = type_and_value_of_expr(se->high).mode == Addressing_Constant;
 
-		if (soa_dynamic) {
-			if (!no_indices) {
-				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
-			}
-		} else if (!low_const || !high_const) {
+		if (!low_const || !high_const) {
 			if (!no_indices && !proven) {
 				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 			}
@@ -6928,6 +6898,9 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(se, SelectorExpr, expr);
+		if (se->is_soa_column) {
+			return lb_addr(lb_address_from_load_or_generate_local(p, lb_build_soa_column(p, expr)));
+		}
 		Ast *sel_node = unparen_expr(se->selector);
 		if (sel_node->kind == Ast_Ident) {
 			InternedString selector = sel_node->Ident.interned;
@@ -7137,11 +7110,6 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 					lb_emit_soa_index_bounds_check(p, addr.addr, addr.swizzle_soa.index, addr.swizzle_soa.index_expr);
 					i32 field_index = addr.swizzle_soa.indices[sel.index[0]];
 					return lb_addr_soa_field_elem(lb_soa_field_elem_ptr(p, addr.addr, field_index, addr.swizzle_soa.index));
-				}
-
-				Type *atype = type_deref(lb_addr_type(addr));
-				if (is_type_soa_struct(atype)) {
-					map_set(&p->selector_addr, expr, addr);
 				}
 
 				lbValue a = lb_addr_get_ptr(p, addr);
