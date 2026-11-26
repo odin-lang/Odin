@@ -5656,6 +5656,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->type = t_invalid;
 			return false;
 		}
+		if (is_type_soa_struct(elem)) {
+			gbString str = type_to_string(elem);
+			error(call, "Invalid type for 'intrinsics.soa_struct', the element type cannot be an #soa type, got '%s'", str);
+			gb_string_free(str);
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+			return false;
+		}
 
 		operand->mode = Addressing_Type;
 		Type *soa_struct = nullptr;

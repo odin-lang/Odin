@@ -4856,6 +4856,12 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		gb_string_free(str);
 		return alloc_type_array(elem, count, generic_type);
 	}
+	if (is_type_soa_struct(elem)) {
+		gbString str = type_to_string(elem);
+		error(elem_expr, "Invalid type for an #soa array, the element type cannot be an #soa type, got '%s'", str);
+		gb_string_free(str);
+		return alloc_type_array(elem, count, generic_type);
+	}
 
 	// NOTE(bill): `#soa[$N]T` is polymorphic in its count, even when `T` is not.
 	if (generic_type != nullptr) {
