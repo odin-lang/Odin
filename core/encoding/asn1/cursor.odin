@@ -602,7 +602,7 @@ _unix_from_fields :: proc "contextless" (year: int, fields: []byte) -> (unix_sec
 		return 0, .Invalid_Time
 	}
 	days := _days_from_civil(i64(year), month, day)
-	return days * 86400 + i64(hour) * 3600 + i64(minute) * 60 + i64(second), .None
+	return days * dt.SECONDS_PER_DAY + i64(hour) * dt.SECONDS_PER_HOUR + i64(minute) * dt.SECONDS_PER_MINUTE + i64(second), .None
 }
 
 // Returns the number of days since 1970-01-01 for a proleptic-Gregorian date 

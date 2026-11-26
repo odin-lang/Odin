@@ -66,14 +66,14 @@ region_get_nearest :: proc(region: ^datetime.TZ_Region, tm: time.Time) -> (out: 
 @private
 month_to_seconds :: proc(month: int, is_leap: bool) -> i64 {
 	month_seconds := []i64{
-		0,             31 * 86_400,  59 * 86_400,  90 * 86_400,
-		120 * 86_400, 151 * 86_400, 181 * 86_400, 212 * 86_400,
-		243 * 86_400, 273 * 86_400, 304 * 86_400, 334 * 86_400,
+		0,                           31 * time.SECONDS_PER_DAY,  59 * time.SECONDS_PER_DAY,  90 * time.SECONDS_PER_DAY,
+		120 * time.SECONDS_PER_DAY, 151 * time.SECONDS_PER_DAY, 181 * time.SECONDS_PER_DAY, 212 * time.SECONDS_PER_DAY,
+		243 * time.SECONDS_PER_DAY, 273 * time.SECONDS_PER_DAY, 304 * time.SECONDS_PER_DAY, 334 * time.SECONDS_PER_DAY,
 	}
 
 	t := month_seconds[month]
 	if is_leap && month >= 2 {
-		t += 86_400
+		t += time.SECONDS_PER_DAY
 	}
 	return t
 }
@@ -81,7 +81,6 @@ month_to_seconds :: proc(month: int, is_leap: bool) -> i64 {
 @private
 trans_date_to_seconds :: proc(year: i64, td: datetime.TZ_Transition_Date) -> (secs: i64, ok: bool) {
 	is_leap := datetime.is_leap_year(year)
-	DAY_SEC :: 86_400
 
 	year_start := datetime.DateTime{{year, 1, 1}, {0, 0, 0, 0}, nil}
 	year_start_time := time.datetime_to_time(year_start) or_return
@@ -94,7 +93,7 @@ trans_date_to_seconds :: proc(year: i64, td: datetime.TZ_Transition_Date) -> (se
 
 		t += month_to_seconds(int(td.month) - 1, is_leap)
 
-		weekday := ((t + (4 * DAY_SEC)) %% (7 * DAY_SEC)) / DAY_SEC
+		weekday := ((t + (4 * time.SECONDS_PER_DAY)) %% (7 * time.SECONDS_PER_DAY)) / time.SECONDS_PER_DAY
 		days := i64(td.day) - weekday
 		if days < 0 { days += 7 }
 
@@ -106,7 +105,7 @@ trans_date_to_seconds :: proc(year: i64, td: datetime.TZ_Transition_Date) -> (se
 			week = 4
 		}
 
-		t += DAY_SEC * (days + (7 * i64(week - 1)))
+		t += time.SECONDS_PER_DAY * (days + (7 * i64(week - 1)))
 		t += td.time
 
 		return t, true
@@ -119,12 +118,12 @@ trans_date_to_seconds :: proc(year: i64, td: datetime.TZ_Transition_Date) -> (se
 		if day < 60 || !is_leap {
 			day -= 1
 		}
-		t += DAY_SEC * day
+		t += time.SECONDS_PER_DAY * day
 
 		return t, true
 
 	case .Leap:
-		t += DAY_SEC * i64(td.day)
+		t += time.SECONDS_PER_DAY * i64(td.day)
 
 		return t, true
 
