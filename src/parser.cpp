@@ -2068,6 +2068,33 @@ gb_internal Ast *        parse_do_body(AstFile *f, Token const &token, char cons
 gb_internal Ast *        parse_block_stmt(AstFile *f, b32 is_when);
 
 
+// NOTE(bill): The passes that recurse over the AST overflow the 1 MiB stacks of the worker threads on deeply nested code.
+// The parser measures the depth of the AST rather than its own recursion.
+// Chains such as `a + b + c` and `x.y.z` are built in a loop.
+// The elements of a compound literal count one level further in: building them takes about twice the stack of other nodes.
+#define PARSER_MAX_NESTING_DEPTH 100
+
+gb_internal void parse_check_nesting(i32 depth, Token const &token) {
+	if (depth <= PARSER_MAX_NESTING_DEPTH) {
+		return;
+	}
+	syntax_error(token, "Code nested too deeply: the limit is %d levels. Break it apart into smaller pieces", PARSER_MAX_NESTING_DEPTH);
+	exit_with_errors();
+}
+
+gb_internal void parse_nesting_push(AstFile *f) {
+	f->nesting_depth += 1;
+	if (f->nesting_peak < f->nesting_depth) {
+		f->nesting_peak = f->nesting_depth;
+	}
+	parse_check_nesting(f->nesting_depth, f->curr_token);
+}
+
+gb_internal void parse_nesting_pop(AstFile *f) {
+	f->nesting_depth -= 1;
+}
+
+
 
 gb_internal Ast *parse_ident(AstFile *f, bool allow_poly_names=false) {
 	Token token = f->curr_token;
@@ -2207,7 +2234,9 @@ gb_internal Ast *parse_literal_value(AstFile *f, Ast *type) {
 	isize expr_level = f->expr_level;
 	f->expr_level = 0;
 	if (f->curr_token.kind != Token_CloseBrace) {
+		parse_nesting_push(f);
 		elems = parse_element_list(f);
+		parse_nesting_pop(f);
 	}
 	f->expr_level = expr_level;
 	Token close = expect_closing(f, Token_CloseBrace, str_lit("compound literal"));
@@ -3948,8 +3977,15 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 		operand = ast_bad_expr(f, begin, f->curr_token);
 	}
 
+	// NOTE(bill): Each step wraps the operand in a new node.
+	// Everything parsed so far moves one level down.
+	i32 chain_peak = f->nesting_peak;
+
 	bool loop = true;
 	while (loop) {
+		Ast *prev_operand = operand;
+		f->nesting_peak = f->nesting_depth;
+
 		switch (f->curr_token.kind) {
 		case Token_OpenParen:
 			parse_check_or_return(operand, "call expression");
@@ -4120,14 +4156,23 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			break;
 		}
 
+		if (operand != prev_operand) {
+			chain_peak = gb_max(chain_peak+1, f->nesting_peak);
+			parse_check_nesting(chain_peak, ast_token(operand));
+		}
+
 		lhs = false; // NOTE(bill): 'tis not lhs anymore
 	}
 
+	f->nesting_peak = chain_peak;
 	return operand;
 }
 
 
 gb_internal Ast *parse_unary_expr(AstFile *f, bool lhs) {
+	parse_nesting_push(f);
+	defer (parse_nesting_pop(f));
+
 	switch (f->curr_token.kind) {
 	case Token_transmute:
 	case Token_cast: {
@@ -4177,7 +4222,14 @@ gb_internal Ast *parse_unary_expr(AstFile *f, bool lhs) {
 	}
 	}
 
-	return parse_atom_expr(f, parse_operand(f, lhs), lhs);
+	i32 outer_peak = f->nesting_peak;
+	f->nesting_peak = f->nesting_depth;
+
+	Ast *operand = parse_operand(f, lhs);
+	Ast *expr    = parse_atom_expr(f, operand, lhs);
+
+	f->nesting_peak = gb_max(outer_peak, f->nesting_peak);
+	return expr;
 }
 
 gb_internal bool is_ast_range(Ast *expr) {
@@ -4242,7 +4294,14 @@ gb_internal i32 token_precedence(AstFile *f, TokenKind t) {
 }
 
 gb_internal Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
+	i32 outer_peak = f->nesting_peak;
+	f->nesting_peak = f->nesting_depth;
+
 	Ast *expr = parse_unary_expr(f, lhs);
+
+	// NOTE(bill): Each operator makes a new node above everything parsed so far.
+	// That moves it all one level down.
+	i32 chain_peak = f->nesting_peak;
 	for (;;) {
 		Token op = f->curr_token;
 		i32 op_prec = token_precedence(f, op.kind);
@@ -4263,6 +4322,9 @@ gb_internal Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 			break;
 		}
 		expect_operator(f); // NOTE(bill): error checks too
+
+		f->nesting_depth += 1;
+		f->nesting_peak = f->nesting_depth;
 
 		if (op.kind == Token_Question) {
 			Ast *cond = expr;
@@ -4298,9 +4360,15 @@ gb_internal Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 			}
 		}
 
+		f->nesting_depth -= 1;
+
+		chain_peak = gb_max(chain_peak+1, f->nesting_peak);
+		parse_check_nesting(chain_peak, op);
+
 		lhs = false;
 	}
 	loop_end:;
+	f->nesting_peak = gb_max(outer_peak, chain_peak);
 	return expr;
 }
 
@@ -5360,9 +5428,17 @@ gb_internal Ast *parse_type_or_ident(AstFile *f) {
 	f->allow_type = true;
 	f->expr_level = -1;
 
+	parse_nesting_push(f);
+	defer (parse_nesting_pop(f));
+
+	i32 outer_peak = f->nesting_peak;
+	f->nesting_peak = f->nesting_depth;
+
 	bool lhs = true;
 	Ast *operand = parse_operand(f, lhs);
 	Ast *type = parse_atom_expr(f, operand, lhs);
+
+	f->nesting_peak = gb_max(outer_peak, f->nesting_peak);
 	return type;
 }
 
@@ -5378,7 +5454,9 @@ gb_internal Ast *parse_body(AstFile *f) {
 	f->expr_level = 0;
 	// f->allow_newline = false;
 	open = expect_token(f, Token_OpenBrace);
+	parse_nesting_push(f);
 	stmts = parse_stmt_list(f);
+	parse_nesting_pop(f);
 	close = expect_token(f, Token_CloseBrace);
 	f->expr_level = prev_expr_level;
 	f->allow_newline = prev_allow_newline;
@@ -5432,6 +5510,10 @@ gb_internal Ast *parse_if_stmt(AstFile *f) {
 	}
 
 	Ast *top_if_stmt = nullptr;
+
+	// NOTE(bill): Each `else if` is a level below the previous one.
+	i32 else_if_depth = 0;
+	defer (f->nesting_depth -= else_if_depth);
 
 	Ast *prev_if_stmt = nullptr;
 if_else_chain:;
@@ -5493,6 +5575,8 @@ if_else_chain:;
 			// we can just inline the tail-recursion manually with a simple loop like
 			// construct using a `goto`
 			prev_if_stmt = curr_if_stmt;
+			parse_nesting_push(f);
+			else_if_depth += 1;
 			goto if_else_chain;
 		case Token_OpenBrace:
 			else_stmt = parse_block_stmt(f, false);
@@ -5550,7 +5634,9 @@ gb_internal Ast *parse_when_stmt(AstFile *f) {
 		Token else_token = expect_token(f, Token_else);
 		switch (f->curr_token.kind) {
 		case Token_when:
+			parse_nesting_push(f);
 			else_stmt = parse_when_stmt(f);
+			parse_nesting_pop(f);
 			break;
 		case Token_OpenBrace:
 			else_stmt = parse_block_stmt(f, true);
@@ -5714,6 +5800,9 @@ range_skip:;
 
 
 gb_internal Ast *parse_case_clause(AstFile *f, bool is_type) {
+	parse_nesting_push(f);
+	defer (parse_nesting_pop(f));
+
 	Token token = f->curr_token;
 	Array<Ast *> list = {};
 	expect_token(f, Token_case);
@@ -5783,9 +5872,11 @@ gb_internal Ast *parse_switch_stmt(AstFile *f) {
 	skip_possible_newline(f);
 	open = expect_token(f, Token_OpenBrace);
 
+	parse_nesting_push(f);
 	while (f->curr_token.kind == Token_case) {
 		array_add(&list, parse_case_clause(f, is_type_switch));
 	}
+	parse_nesting_pop(f);
 
 	close = expect_token(f, Token_CloseBrace);
 
@@ -6081,6 +6172,9 @@ gb_internal Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
 }
 
 gb_internal Ast *parse_stmt(AstFile *f) {
+	parse_nesting_push(f);
+	defer (parse_nesting_pop(f));
+
 	Ast *s = nullptr;
 	Token token = f->curr_token;
 	switch (token.kind) {
@@ -6287,8 +6381,13 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 		return s;
 	} break;
 
-	case Token_OpenBrace:
-		return parse_block_stmt(f, false);
+	case Token_OpenBrace: {
+		// NOTE(bill): The block is both the statement and its body, and counts as one level.
+		f->nesting_depth -= 1;
+		Ast *block = parse_block_stmt(f, false);
+		f->nesting_depth += 1;
+		return block;
+	}
 
 	case Token_Semicolon:
 		s = ast_empty_stmt(f, token);
@@ -6430,6 +6529,8 @@ gb_internal ParseFileError init_ast_file(AstFile *f, String const &fullpath) {
 			return ParseFile_Permission;
 		case TokenizerInit_FileTooLarge:
 			return ParseFile_FileTooLarge;
+		case TokenizerInit_Outside:
+			return ParseFile_Outside;
 		default:
 			return ParseFile_InvalidFile;
 		}
@@ -6471,7 +6572,14 @@ gb_global Parser *identity_parser;
 
 gb_internal String package_identity_key(gbAllocator a, String path) {
 	FileId id = {};
-	if (path_file_id(path, &id)) {
+	ConfineHandle h = CONFINE_NO_HANDLE;
+	bool is_dir = false;
+	bool have_id = false;
+	if (confine_open(path, CONFINE_ANY, &h, &is_dir) == Confine_Ok) {
+		have_id = confine_file_id(h, &id);
+		confine_close(h);
+	}
+	if (have_id) {
 		u8 *b = gb_alloc_array(a, u8, 1+gb_size_of(FileId));
 		b[0] = 'i';
 		gb_memmove(b+1, &id, gb_size_of(FileId));
@@ -6563,11 +6671,12 @@ gb_internal WORKER_TASK_PROC(foreign_file_worker_proc) {
 
 	String fullpath = imp->fi.fullpath;
 
-	char *c_str = alloc_cstring(temporary_allocator(), fullpath);
-
-	gbFileContents fc = gb_file_read_contents(permanent_allocator(), true, c_str);
-	foreign_file.source.text = (u8 *)fc.data;
-	foreign_file.source.len = fc.size;
+	bool is_dir = false;
+	String source = {};
+	if (confine_read_file(fullpath, permanent_allocator(), &source, &is_dir) == Confine_Outside) {
+		syntax_error(imp->pos, "Failed to read file: %.*s; it resolves outside the project root and every collection", LIT(fullpath));
+	}
+	foreign_file.source = source;
 
 	switch (wd->foreign_kind) {
 	case AstForeignFile_S:
@@ -6640,7 +6749,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 
 
 	Array<FileInfo> list = {};
-	ReadDirectoryError rd_err = read_directory(path, &list);
+	ReadDirectoryError rd_err = confine_read_directory(path, &list);
 	defer (array_free(&list));
 	if (rd_err == ReadDirectory_None || rd_err == ReadDirectory_Empty) {
 		overlay_directory(path, &list);
@@ -6673,6 +6782,9 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 		return nullptr;
 	case ReadDirectory_Unknown:
 		syntax_error(pos, "Unknown error whilst reading path %.*s", LIT(rel_path));
+		return nullptr;
+	case ReadDirectory_Outside:
+		syntax_error(pos, "Path resolves outside the project root and every collection: %.*s", LIT(rel_path));
 		return nullptr;
 	}
 
@@ -6840,6 +6952,49 @@ gb_internal bool is_package_name_reserved(String const &name) {
 }
 
 
+gb_internal bool path_in_sandbox(String fullpath, isize scope) {
+	if (!confine_active()) {
+		return true;
+	}
+	bool is_dir = false;
+	return confine_probe(fullpath, scope, &is_dir) != Confine_Outside;
+}
+
+gb_internal bool path_init_sandbox(String init_fullpath) {
+	if (build_context.sandbox_roots.count == 0) {
+		return true;
+	}
+	for (String const &root : build_context.sandbox_roots) {
+		confine_add_root(root, true);
+	}
+	for (auto const &lc : library_collections) {
+		confine_add_root(lc.path, false);
+	}
+	if (!confine_active()) {
+		return true;
+	}
+	String init_dir = init_fullpath;
+	if (!path_is_directory(init_dir)) {
+		init_dir = path_parent(init_dir);
+	}
+	if (!path_in_sandbox(init_dir, CONFINE_SANDBOX)) {
+		error({}, "The main package %.*s is outside every -sandbox-root\n", LIT(init_dir));
+		return false;
+	}
+	for (String const &extra : build_context.extra_packages) {
+		String full = path_spelled(heap_allocator(), extra);
+		bool inside = path_in_sandbox(full, CONFINE_SANDBOX);
+		if (!inside) {
+			error({}, "The package %.*s is outside every -sandbox-root\n", LIT(full));
+		}
+		gb_free(heap_allocator(), full.text);
+		if (!inside) {
+			return false;
+		}
+	}
+	return true;
+}
+
 gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String base_dir, String const &original_string, String *path, bool use_check_errors=false) {
 	GB_ASSERT(path != nullptr);
 
@@ -6898,9 +7053,16 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 			do_error(node, "Invalid path: '%.*s'", LIT(original_string));
 			return false;
 		}
-		*path = path_spelled(permanent_allocator(), spelled);
+		String fullpath = path_spelled(permanent_allocator(), spelled);
+		if (!path_in_sandbox(fullpath, confine_scope_of(base_dir))) {
+			do_error(node, "Path '%.*s' is outside every -sandbox-root", LIT(original_string));
+			return false;
+		}
+		*path = fullpath;
 		return true;
 	}
+
+	String from_dir = base_dir;
 
 	String file_str = {};
 	if (colon_pos == 0) {
@@ -6953,10 +7115,21 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 			if (node->kind != Ast_ForeignImportDecl) {
 				do_error(node, "The library collection 'system' is restrict for 'foreign import'");
 				return false;
-			} else {
-				*path = file_str;
-				return true;
 			}
+			if (confine_active()) {
+				bool is_name = !string_starts_with(file_str, str_lit(".."));
+				for (isize i = 0; i < file_str.len; i++) {
+					if (file_str.text[i] == '/' || file_str.text[i] == '\\') {
+						is_name = false;
+					}
+				}
+				if (!is_name) {
+					do_error(node, "With -sandbox-root, a 'system:' library must be a name, not a path: '%.*s'", LIT(file_str));
+					return false;
+				}
+			}
+			*path = file_str;
+			return true;
 		} else if (!find_library_collection_path(collection_name, &base_dir)) {
 			// NOTE(bill): It's a naughty name
 			do_error(node, "Unknown library collection: '%.*s'", LIT(collection_name));
@@ -6979,6 +7152,15 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 	}
 
 	String fullpath = get_fullpath_relative(permanent_allocator(), base_dir, file_str, nullptr);
+	if (collection_name.len > 0) {
+		if (!path_in_sandbox(fullpath, confine_collection_scope(base_dir))) {
+			do_error(node, "Path '%.*s' leaves the '%.*s' collection and every -sandbox-root", LIT(original_string), LIT(collection_name));
+			return false;
+		}
+	} else if (!path_in_sandbox(fullpath, confine_scope_of(from_dir))) {
+		do_error(node, "Path '%.*s' is outside every -sandbox-root", LIT(original_string));
+		return false;
+	}
 	*path = fullpath;
 	return true;
 }
@@ -7492,7 +7674,8 @@ gb_internal isize calc_decl_count(Ast *decl) {
 		{
 			isize inner_count = calc_decl_count(decl->WhenStmt.body);
 			if (decl->WhenStmt.else_stmt) {
-				inner_count = gb_max(inner_count, calc_decl_count(decl->WhenStmt.else_stmt));
+				isize else_count = calc_decl_count(decl->WhenStmt.else_stmt);
+				inner_count = gb_max(inner_count, else_count);
 			}
 			count += inner_count;
 		}
@@ -7786,6 +7969,9 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 			case ParseFile_FileTooLarge:
 				syntax_error(pos, "Failed to parse file: %.*s; file is too large, exceeds maximum file size of 2 GiB", LIT(fi.name));
 				break;
+			case ParseFile_Outside:
+				syntax_error(pos, "Failed to parse file: %.*s; it resolves outside the project root and every collection ('%.*s')", LIT(fi.name), LIT(fi.fullpath));
+				break;
 			}
 
 			return err;
@@ -7859,6 +8045,9 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 
 
 	p->init_fullpath = init_fullpath;
+	if (!path_init_sandbox(init_fullpath)) {
+		return ParseFile_GeneralError;
+	}
 
 	StringSet extra_fullpaths = {};
 	string_set_init(&extra_fullpaths);

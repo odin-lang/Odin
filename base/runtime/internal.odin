@@ -272,57 +272,60 @@ conditional_mem_zero :: proc "contextless" (data: rawptr, n_: int) #no_bounds_ch
 }
 
 memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
-	switch {
-	case n == 0: return true
-	case x == y: return true
-	}
 	a, b := cast([^]byte)x, cast([^]byte)y
+
+	switch {
+	case n < 4:
+		for i in 0..<n {
+			if a[i] != b[i] {
+				return false
+			}
+		}
+		return true
+	case n < 8:
+		head := intrinsics.unaligned_load(cast(^u32)a)       ~ intrinsics.unaligned_load(cast(^u32)b)
+		tail := intrinsics.unaligned_load(cast(^u32)&a[n-4]) ~ intrinsics.unaligned_load(cast(^u32)&b[n-4])
+		return (head | tail) == 0
+	case n <= 16:
+		head := intrinsics.unaligned_load(cast(^u64)a)       ~ intrinsics.unaligned_load(cast(^u64)b)
+		tail := intrinsics.unaligned_load(cast(^u64)&a[n-8]) ~ intrinsics.unaligned_load(cast(^u64)&b[n-8])
+		return (head | tail) == 0
+	}
 
 	n := uint(n)
 	i := uint(0)
 	m := uint(0)
 
-	if n >= 8 {
-		when HAS_HARDWARE_SIMD {
-			// Avoid using 256-bit SIMD on platforms where its emulation is
-			// likely to be less than ideal.
-			when ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2") {
-				m = n / 32 * 32
-				for /**/; i < m; i += 32 {
-					load_a := intrinsics.unaligned_load(cast(^#simd[32]u8)&a[i])
-					load_b := intrinsics.unaligned_load(cast(^#simd[32]u8)&b[i])
-					ne := intrinsics.simd_lanes_ne(load_a, load_b)
-					if intrinsics.simd_reduce_or(ne) != 0 {
-						return false
-					}
+	when HAS_HARDWARE_SIMD {
+		// Avoid using 256-bit SIMD on platforms where its emulation is
+		// likely to be less than ideal.
+		when ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2") {
+			m = n / 32 * 32
+			for /**/; i < m; i += 32 {
+				load_a := intrinsics.unaligned_load(cast(^#simd[32]u8)&a[i])
+				load_b := intrinsics.unaligned_load(cast(^#simd[32]u8)&b[i])
+				ne := intrinsics.simd_lanes_ne(load_a, load_b)
+				if intrinsics.simd_reduce_or(ne) != 0 {
+					return false
 				}
 			}
 		}
-
-		m = (n-i) / 16 * 16
-		for /**/; i < m; i += 16 {
-			load_a := intrinsics.unaligned_load(cast(^#simd[16]u8)&a[i])
-			load_b := intrinsics.unaligned_load(cast(^#simd[16]u8)&b[i])
-			ne := intrinsics.simd_lanes_ne(load_a, load_b)
-			if intrinsics.simd_reduce_or(ne) != 0 {
-				return false
-			}
-		}
-
-		m = (n-i) / size_of(uintptr) * size_of(uintptr)
-		for /**/; i < m; i += size_of(uintptr) {
-			if intrinsics.unaligned_load(cast(^uintptr)&a[i]) != intrinsics.unaligned_load(cast(^uintptr)&b[i]) {
-				return false
-			}
-		}
 	}
 
-	for /**/; i < n; i += 1 {
-		if a[i] != b[i] {
+	m = n / 16 * 16
+	for /**/; i < m; i += 16 {
+		load_a := intrinsics.unaligned_load(cast(^#simd[16]u8)&a[i])
+		load_b := intrinsics.unaligned_load(cast(^#simd[16]u8)&b[i])
+		ne := intrinsics.simd_lanes_ne(load_a, load_b)
+		if intrinsics.simd_reduce_or(ne) != 0 {
 			return false
 		}
 	}
-	return true
+
+	load_a := intrinsics.unaligned_load(cast(^#simd[16]u8)&a[n-16])
+	load_b := intrinsics.unaligned_load(cast(^#simd[16]u8)&b[n-16])
+	ne := intrinsics.simd_lanes_ne(load_a, load_b)
+	return intrinsics.simd_reduce_or(ne) == 0
 }
 
 memory_compare :: proc "contextless" (x, y: rawptr, n: int) -> int #no_bounds_check {
@@ -569,6 +572,7 @@ string16_le :: #force_inline proc "contextless" (a, b: string16) -> bool { retur
 string16_ge :: #force_inline proc "contextless" (a, b: string16) -> bool { return string16_cmp(a, b) >= 0 }
 
 
+@(no_sanitize_address)
 cstring_len :: proc "contextless" (s: cstring) -> int {
 	if s == nil {
 		return 0
@@ -673,6 +677,7 @@ cstring_len :: proc "contextless" (s: cstring) -> int {
 	}
 }
 
+@(no_sanitize_address)
 cstring16_len :: proc "contextless" (s: cstring16) -> int {
 	if s == nil {
 		return 0
@@ -800,6 +805,7 @@ cstring16_to_string16 :: proc "contextless" (s: cstring16) -> string16 {
 }
 
 
+@(no_sanitize_address)
 cstring_eq :: proc "contextless" (lhs, rhs: cstring) -> bool {
 	when HAS_HARDWARE_SIMD && (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) {
 		return cstring_cmp(lhs, rhs) == 0
@@ -821,6 +827,7 @@ cstring_eq :: proc "contextless" (lhs, rhs: cstring) -> bool {
 	}
 }
 
+@(no_sanitize_address)
 cstring_cmp :: proc "contextless" (lhs, rhs: cstring) -> int {
 	x := ([^]byte)(lhs)
 	y := ([^]byte)(rhs)
@@ -887,6 +894,7 @@ cstring_gt :: #force_inline proc "contextless" (a, b: cstring) -> bool { return 
 cstring_le :: #force_inline proc "contextless" (a, b: cstring) -> bool { return cstring_cmp(a, b) <= 0 }
 cstring_ge :: #force_inline proc "contextless" (a, b: cstring) -> bool { return cstring_cmp(a, b) >= 0 }
 
+@(no_sanitize_address)
 cstring16_eq :: proc "contextless" (lhs, rhs: cstring16) -> bool {
 	x := ([^]u16)(lhs)
 	y := ([^]u16)(rhs)
@@ -942,6 +950,7 @@ cstring16_eq :: proc "contextless" (lhs, rhs: cstring16) -> bool {
 	}
 }
 
+@(no_sanitize_address)
 cstring16_cmp :: proc "contextless" (lhs, rhs: cstring16) -> int {
 	x := ([^]u16)(lhs)
 	y := ([^]u16)(rhs)

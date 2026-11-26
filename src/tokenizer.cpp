@@ -305,6 +305,7 @@ enum TokenizerInitError {
 	TokenizerInit_Permission,
 	TokenizerInit_Empty,
 	TokenizerInit_FileTooLarge,
+	TokenizerInit_Outside,
 
 	TokenizerInit_Count,
 };
@@ -436,19 +437,18 @@ gb_global TokenizerInitError loaded_file_error_map_to_tokenizer[LoadedFile_COUNT
 	TokenizerInit_Invalid,      /*LoadedFile_Invalid*/
 	TokenizerInit_NotExists,    /*LoadedFile_NotExists*/
 	TokenizerInit_Permission,   /*LoadedFile_Permission*/
+	TokenizerInit_Outside,
 };
 
 gb_internal TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &fullpath, bool copy_file_contents) {
 	String load_path = fullpath;
+	bool confined = true;
 	OverlayEntry *overlay = overlay_find(fullpath);
 	if (overlay != nullptr && overlay->replacement.len != 0) {
 		load_path = overlay->replacement;
+		confined = false;
 	}
-	LoadedFileError file_err = load_file_32(
-		alloc_cstring(temporary_allocator(), load_path),
-		&t->loaded_file,
-		copy_file_contents
-	);
+	LoadedFileError file_err = load_file_32(load_path, confined, &t->loaded_file, copy_file_contents);
 	
 	TokenizerInitError err = loaded_file_error_map_to_tokenizer[file_err];
 	switch (file_err) {

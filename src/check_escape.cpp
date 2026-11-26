@@ -60,15 +60,31 @@ struct EscapeFlow {
 	isize                target_index; // of the result, or of the argument it is stored through
 	EscapePath           target_path;  // within the result, or of the pointer within that argument
 	EscapePath           value_path;   // within what is stored through a loaded pointer, where the argument's pointers are
-	Entity *             global;       // of an outer target when known: the target and value paths are then within it
+	Entity *             global;       // of an outer target when known: the target and value paths are then within it; for a write, null means any global
 };
 
 struct EscapeOrigin {
-	EscapeOriginKind kind;
-	bool             offset_lost; // an offset into the memory of a 'ParamLoad' or 'ParamDeep' was dropped
-	EscapeObject     obj;
-	EscapePath       path;
-	Ast *            site;        // where the address of a 'Local' was taken, not part of its identity
+	EscapeOriginKind  kind;
+	bool              offset_lost; // an offset into the memory of a 'ParamLoad' or 'ParamDeep' was dropped
+	EscapeObject      obj;
+	EscapePath        path;
+	Ast *             site;        // where the address of a 'Local' was taken, not part of its identity
+	Ast *             via;         // the first call it went through, and the flow of the callee it took, neither part of its identity
+	EscapeFlow const *via_flow;
+	Entity *          via_deferred; // set when `via_flow` is of the procedure that `via` defers
+};
+
+// a hash set of where the items of a list are, so that finding one costs the same however long the list grows
+struct EscapeIndex {
+	Slice<u32> slots; // one more than where an item is in the list, or zero when the slot is empty
+	isize      used;  // the first items of the list it holds
+};
+
+// a list of distinct items, which finds them through an index once it is long enough for that to pay
+// NOTE: copies of a list share `data` and one index, so only one copy may add items
+template <typename T>
+struct EscapeList : Array<T> {
+	EscapeIndex *index;
 };
 
 struct EscapeValueFact {
@@ -76,7 +92,7 @@ struct EscapeValueFact {
 	EscapeOrigin origin;
 	bool         definite; // straight from the expression itself, not read back from a variable or through a pointer
 };
-typedef Array<EscapeValueFact> EscapeValue;
+typedef EscapeList<EscapeValueFact> EscapeValue;
 
 struct EscapeFact {
 	EscapeObject obj;
@@ -244,18 +260,35 @@ struct EscapeMemberTask {
 	Array<i32>          callers; // the members of the group calling it, by their index
 };
 
+struct EscapeDeferredCall {
+	Ast *                 call;
+	DeferredProcedureKind kind;
+	Entity *              deferred;
+	TypeProc *            pt; // of the deferred procedure
+	Slice<EscapeFlow>     flows;
+	Array<EscapeValue>    args;
+	Array<Type *>         types;
+	Array<bool>           given;
+};
+
+struct EscapeDefer {
+	Ast *               stmt;
+	EscapeDeferredCall *call;
+};
+
 struct EscapeAnalysis {
 	TypeProc *           pt;
 	Entity *             variadic;
 	EscapeState          state;
 	EscapeState          fallthrough;
-	Array<Array<Ast *> > defers;
+	Array<Array<EscapeDefer> > defers;
 	isize                defers_floor; // the levels of `defers` below it are running
 	Array<EscapeTarget>  targets;
 	Array<EscapeAlias>   aliases;
 	Array<Ast *>         reported;
 	Array<EscapeUse>     uses;
-	Array<EscapeFlow>    flows;
+	EscapeList<EscapeFlow> flows;
+	bool                 writes_any_global; // through a call that may, see `escape_overwrite_globals`
 	EscapeGraph *        graph;
 	i32                  group;       // of the procedures being analysed together, see `EscapeGraph`
 	Array<EscapeReport> *reports;     // kept rather than reported until it is done, see `escape_analyse`
@@ -295,6 +328,8 @@ gb_internal EscapeValue        escape_addr         (EscapeAnalysis *ea, Ast *exp
 gb_internal EscapeValue        escape_ident_value  (EscapeAnalysis *ea, Entity *e);
 gb_internal Array<EscapeValue> escape_call         (EscapeAnalysis *ea, Ast *call);
 gb_internal void               escape_store_through(EscapeAnalysis *ea, Ast *node, EscapeValue const &ptr, EscapeValue const &v, EscapeUpdateKind update);
+gb_internal void               escape_overwrite    (EscapeAnalysis *ea, EscapeLocation const &loc, EscapeOrigin const *dest);
+gb_internal void               escape_overwrite_globals(EscapeAnalysis *ea);
 gb_internal void               escape_scan         (EscapeAnalysis *ea, Ast *expr, u8 flags);
 gb_internal void               escape_stmt         (EscapeAnalysis *ea, Ast *node);
 gb_internal void               escape_branch       (EscapeAnalysis *ea, Ast *label, TokenKind kind);
@@ -367,19 +402,162 @@ gb_internal bool escape_eq(EscapeOuterStore const &a, EscapeOuterStore const &b)
 	       escape_eq(a.origin, b.origin);
 }
 
-gb_internal EscapeValue escape_value(void) {
-	// NOTE(bill): most values are empty so allocate on the fly when needed
-	return array_make<EscapeValueFact>(temporary_allocator(), 0, 0);
+// what is not part of the identity of an item, e.g. the `definite` of a fact, is not hashed
+gb_internal u64 escape_hash_mix(u64 h, u64 x) {
+	h = (h ^ x) * 0x9e3779b97f4a7c15ull;
+	return h ^ (h >> 29);
 }
 
-gb_internal void escape_value_add(EscapeValue *v, EscapePath const &path, EscapeOrigin const &o, bool definite=false) {
-	for (EscapeValueFact &f : *v) {
-		if (escape_path_eq(f.path, path) && escape_eq(f.origin, o)) {
-			f.definite |= definite;
+gb_internal u64 escape_hash(u64 h, EscapePath const &p) {
+	h = escape_hash_mix(h, cast(u64)p.count);
+	for (EscapeStep const &s : p) {
+		h = escape_hash_mix(h, cast(u64)s.kind);
+		h = escape_hash_mix(h, cast(u64)cast(uintptr)s.field);
+	}
+	return h;
+}
+
+gb_internal u64 escape_hash(u64 h, EscapeOrigin const &o) {
+	h = escape_hash_mix(h, cast(u64)o.kind);
+	h = escape_hash_mix(h, cast(u64)o.offset_lost);
+	h = escape_hash_mix(h, cast(u64)cast(uintptr)o.obj.entity);
+	h = escape_hash_mix(h, cast(u64)cast(uintptr)o.obj.temp);
+	return escape_hash(h, o.path);
+}
+
+gb_internal bool escape_eq(EscapeValueFact const &a, EscapeValueFact const &b) {
+	return escape_path_eq(a.path, b.path) &&
+	       escape_eq(a.origin, b.origin);
+}
+
+gb_internal u32 escape_hash(EscapeValueFact const &f) {
+	return cast(u32)escape_hash(escape_hash(0, f.path), f.origin);
+}
+
+enum : isize { ESCAPE_INDEX_FROM = 16 }; // the length of a list from which it is indexed
+
+gb_internal void escape_index_put(EscapeIndex *index, u32 hash, isize at) {
+	usize mask = cast(usize)index->slots.count-1;
+	for (usize i = hash & mask; ; i = (i+1) & mask) {
+		if (index->slots[i] == 0) {
+			index->slots[i] = cast(u32)(at+1);
 			return;
 		}
 	}
-	array_add(v, EscapeValueFact{path, o, definite});
+}
+
+// `room` is a power of two at least twice `items.count`, so at most half its slots are used
+template <typename T>
+gb_internal void escape_index_fill(EscapeIndex *index, gbAllocator a, Slice<T> items, isize room) {
+	index->slots = slice_make<u32>(a, room);
+	gb_zero_size(index->slots.data, index->slots.count*gb_size_of(u32));
+	index->used = items.count;
+	for_array(i, items) {
+		escape_index_put(index, escape_hash(items.data[i]), i);
+	}
+}
+
+template <typename T>
+gb_internal T *escape_index_find(EscapeIndex const *index, Slice<T> items, T const &x, u32 hash) {
+	usize mask = cast(usize)index->slots.count-1;
+	for (usize i = hash & mask; index->slots[i] != 0; i = (i+1) & mask) {
+		isize at = cast(isize)index->slots[i]-1;
+		if (at < items.count && escape_eq(x, items.data[at])) {
+			return &items.data[at];
+		}
+	}
+	return nullptr;
+}
+
+template <typename T>
+gb_internal void escape_list_index(EscapeList<T> *list) {
+	list->index = gb_alloc_item(list->allocator, EscapeIndex);
+	// room to double before rebuilding (e.g. 64 slots for 16 items)
+	escape_index_fill(list->index, list->allocator, slice_from_array(*list), next_pow2_isize(4*list->count));
+}
+
+template <typename T>
+gb_internal EscapeList<T> escape_list_make(gbAllocator const &a) {
+	EscapeList<T> list = {};
+	list.allocator = a;
+	return list;
+}
+
+// the item of the list equal to `x`; or none, and `x` is added to its end
+template <typename T>
+gb_internal T *escape_list_add_unique(EscapeList<T> *list, T const &x) {
+	if (list->index == nullptr) {
+		for (T &y : *list) {
+			if (escape_eq(x, y)) {
+				return &y;
+			}
+		}
+		array_add(list, x);
+		if (list->count >= ESCAPE_INDEX_FROM) {
+			escape_list_index(list);
+		}
+		return nullptr;
+	}
+
+	u32 hash = escape_hash(x);
+	EscapeIndex *index = list->index;
+	if (T *found = escape_index_find(index, slice_from_array(*list), x, hash)) {
+		return found;
+	}
+
+	array_add(list, x);
+	if (list->count-1 != index->used) {
+		// another copy added to it first
+		escape_list_index(list);
+	} else if (list->count*2 > index->slots.count) {
+		escape_index_fill(index, list->allocator, slice_from_array(*list), 2*index->slots.count);
+	} else {
+		escape_index_put(index, hash, list->count-1);
+		index->used = list->count;
+	}
+	return nullptr;
+}
+
+// whether every item of `wanted` from `from` onwards is equal to one in `items`
+template <typename T>
+gb_internal bool escape_slice_contains_all(Slice<T> items, Slice<T> wanted, isize from) {
+	if (items.count < ESCAPE_INDEX_FROM) {
+		for (isize i = from; i < wanted.count; i++) {
+			bool found = false;
+			for (T const &y : items) {
+				if (escape_eq(wanted[i], y)) {
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	TEMPORARY_ALLOCATOR_GUARD();
+	EscapeIndex index = {};
+	escape_index_fill(&index, temporary_allocator(), items, next_pow2_isize(2*items.count));
+	for (isize i = from; i < wanted.count; i++) {
+		if (escape_index_find(&index, items, wanted[i], escape_hash(wanted[i])) == nullptr) {
+			return false;
+		}
+	}
+	return true;
+}
+
+gb_internal EscapeValue escape_value(void) {
+	// NOTE(bill): most values are empty so allocate on the fly when needed
+	return escape_list_make<EscapeValueFact>(temporary_allocator());
+}
+
+gb_internal void escape_value_add(EscapeValue *v, EscapePath const &path, EscapeOrigin const &o, bool definite=false) {
+	EscapeValueFact *f = escape_list_add_unique(v, EscapeValueFact{path, o, definite});
+	if (f != nullptr) {
+		f->definite |= definite;
+	}
 }
 
 gb_internal EscapeValue escape_value_one(EscapePath const &path, EscapeOrigin const &o, bool definite=false) {
@@ -545,6 +723,11 @@ gb_internal bool escape_add_unique(Array<T> *array, T const &x) {
 	}
 	array_add(array, x);
 	return true;
+}
+
+template <typename T>
+gb_internal bool escape_add_unique(EscapeList<T> *list, T const &x) {
+	return escape_list_add_unique(list, x) == nullptr;
 }
 
 // whether two integer expressions reading only unchanged locals and constants have the same value; as integers wrap,
@@ -2965,6 +3148,235 @@ gb_internal bool escape_write_matters(EscapeAnalysis *ea, EscapeValue const &arg
 	return false;
 }
 
+gb_internal bool escape_proc_known(EscapeAnalysis *ea, DeclInfo *d) {
+	if (d == nullptr || d->proc->proc_info == nullptr) {
+		return false;
+	}
+	if (ea->calls_unknown) {
+		return false;
+	}
+	if (!d->proc->escapes_analysed.load()) {
+		// otherwise a call the checker did not record, which should not happen
+		return ea->graph->group_of[d->proc->escape_index] == ea->group;
+	}
+	return true;
+}
+
+gb_internal bool escape_flows_involve(Slice<EscapeFlow> const &flows, isize index) {
+	for (EscapeFlow const &flow : flows) {
+		if (flow.param == index) {
+			return true;
+		}
+		switch (flow.target) {
+		case EscapeFlowTarget_Pointee:
+		case EscapeFlowTarget_Loaded:
+		case EscapeFlowTarget_Deep:
+			if (flow.target_index == index) {
+				return true;
+			}
+			break;
+		}
+	}
+	return false;
+}
+
+// the parameter of the deferred procedure which is given the argument of a parameter of the call, or -1
+gb_internal isize escape_deferred_param(TypeProc *pt, DeferredProcedureKind kind, isize index) {
+	if (kind != DeferredProcedure_in && kind != DeferredProcedure_in_out) {
+		return -1;
+	}
+	Slice<Entity *> const &params = pt->params->Tuple.variables;
+	if (params[index]->kind != Entity_Variable) {
+		return -1;
+	}
+
+	isize deferred_index = 0;
+	for (isize i = 0; i < index; i++) {
+		if (params[i]->kind == Entity_Variable) {
+			deferred_index += 1;
+		}
+	}
+	return deferred_index;
+}
+
+// the deferred procedure of what a call goes to, when what it does is known
+gb_internal EscapeDeferredCall *escape_deferred_call(EscapeAnalysis *ea, Ast *call, Entity *e) {
+	Entity *deferred = e->Procedure.deferred_procedure.entity;
+	if (deferred == nullptr) {
+		return nullptr;
+	}
+
+	DeferredProcedureKind kind = e->Procedure.deferred_procedure.kind;
+	switch (kind) {
+	case DeferredProcedure_in_by_ptr:
+	case DeferredProcedure_out_by_ptr:
+	case DeferredProcedure_in_out_by_ptr:
+		// NOTE(bill): These are given the addresses of copies in the stack frame, which are not followed.
+		return nullptr;
+	}
+
+	DeclInfo *d = deferred->decl_info;
+	if (!escape_proc_known(ea, d)) {
+		return nullptr;
+	}
+	if (d->proc->escape_flows.count == 0) {
+		return nullptr;
+	}
+	Type *t = base_type(proc_entity_full_type(deferred));
+	if (t == nullptr || t->kind != Type_Proc) {
+		return nullptr;
+	}
+
+	EscapeDeferredCall *dc = gb_alloc_item(temporary_allocator(), EscapeDeferredCall);
+	dc->call     = call;
+	dc->kind     = kind;
+	dc->deferred = deferred;
+	dc->pt       = &t->Proc;
+	dc->flows    = d->proc->escape_flows;
+	dc->args     = array_make<EscapeValue>(temporary_allocator(), dc->pt->param_count);
+	dc->types    = array_make<Type *>(temporary_allocator(), dc->pt->param_count);
+	dc->given    = array_make<bool>(temporary_allocator(), dc->pt->param_count);
+	for (EscapeValue &arg : dc->args) {
+		arg = escape_value();
+	}
+	return dc;
+}
+
+// what the flows of the procedure a call goes to do with the values of its arguments, and the values of its results when wanted
+gb_internal void escape_call_flows(EscapeAnalysis *ea, Ast *call, Entity *deferred, TypeProc *pt, Slice<EscapeFlow> const &flows,
+                                   Array<EscapeValue> const &args, Array<Type *> const &types, Array<bool> const &given,
+                                   Array<EscapeValue> *results) {
+	for (EscapeFlow const &flow : flows) {
+		if (flow.kind != EscapeFlow_Write) {
+			continue;
+		}
+		if (flow.target == EscapeFlowTarget_Outer) {
+			if (flow.global == nullptr) {
+				escape_overwrite_globals(ea);
+			} else {
+				escape_overwrite(ea, {flow.global, flow.target_path}, nullptr);
+			}
+		} else if (given[flow.target_index] && escape_write_matters(ea, args[flow.target_index])) {
+			Type *pointee = nullptr;
+			EscapeValue ptr = escape_arg_pointers(args[flow.target_index], types[flow.target_index], flow.target_path, &pointee);
+			escape_store_through(ea, call, ptr, escape_value(), EscapeUpdate_Replace);
+		}
+	}
+
+	for (EscapeFlow const &flow : flows) {
+		if (flow.kind == EscapeFlow_Write || !given[flow.param]) {
+			continue;
+		}
+		EscapeValue v = {};
+		Type *v_type = nullptr;
+		if (flow.kind == EscapeFlow_Value && escape_path_deref_index(flow.param_path) == flow.param_path.count) {
+			v = escape_value_project(args[flow.param], flow.param_path);
+			v_type = escape_type_within(types[flow.param], flow.param_path);
+		} else {
+			Type *pointee = nullptr;
+			v = escape_arg_pointers(args[flow.param], types[flow.param], flow.param_path, &pointee);
+			if (flow.kind != EscapeFlow_Value) {
+				if (pointee != nullptr && !escape_type_has_pointers(pointee)) {
+					continue;
+				}
+				v = escape_load_once(ea, v);
+				v_type = pointee;
+				if (pointee == nullptr) {
+					// NOTE(bill): the paths of what is loaded are of another type, which could otherwise nest without end in a loop
+					v = escape_as_pointer(v);
+				}
+			}
+		}
+		for (EscapeValueFact &f : v) {
+			// NOTE(bill): What the deferred procedure does with a result of the call says more than how the call made it.
+			if (f.origin.via == nullptr || (deferred != nullptr && f.origin.via == call)) {
+				f.origin.via          = call;
+				f.origin.via_flow     = &flow;
+				f.origin.via_deferred = deferred;
+			}
+		}
+
+		// NOTE(bill): likewise when it goes somewhere of another type, e.g. all of `p^` loaded into `p.name`
+		switch (flow.target) {
+		case EscapeFlowTarget_Result: {
+			if (results == nullptr) {
+				break;
+			}
+			Type *t = escape_type_within(pt->results->Tuple.variables[flow.target_index]->type, flow.target_path);
+			if (!escape_types_known_identical(v_type, t)) {
+				v = escape_as_pointer(v);
+			}
+			for (EscapeValueFact const &f : v) {
+				escape_value_add(&(*results)[flow.target_index], escape_path_concat(flow.target_path, f.path), f.origin);
+			}
+			break;
+		}
+
+		case EscapeFlowTarget_Pointee:
+		case EscapeFlowTarget_Loaded:
+		case EscapeFlowTarget_Deep:
+			if (given[flow.target_index]) {
+				Type *pointee = nullptr;
+				EscapeValue ptr = escape_arg_pointers(args[flow.target_index], types[flow.target_index], flow.target_path, &pointee);
+				if (flow.target != EscapeFlowTarget_Pointee) {
+					ptr = escape_as_pointer(escape_load_once(ea, ptr));
+				} else if (!escape_types_known_identical(v_type, pointee)) {
+					v = escape_as_pointer(v);
+				}
+				if (flow.target == EscapeFlowTarget_Deep) {
+					ptr = escape_reachable(ea, ptr);
+				}
+				if (flow.value_path.count > 0) {
+					escape_store_loaded(ea, call, ptr, v, flow.value_path);
+				} else {
+					escape_store_through(ea, call, ptr, v, EscapeUpdate_Add);
+				}
+			}
+			break;
+
+		case EscapeFlowTarget_Outer: {
+			EscapeValue within = escape_value();
+			escape_value_add_at(&within, flow.value_path, v);
+			escape_store_through(ea, call, escape_value_of(EscapeOrigin_Outer, {flow.global}, flow.target_path), within, EscapeUpdate_Add);
+			break;
+		}
+		}
+	}
+}
+
+// the deferred procedure is given the arguments of the call as they were, then its results, and is called at the end of the scope
+gb_internal void escape_defer_call(EscapeAnalysis *ea, EscapeDeferredCall *dc, TypeProc *pt,
+                                   Array<EscapeValue> const &args, Array<Type *> const &types, Array<bool> const &given,
+                                   Array<EscapeValue> const &results) {
+	isize in_count = 0;
+	for (isize i = 0; i < pt->param_count; i++) {
+		isize j = escape_deferred_param(pt, dc->kind, i);
+		if (j < 0) {
+			continue;
+		}
+		in_count = j+1;
+		if (j < dc->args.count && given[i]) {
+			dc->args[j]  = args[i];
+			dc->types[j] = types[i];
+			dc->given[j] = true;
+		}
+	}
+
+	if (dc->kind == DeferredProcedure_out || dc->kind == DeferredProcedure_in_out) {
+		for_array(k, results) {
+			isize j = in_count+k;
+			if (j >= dc->args.count) {
+				break;
+			}
+			dc->args[j]  = results[k];
+			dc->types[j] = pt->results->Tuple.variables[k]->type;
+			dc->given[j] = true;
+		}
+	}
+
+	array_add(&ea->defers[ea->defers.count-1], EscapeDefer{nullptr, dc});
+}
+
 gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 	ast_node(ce, CallExpr, call);
 
@@ -3031,20 +3443,20 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 		if (t != nullptr && t->kind == Type_Proc) {
 			pt = &t->Proc;
 
-			// none for a foreign procedure or one whose body was not checked, and what it has so far while its group settles
 			DeclInfo *d = e->decl_info;
-			bool known = d != nullptr && d->proc->proc_info != nullptr;
-			if (known && !d->proc->escapes_analysed.load()) {
-				// otherwise a call the checker did not record, which should not happen
-				known = ea->graph->group_of[d->proc->escape_index] == ea->group;
-			}
-			if (known && !ea->calls_unknown) {
+			if (escape_proc_known(ea, d)) {
 				flows   = d->proc->escape_flows;
 				unknown = d->proc->proc_info->body == nullptr;
 			}
 		}
 	}
-	if (flows.count == 0) {
+
+	EscapeDeferredCall *dc = nullptr;
+	if (pt != nullptr && ea->defers.count > 0) {
+		dc = escape_deferred_call(ea, call, e);
+	}
+
+	if (flows.count == 0 && dc == nullptr) {
 		for (Ast *arg : ce->args) {
 			if (arg->kind == Ast_FieldValue) {
 				arg = arg->FieldValue.value;
@@ -3096,20 +3508,30 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 
 		bool involved = false;
 		if (has_param) {
-			for (EscapeFlow const &flow : flows) {
-				involved |= flow.param == index;
-				switch (flow.target) {
-				case EscapeFlowTarget_Pointee:
-				case EscapeFlowTarget_Loaded:
-				case EscapeFlowTarget_Deep:
-					involved |= flow.target_index == index;
-					break;
+			involved = escape_flows_involve(flows, index);
+			if (dc != nullptr) {
+				isize deferred_index = escape_deferred_param(pt, dc->kind, index);
+				if (deferred_index >= 0) {
+					involved |= escape_flows_involve(dc->flows, deferred_index);
 				}
 			}
 		}
+
+		Type *pointee = escape_pointee_type(value->tav.type);
+		bool written = flows.count == 0 && unknown && escape_type_has_pointers(pointee != nullptr ? pointee : value->tav.type);
+
 		if (!involved) {
-			escape_visit_exits(ea, value);
+			if (written) {
+				escape_store_through(ea, call, escape_as_pointer(escape_expr(ea, value)), escape_value(), EscapeUpdate_Replace);
+			} else {
+				escape_visit_exits(ea, value);
+			}
 			continue;
+		}
+
+		EscapeValue v = escape_expr(ea, value);
+		if (written) {
+			escape_store_through(ea, call, escape_as_pointer(v), escape_value(), EscapeUpdate_Replace);
 		}
 
 		Type *type = pt->params->Tuple.variables[index]->type;
@@ -3123,94 +3545,21 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 			if (slice->kind == Type_Slice) {
 				elem = slice->Slice.elem;
 			}
-			EscapeValue v = escape_convert(ea, escape_expr(ea, value), value, elem);
-			escape_store_obj(ea, {nullptr, call}, escape_path_of(EscapeStep_AnyElement), v, EscapeUpdate_Add);
+			escape_store_obj(ea,
+				{nullptr, call},
+				escape_path_of(EscapeStep_AnyElement),
+				escape_convert(ea, v, value, elem),
+				EscapeUpdate_Add
+			);
 			args[index] = escape_value_of(EscapeOrigin_Temp, {nullptr, call}, escape_path_of(EscapeStep_AnyElement));
 			continue;
 		}
-		args[index] = escape_convert(ea, escape_expr(ea, value), value, type);
+		args[index] = escape_convert(ea, v, value, type);
 	}
 
-	for (EscapeFlow const &flow : flows) {
-		if (flow.kind != EscapeFlow_Write) {
-			continue;
-		}
-		if (flow.target == EscapeFlowTarget_Outer) {
-			escape_store_through(ea, call, escape_value_of(EscapeOrigin_Outer, {flow.global}, flow.target_path), escape_value(), EscapeUpdate_Replace);
-		} else if (given[flow.target_index] && escape_write_matters(ea, args[flow.target_index])) {
-			Type *pointee = nullptr;
-			EscapeValue ptr = escape_arg_pointers(args[flow.target_index], types[flow.target_index], flow.target_path, &pointee);
-			escape_store_through(ea, call, ptr, escape_value(), EscapeUpdate_Replace);
-		}
-	}
-
-	for (EscapeFlow const &flow : flows) {
-		if (flow.kind == EscapeFlow_Write || !given[flow.param]) {
-			continue;
-		}
-		EscapeValue v = {};
-		Type *v_type = nullptr;
-		if (flow.kind == EscapeFlow_Value && escape_path_deref_index(flow.param_path) == flow.param_path.count) {
-			v = escape_value_project(args[flow.param], flow.param_path);
-			v_type = escape_type_within(types[flow.param], flow.param_path);
-		} else {
-			Type *pointee = nullptr;
-			v = escape_arg_pointers(args[flow.param], types[flow.param], flow.param_path, &pointee);
-			if (flow.kind != EscapeFlow_Value) {
-				if (pointee != nullptr && !escape_type_has_pointers(pointee)) {
-					continue;
-				}
-				v = escape_load_once(ea, v);
-				v_type = pointee;
-				if (pointee == nullptr) {
-					// NOTE(bill): the paths of what is loaded are of another type, which could otherwise nest without end in a loop
-					v = escape_as_pointer(v);
-				}
-			}
-		}
-
-		// NOTE(bill): likewise when it goes somewhere of another type, e.g. all of `p^` loaded into `p.name`
-		switch (flow.target) {
-		case EscapeFlowTarget_Result: {
-			Type *t = escape_type_within(pt->results->Tuple.variables[flow.target_index]->type, flow.target_path);
-			if (!escape_types_known_identical(v_type, t)) {
-				v = escape_as_pointer(v);
-			}
-			for (EscapeValueFact const &f : v) {
-				escape_value_add(&results[flow.target_index], escape_path_concat(flow.target_path, f.path), f.origin);
-			}
-			break;
-		}
-
-		case EscapeFlowTarget_Pointee:
-		case EscapeFlowTarget_Loaded:
-		case EscapeFlowTarget_Deep:
-			if (given[flow.target_index]) {
-				Type *pointee = nullptr;
-				EscapeValue ptr = escape_arg_pointers(args[flow.target_index], types[flow.target_index], flow.target_path, &pointee);
-				if (flow.target != EscapeFlowTarget_Pointee) {
-					ptr = escape_as_pointer(escape_load_once(ea, ptr));
-				} else if (!escape_types_known_identical(v_type, pointee)) {
-					v = escape_as_pointer(v);
-				}
-				if (flow.target == EscapeFlowTarget_Deep) {
-					ptr = escape_reachable(ea, ptr);
-				}
-				if (flow.value_path.count > 0) {
-					escape_store_loaded(ea, call, ptr, v, flow.value_path);
-				} else {
-					escape_store_through(ea, call, ptr, v, EscapeUpdate_Add);
-				}
-			}
-			break;
-
-		case EscapeFlowTarget_Outer: {
-			EscapeValue within = escape_value();
-			escape_value_add_at(&within, flow.value_path, v);
-			escape_store_through(ea, call, escape_value_of(EscapeOrigin_Outer, {flow.global}, flow.target_path), within, EscapeUpdate_Add);
-			break;
-		}
-		}
+	escape_call_flows(ea, call, nullptr, pt, flows, args, types, given, &results);
+	if (dc != nullptr) {
+		escape_defer_call(ea, dc, pt, args, types, given, results);
 	}
 	return results;
 }
@@ -3551,6 +3900,62 @@ gb_internal bool escape_site_shown(Ast *node, Ast *site) {
 	return start.offset <= pos.offset && pos.offset <= end.offset;
 }
 
+gb_internal gbString escape_append_param(gbString s, TypeProc *pt, isize index, EscapePath const &path) {
+	Entity *e = pt->params->Tuple.variables[index];
+	s = gb_string_append_fmt(s, "its parameter '%.*s", LIT(e->token.string));
+	s = escape_append_fields(s, e->type, path);
+	return gb_string_appendc(s, "'");
+}
+
+gb_internal gbString escape_append_flow(gbString s, Entity *proc, EscapeFlow const &flow) {
+	Type *t = base_type(proc_entity_full_type(proc));
+	TypeProc *pt = &t->Proc;
+
+	gbString value = gb_string_make(temporary_allocator(), "");
+	if (flow.kind == EscapeFlow_Load) {
+		value = gb_string_appendc(value, "a pointer loaded through ");
+	}
+	value = escape_append_param(value, pt, flow.param, flow.param_path);
+
+	switch (flow.target) {
+	case EscapeFlowTarget_Result: {
+		Entity * e      = pt->results->Tuple.variables[flow.target_index];
+		gbString fields = escape_append_fields(gb_string_make(temporary_allocator(), ""), e->type, flow.target_path);
+		s = gb_string_append_fmt(s, "returns %s", value);
+		if (e->token.string.len > 0) {
+			s = gb_string_append_fmt(s, " in its result '%.*s%s'", LIT(e->token.string), fields);
+		} else if (gb_string_length(fields) > 0) {
+			s = gb_string_append_fmt(s, " in '%s' of its result", fields);
+		} else if (pt->result_count > 1) {
+			s = gb_string_appendc(s, " as its result");
+		}
+		if (e->token.string.len == 0 && pt->result_count > 1) {
+			s = gb_string_append_fmt(s, " %td", flow.target_index+1);
+		}
+		break;
+	}
+	case EscapeFlowTarget_Pointee:
+		s = gb_string_append_fmt(s, "stores %s through ", value);
+		s = escape_append_param(s, pt, flow.target_index, flow.target_path);
+		break;
+	case EscapeFlowTarget_Loaded:
+	case EscapeFlowTarget_Deep:
+		s = gb_string_append_fmt(s, "stores %s in memory reached through ", value);
+		s = escape_append_param(s, pt, flow.target_index, flow.target_path);
+		break;
+	case EscapeFlowTarget_Outer:
+		if (flow.global != nullptr) {
+			s = gb_string_append_fmt(s, "stores %s in '%.*s", value, LIT(flow.global->token.string));
+			s = escape_append_fields(s, flow.global->type, flow.target_path);
+			s = gb_string_appendc(s, "'");
+		} else {
+			s = gb_string_append_fmt(s, "stores %s where it outlives the call", value);
+		}
+		break;
+	}
+	return s;
+}
+
 gb_internal void escape_report_emit(EscapeReport const &r) {
 	Ast *node = r.node;
 	String expr_str = r.expr_str;
@@ -3625,6 +4030,24 @@ gb_internal void escape_report_emit(EscapeReport const &r) {
 		gb_string_free(site);
 	} else if (o.kind == EscapeOrigin_Temp && !escape_site_shown(node, o.obj.temp)) {
 		error_line("\tThe %s is made at %s\n", temp_description, token_pos_to_string(ast_token(o.obj.temp).pos));
+	}
+
+	if (o.via != nullptr) {
+		gbString via = escape_expr_to_string(o.via->CallExpr.proc);
+		gbString line = gb_string_make(temporary_allocator(), "");
+		Entity * proc = escape_proc_entity(o.via->CallExpr.proc);
+		if (o.via_deferred != nullptr) {
+			proc = o.via_deferred;
+			line = gb_string_append_fmt(line, "\tThe call to '%.*s' deferred by '%s' ", LIT(proc->token.string), via);
+		} else {
+			line = gb_string_append_fmt(line, "\tThe call to '%s' ", via);
+		}
+		if (!escape_site_shown(node, o.via)) {
+			line = gb_string_append_fmt(line, "at %s ", token_pos_to_string(ast_token(o.via).pos));
+		}
+		line = escape_append_flow(line, proc, *o.via_flow);
+		error_line("%s\n", line);
+		gb_string_free(via);
 	}
 
 	if (r.self_ref) {
@@ -3723,9 +4146,16 @@ gb_internal void escape_run_defers(EscapeAnalysis *ea, isize depth) {
 	isize floor = ea->defers_floor;
 	ea->defers_floor = ea->defers.count;
 	for (isize i = ea->defers.count-1; i >= depth; i--) {
-		Array<Ast *> defers = array_clone(temporary_allocator(), ea->defers[i]);
+		Array<EscapeDefer> defers = array_clone(temporary_allocator(), ea->defers[i]);
 		for (isize j = defers.count-1; j >= 0; j--) {
-			escape_stmt(ea, defers[j]);
+			EscapeDefer const &d = defers[j];
+			if (d.stmt != nullptr) {
+				escape_stmt(ea, d.stmt);
+				continue;
+			}
+
+			EscapeDeferredCall *dc = d.call;
+			escape_call_flows(ea, dc->call, dc->deferred, dc->pt, dc->flows, dc->args, dc->types, dc->given, nullptr);
 		}
 	}
 	ea->defers_floor = floor;
@@ -3765,6 +4195,17 @@ gb_internal bool escape_eq(EscapeFlow const &a, EscapeFlow const &b) {
 	       escape_path_eq(a.param_path,  b.param_path) &&
 	       escape_path_eq(a.target_path, b.target_path) &&
 	       escape_path_eq(a.value_path,  b.value_path);
+}
+
+gb_internal u32 escape_hash(EscapeFlow const &f) {
+	u64 h = escape_hash_mix(0, cast(u64)f.kind);
+	h = escape_hash_mix(h, cast(u64)f.param);
+	h = escape_hash_mix(h, cast(u64)f.target);
+	h = escape_hash_mix(h, cast(u64)f.target_index);
+	h = escape_hash_mix(h, cast(u64)cast(uintptr)f.global);
+	h = escape_hash(h, f.param_path);
+	h = escape_hash(h, f.target_path);
+	return cast(u32)escape_hash(h, f.value_path);
 }
 
 // a path is cut before a step repeating an earlier one, as otherwise a recursive procedure could make its flows
@@ -4043,6 +4484,17 @@ gb_internal void escape_overwrite(EscapeAnalysis *ea, EscapeLocation const &loc,
 	escape_add_flow(ea, flow);
 }
 
+gb_internal void escape_overwrite_globals(EscapeAnalysis *ea) {
+	for (isize i = ea->state.outers.count-1; i >= 0; i--) {
+		Entity *root = ea->state.outers[i].location.root;
+		if (root != nullptr && !escape_is_local(root)) {
+			escape_add_unique(&ea->state.cleared, ea->state.outers[i]);
+			array_unordered_remove(&ea->state.outers, i);
+		}
+	}
+	ea->writes_any_global = true;
+}
+
 // `node` is the left hand side, or a call storing into memory it was given
 gb_internal void escape_store_through(EscapeAnalysis *ea, Ast *node, EscapeValue const &ptr, EscapeValue const &v, EscapeUpdateKind update) {
 	EscapeLocation location = {};
@@ -4152,19 +4604,26 @@ gb_internal void escape_branch(EscapeAnalysis *ea, Ast *label, TokenKind kind) {
 	ea->state.reachable = false;
 }
 
+gb_internal void escape_open_defers(EscapeAnalysis *ea) {
+	array_add(&ea->defers, array_make<EscapeDefer>(temporary_allocator(), 0, 0));
+}
+
+gb_internal void escape_close_defers(EscapeAnalysis *ea) {
+	if (ea->state.reachable) {
+		escape_run_defers(ea, ea->defers.count-1);
+	}
+	array_pop(&ea->defers);
+}
+
 gb_internal void escape_block(EscapeAnalysis *ea, Slice<Ast *> const &stmts) {
-	array_add(&ea->defers, array_make<Ast *>(temporary_allocator(), 0, 0));
+	escape_open_defers(ea);
 	for (Ast *stmt : stmts) {
 		if (!ea->state.reachable) {
 			break;
 		}
 		escape_stmt(ea, stmt);
 	}
-
-	if (ea->state.reachable) {
-		escape_run_defers(ea, ea->defers.count-1);
-	}
-	array_pop(&ea->defers);
+	escape_close_defers(ea);
 
 	for (Ast *stmt : stmts) {
 		escape_forget(ea, stmt);
@@ -4687,6 +5146,9 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 	case_end;
 
 	case_ast_node(is, IfStmt, node);
+		// NOTE(bill): The backend gives the statement a scope where the deferred procedures of the calls in its header run
+		escape_open_defers(ea);
+
 		isize target_index = -1;
 		if (is->label != nullptr) {
 			target_index = escape_push_target(ea, node, EscapeTarget_Labelled);
@@ -4713,6 +5175,7 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 			array_pop(&ea->targets);
 		}
 
+		escape_close_defers(ea);
 		escape_forget(ea, is->init);
 	case_end;
 
@@ -4757,12 +5220,15 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 	case_end;
 
 	case_ast_node(fs, ForStmt, node);
+		escape_open_defers(ea);
 		escape_stmt(ea, fs->init);
 		escape_loop(ea, node, fs->cond, fs->post, fs->body, nullptr, nullptr, nullptr, nullptr);
+		escape_close_defers(ea);
 		escape_forget(ea, fs->init);
 	case_end;
 
 	case_ast_node(rs, RangeStmt, node);
+		escape_open_defers(ea);
 		escape_stmt(ea, rs->init);
 		Ast *val0 = rs->vals.count > 0 ? rs->vals[0] : nullptr;
 		Ast *val1 = rs->vals.count > 1 ? rs->vals[1] : nullptr;
@@ -4785,18 +5251,22 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 		escape_scan_range(ea, rs->expr, by_ref, EscapeScan_Nil);
 		escape_bounds_flush(ea);
 		escape_loop(ea, node, nullptr, nullptr, rs->body, val0, val1, rs->expr, each);
+		escape_close_defers(ea);
 		escape_forget(ea, rs->init);
 	case_end;
 
 	case_ast_node(rs, UnrollRangeStmt, node);
+		escape_open_defers(ea);
 		escape_stmt(ea, rs->init);
 		escape_scan_range(ea, rs->expr, escape_is_by_ref(rs->val0) || escape_is_by_ref(rs->val1), EscapeScan_Stmt);
 		escape_bounds_flush(ea);
 		escape_loop(ea, node, nullptr, nullptr, rs->body, rs->val0, rs->val1, rs->expr, nullptr);
+		escape_close_defers(ea);
 		escape_forget(ea, rs->init);
 	case_end;
 
 	case_ast_node(ss, SwitchStmt, node);
+		escape_open_defers(ea);
 		escape_stmt(ea, ss->init);
 		escape_stmt_expr(ea, ss->tag);
 		bool exhaustive = false;
@@ -4805,6 +5275,7 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 			exhaustive = is_type_enum(ss->tag->tav.type);
 		}
 		escape_switch(ea, node, ss->body, nullptr, exhaustive);
+		escape_close_defers(ea);
 		escape_forget(ea, ss->init);
 	case_end;
 
@@ -4816,14 +5287,16 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 		if (rhs == nullptr) {
 			break;
 		}
+		escape_open_defers(ea);
 		escape_scan(ea, rhs, EscapeScan_Stmt);
 		escape_bounds_flush(ea);
 		escape_switch(ea, node, ss->body, rhs, !ss->partial);
+		escape_close_defers(ea);
 	case_end;
 
 	case_ast_node(ds, DeferStmt, node);
 		if (ea->defers.count > 0) {
-			array_add(&ea->defers[ea->defers.count-1], ds->stmt);
+			array_add(&ea->defers[ea->defers.count-1], EscapeDefer{ds->stmt, nullptr});
 		}
 	case_end;
 
@@ -4843,6 +5316,8 @@ gb_internal ErrorInstantiations escape_instantiations_of(ProcInfo *pi) {
 	return {pi->generated_from_polymorphic ? pi : pi->poly_parent, nullptr};
 }
 
+enum : isize { ESCAPE_MAX_GLOBAL_WRITES = 64 }; // that a procedure's summary keeps apart, see the end of `escape_analyse`
+
 gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<EscapeReport> *reports, bool calls_unknown=false) {
 	ProcInfo *pi = g->procs[v];
 	Type *type = pi->type;
@@ -4857,12 +5332,12 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	ea.state    = escape_state_unreachable();
 	ea.state.reachable = true;
 
-	ea.defers   = array_make<Array<Ast *> >(temporary_allocator());
-	ea.targets  = array_make<EscapeTarget>(temporary_allocator());
-	ea.aliases  = array_make<EscapeAlias>(temporary_allocator());
-	ea.reported = array_make<Ast *>(temporary_allocator());
-	ea.uses     = array_make<EscapeUse>(temporary_allocator(), 0, 0);
-	ea.flows    = array_make<EscapeFlow>(temporary_allocator(), 0, 0);
+	ea.defers   = array_make<Array<EscapeDefer> >(temporary_allocator());
+	ea.targets  = array_make<EscapeTarget>       (temporary_allocator());
+	ea.aliases  = array_make<EscapeAlias>        (temporary_allocator());
+	ea.reported = array_make<Ast *>              (temporary_allocator());
+	ea.uses     = array_make<EscapeUse>          (temporary_allocator(), 0, 0);
+	ea.flows    = escape_list_make<EscapeFlow>   (temporary_allocator());
 	ea.graph    = g;
 	ea.group    = g->group_of[v];
 	ea.reports  = reports;
@@ -4943,14 +5418,74 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	}
 	global_error_context.instantiations = prev_instantiations;
 
-	// the callers read it once this analysis and its temporary memory are gone
-	auto flows = permanent_slice_make<EscapeFlow>(ea.flows.count);
-	for_array(i, ea.flows) {
-		flows[i] = ea.flows[i];
-		flows[i].target_path = slice_clone(permanent_allocator(), ea.flows[i].target_path);
-		flows[i].param_path  = slice_clone(permanent_allocator(), ea.flows[i].param_path);
-		flows[i].value_path  = slice_clone(permanent_allocator(), ea.flows[i].value_path);
+	// past ESCAPE_MAX_GLOBAL_WRITES writes to globals, the writes to the fields of one become a write to all of it, and past
+	// as many globals or writes through their pointers, one write to any global
+	isize global_writes = 0;
+	isize whole_writes  = 0; // other than through a pointer in the global
+	for (EscapeFlow const &f : ea.flows) {
+		if (f.kind == EscapeFlow_Write && f.target == EscapeFlowTarget_Outer) {
+			global_writes++;
+			if (escape_path_deref_index(f.target_path) == f.target_path.count) {
+				whole_writes++;
+			}
+		}
 	}
+	bool any_global = ea.writes_any_global;
+	auto whole_globals = array_make<Entity *>(temporary_allocator(), 0, 0); // written to, other than through a pointer in it
+	if (!any_global && global_writes > ESCAPE_MAX_GLOBAL_WRITES) {
+		auto globals = array_make<Entity *>(temporary_allocator(), 0, 0);
+		isize deref_writes = 0;
+		for (EscapeFlow const &f : ea.flows) {
+			if (f.kind != EscapeFlow_Write || f.target != EscapeFlowTarget_Outer) {
+				continue;
+			}
+			escape_add_unique(&globals, f.global);
+			if (escape_path_deref_index(f.target_path) < f.target_path.count) {
+				deref_writes++;
+			} else {
+				escape_add_unique(&whole_globals, f.global);
+			}
+			if (globals.count > ESCAPE_MAX_GLOBAL_WRITES || deref_writes > ESCAPE_MAX_GLOBAL_WRITES) {
+				any_global = true;
+				break;
+			}
+		}
+	}
+	bool per_global = !any_global && global_writes > ESCAPE_MAX_GLOBAL_WRITES;
+
+	// the callers read it once this analysis and its temporary memory are gone
+	isize flow_count = ea.flows.count;
+	if (any_global) {
+		flow_count += 1 - global_writes;
+	} else if (per_global) {
+		flow_count += whole_globals.count - whole_writes;
+	}
+	auto flows = permanent_slice_make<EscapeFlow>(flow_count);
+	isize count = 0;
+	for (EscapeFlow const &f : ea.flows) {
+		if (f.kind == EscapeFlow_Write && f.target == EscapeFlowTarget_Outer &&
+		    (any_global || (per_global && escape_path_deref_index(f.target_path) == f.target_path.count))) {
+			continue;
+		}
+		flows[count] = f;
+		flows[count].target_path = slice_clone(permanent_allocator(), f.target_path);
+		flows[count].param_path  = slice_clone(permanent_allocator(), f.param_path);
+		flows[count].value_path  = slice_clone(permanent_allocator(), f.value_path);
+		count++;
+	}
+	if (any_global) {
+		EscapeFlow any = {EscapeFlow_Write, -1};
+		any.target = EscapeFlowTarget_Outer;
+		flows[count++] = any;
+	} else {
+		for (Entity *global : whole_globals) {
+			EscapeFlow whole = {EscapeFlow_Write, -1};
+			whole.target = EscapeFlowTarget_Outer;
+			whole.global = global;
+			flows[count++] = whole;
+		}
+	}
+	GB_ASSERT(count == flow_count);
 	return flows;
 }
 
@@ -4982,13 +5517,15 @@ gb_internal void escape_update_member(EscapeGraph *g, Slice<EscapeMemberTask> ta
 	EscapeMemberTask &t = tasks[k];
 	DeclInfo *d = g->procs[t.v]->decl;
 
-	// the same flows, in any order
-	bool same = t.flows.count == d->proc->escape_flows.count;
-	for (isize i = 0; same && i < t.flows.count; i++) {
-		same = false;
-		for (EscapeFlow const &other : d->proc->escape_flows) {
-			same |= escape_eq(t.flows[i], other);
-		}
+	// the same flows, in any order; both slices hold distinct items, so equal counts and containment suffice
+	Slice<EscapeFlow> old = d->proc->escape_flows;
+	bool same = t.flows.count == old.count;
+	isize i = 0;
+	while (same && i < t.flows.count && escape_eq(t.flows[i], old[i])) {
+		i++;
+	}
+	if (same && i < t.flows.count) {
+		same = escape_slice_contains_all(old, t.flows, i);
 	}
 	if (same) {
 		return;

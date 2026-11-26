@@ -22,7 +22,13 @@ foreign {
 	abort_ext   :: proc(file: cstring, function: cstring, line: i32, fmt: cstring, #c_vararg args: ..any) -> ! ---
 	assert_fail :: proc(file: cstring, function: cstring, line: i32, src: cstring, fmt: cstring, #c_vararg args: ..any) -> ! ---
 	log_ext     :: proc(level: log_level, function: cstring, file: cstring, line: i32, fmt: cstring, #c_vararg args: ..any) ---
+
+	@(private="file")
+	clock_time  :: proc(clock: u32) -> f64 ---
 }
+
+@(private="file")
+CLOCK_MONOTONIC :: 0
 
 // NOTE: This is all pretty gross, don't look.
 
@@ -44,6 +50,9 @@ _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 	return len(data), 0
 }
 
+_read_cycle_counter :: proc "contextless" () -> i64 {
+	return i64(clock_time(CLOCK_MONOTONIC) * 1e9)
+}
 
 _exit :: proc "contextless" (code: int) -> ! {
 	trap()

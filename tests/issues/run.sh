@@ -109,6 +109,13 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_nesting_limit $COMMON_CHECK 2>&1 >/dev/null | grep -c "nested too deeply") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 $ODIN check ../test_issue_foreign_redeclaration -no-entry-point $COMMON_CHECK
 $ODIN check ../test_issue_foreign_import_attributes -no-entry-point $COMMON_CHECK
 
@@ -202,6 +209,14 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_poly_recursion_limit $COMMON_CHECK 2>&1 >/dev/null | grep -c "Polymorphic instantiations are nested too deeply") -eq 1 &&
+      $($ODIN check ../test_issue_poly_recursion_limit_record $COMMON_CHECK 2>&1 >/dev/null | grep -c "Polymorphic instantiations are nested too deeply") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_fixed_point_scale $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
@@ -245,10 +260,12 @@ else
 fi
 
 ESCAPE_OUT=$($ODIN check ../test_issue_escape_diagnostics -no-entry-point $COMMON_CHECK 2>&1 >/dev/null)
-if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 4 &&
-      $(grep -c "holds a pointer into itself" <<< "$ESCAPE_OUT") -eq 2 &&
-      $(grep -c "is taken at" <<< "$ESCAPE_OUT") -eq 4 &&
-      $(grep -c "'temp.allocator.data' may refer to 'temp.arena' in the stack memory of the named result 'temp'" <<< "$ESCAPE_OUT") -eq 1 ]]; then
+if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 5 &&
+      $(grep -c "holds a pointer into itself" <<< "$ESCAPE_OUT") -eq 3 &&
+      $(grep -c "is taken at" <<< "$ESCAPE_OUT") -eq 5 &&
+      $(grep -c "'temp.allocator.data' may refer to 'temp.arena' in the stack memory of the named result 'temp'" <<< "$ESCAPE_OUT") -eq 1 &&
+      $(grep -c "The call to" <<< "$ESCAPE_OUT") -eq 3 &&
+      $(grep -c "returns its parameter 'mem' in '.memory' of its result" <<< "$ESCAPE_OUT") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
@@ -263,8 +280,17 @@ else
 fi
 
 ESCAPE_OUT=$($ODIN check ../test_issue_escape_cleared_stores -no-entry-point $COMMON_CHECK 2>&1 >/dev/null)
-if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 15 &&
+if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 28 &&
       $(grep -c "local variable 'y'" <<< "$ESCAPE_OUT") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+ESCAPE_OUT=$($ODIN check ../test_issue_escape_deferred_procs -no-entry-point $COMMON_CHECK 2>&1 >/dev/null)
+if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 8 &&
+      $(grep -c "deferred by" <<< "$ESCAPE_OUT") -eq 7 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
@@ -740,6 +766,14 @@ if command -v wasmtime > /dev/null; then
 	done
 fi
 
+$ODIN run ../test_issue_8177 $COMMON
+$ODIN build ../test_issue_8177 -target:js_wasm64p32 -build-mode:obj $COMMON_CHECK
+$ODIN build ../test_issue_8177 -target:wasi_wasm64p32 -build-mode:obj $COMMON_CHECK
+if command -v wasmtime > /dev/null; then
+	$ODIN build ../test_issue_8177 -target:wasi_wasm64p32 $COMMON_CHECK
+	wasmtime run ./test_issue_8177.wasm
+fi
+
 # wasm32 C vectors, both sides without and with simd128; needs wasmtime and a clang that targets wasm32
 if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]] && command -v wasmtime > /dev/null; then
 	for simd in "" simd128; do
@@ -935,6 +969,34 @@ chmod +x fake_cc_128 fake_cc_sig
 if ODIN_CLANG_PATH="$PWD/fake_cc_128" $ODIN build ../test_paths_debug $COMMON -out:fake_link; then exit 1; fi
 SIG_OUT=$(ODIN_CLANG_PATH="$PWD/fake_cc_sig" $ODIN build ../test_paths_debug $COMMON -out:fake_link 2>&1 || true)
 grep -q "terminated by signal 15" <<< "$SIG_OUT"
+
+SB=../test_paths_sandbox
+LOAD_OUT=$($ODIN check $SB/load -no-entry-point -sandbox-root:$SB/load -collection:foo=$SB/coll 2>&1 || true)
+FOREIGN_OUT=$($ODIN check $SB/foreign -no-entry-point -sandbox-root:$SB/foreign 2>&1 || true)
+ROOTS_OUT=$($ODIN check $SB/roots -no-entry-point -sandbox-root:$SB/roots 2>&1 || true)
+MAIN_OUT=$($ODIN check $SB/roots -no-entry-point -sandbox-root:../test_issue_6165 2>&1 || true)
+if [[ $(echo "$LOAD_OUT" | grep -c "is outside every -sandbox-root") -eq 8 &&
+      $(echo "$LOAD_OUT" | grep -c "it contains a NUL byte") -eq 1 &&
+      $(echo "$LOAD_OUT" | grep -c "collection and every -sandbox-root") -eq 2 &&
+      $(echo "$LOAD_OUT" | grep -c "Error:") -eq 11 &&
+      $(echo "$FOREIGN_OUT" | grep -c "must be a name, not a path") -eq 2 &&
+      $(echo "$FOREIGN_OUT" | grep -c "is outside every -sandbox-root") -eq 1 &&
+      $(echo "$ROOTS_OUT" | grep -c "is outside every -sandbox-root") -eq 2 &&
+      $(echo "$MAIN_OUT" | grep -c "The main package") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+$ODIN check $SB/foreign -no-entry-point
+$ODIN check $SB/roots -no-entry-point
+$ODIN check $SB/roots -no-entry-point -sandbox-root:$SB/roots -sandbox-root:../../..
+rm -rf sb_link
+mkdir -p sb_link/root
+printf 'ok\n' > sb_link/root/x.txt
+ln -sfn "$PWD/sb_link" sb_link/root/up
+printf 'package sb_link\n\nA :: #load("up/root/x.txt", string)\nB :: #exists("up/root/missing.txt")\n\n#assert(A == "ok\\n")\n#assert(!B)\n' > sb_link/root/main.odin
+$ODIN check sb_link/root -no-entry-point -sandbox-root:sb_link/root
 
 #########################################################################################################
 

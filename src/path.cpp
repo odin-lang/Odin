@@ -466,6 +466,27 @@ gb_internal bool file_id_visit(StringSet *visited, String path) {
 	return !string_set_update(visited, make_string(key, gb_size_of(FileId)));
 }
 
+gb_internal String path_parent(String s) {
+	while (s.len > 1 && s.text[s.len-1] == '/') {
+		s.len -= 1;
+	}
+	isize i = s.len;
+	while (i > 0 && s.text[i-1] != '/') {
+		i -= 1;
+	}
+	if (i == 0) {
+		return {};
+	}
+	String parent = substring(s, 0, i);
+	if (parent.len > 1 && !(parent.len == 3 && parent.text[1] == ':')) {
+		parent.len -= 1;
+	}
+	if (parent.len == s.len) {
+		return {};
+	}
+	return parent;
+}
+
 struct Path {
 	String basename;
 	String name;
@@ -626,6 +647,7 @@ enum ReadDirectoryError {
 	ReadDirectory_NotDir,
 	ReadDirectory_Empty,
 	ReadDirectory_Unknown,
+	ReadDirectory_Outside,
 
 	ReadDirectory_COUNT,
 };
@@ -827,6 +849,1060 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 #else
 #error Implement read_directory
 #endif
+
+enum ConfineResult {
+	Confine_Ok,
+	Confine_NotExists,
+	Confine_Outside,
+	Confine_Permission,
+	Confine_Invalid,
+};
+
+enum ConfineKind {
+	ConfineKind_File,
+	ConfineKind_Dir,
+	ConfineKind_Link,
+};
+
+#if defined(GB_SYSTEM_WINDOWS)
+typedef HANDLE ConfineHandle;
+gb_global ConfineHandle const CONFINE_NO_HANDLE = INVALID_HANDLE_VALUE;
+
+struct ConfineUnicodeString {
+	USHORT Length;
+	USHORT MaximumLength;
+	PWSTR  Buffer;
+};
+
+struct ConfineObjectAttributes {
+	ULONG                 Length;
+	HANDLE                RootDirectory;
+	ConfineUnicodeString *ObjectName;
+	ULONG                 Attributes;
+	PVOID                 SecurityDescriptor;
+	PVOID                 SecurityQualityOfService;
+};
+
+struct ConfineIoStatusBlock {
+	union {
+		LONG  Status;
+		PVOID Pointer;
+	};
+	ULONG_PTR Information;
+};
+
+typedef LONG (NTAPI *ConfineNtCreateFileProc)(HANDLE *, ACCESS_MASK, ConfineObjectAttributes *, ConfineIoStatusBlock *, LARGE_INTEGER *, ULONG, ULONG, ULONG, ULONG, void *, ULONG);
+
+gb_global ConfineNtCreateFileProc confine_nt_create_file;
+
+gb_global u32 const CONFINE_TAG_MOUNT_POINT = 0xA0000003u;
+gb_global u32 const CONFINE_TAG_SYMLINK     = 0xA000000Cu;
+gb_global u32 const CONFINE_TAG_LX_SYMLINK  = 0xA000001Du;
+gb_global u32 const CONFINE_TAG_SURROGATE   = 0x20000000u;
+#else
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <errno.h>
+#if defined(GB_SYSTEM_LINUX)
+#include <sys/syscall.h>
+#endif
+typedef int ConfineHandle;
+gb_global ConfineHandle const CONFINE_NO_HANDLE = -1;
+#endif
+
+struct ConfineRoot {
+	String        spelled;
+	String        real;
+	ConfineHandle handle;
+	bool          sandbox;
+};
+
+gb_global isize const CONFINE_ANY     = -2;
+gb_global isize const CONFINE_SANDBOX = -1;
+
+gb_global Array<ConfineRoot> confine_roots;
+gb_global std::atomic<bool> confine_fast_off;
+
+gb_internal bool confine_active(void) {
+	return confine_roots.count > 0;
+}
+
+gb_internal bool confine_is_sep(u8 c) {
+#if defined(GB_SYSTEM_WINDOWS)
+	return c == '/' || c == '\\';
+#else
+	return c == '/';
+#endif
+}
+
+gb_internal void confine__slashes(String s) {
+#if defined(GB_SYSTEM_WINDOWS)
+	for (isize i = 0; i < s.len; i++) {
+		if (s.text[i] == '\\') {
+			s.text[i] = '/';
+		}
+	}
+#else
+	gb_unused(s);
+#endif
+}
+
+gb_internal void confine__collapse(String *s) {
+	isize start = 0;
+#if defined(GB_SYSTEM_WINDOWS)
+	if (s->len >= 2 && s->text[0] == '/' && s->text[1] == '/') {
+		start = 2;
+	}
+#endif
+	isize w = start;
+	for (isize r = start; r < s->len; r++) {
+		u8 c = s->text[r];
+		if (c == '/' && w > 0 && s->text[w-1] == '/') {
+			continue;
+		}
+		s->text[w] = c;
+		w += 1;
+	}
+	s->len = w;
+}
+
+gb_internal String confine__normalize(gbAllocator a, String s) {
+	String c = copy_string(a, s);
+	confine__slashes(c);
+	confine__collapse(&c);
+	while (c.len > 1 && c.text[c.len-1] == '/' && !(c.len == 3 && c.text[1] == ':')) {
+		c.len -= 1;
+	}
+	return c;
+}
+
+gb_internal bool confine__path_eq(String a, String b) {
+#if defined(GB_SYSTEM_WINDOWS)
+	return str_eq_ignore_case(a, b);
+#else
+	return a == b;
+#endif
+}
+
+gb_internal bool confine__prefix(String path, String root) {
+	if (root.len == 0 || path.len < root.len) {
+		return false;
+	}
+	if (!confine__path_eq(substring(path, 0, root.len), root)) {
+		return false;
+	}
+	if (path.len == root.len) {
+		return true;
+	}
+	return root.text[root.len-1] == '/' || path.text[root.len] == '/';
+}
+
+gb_internal bool confine__is_absolute(String s) {
+	if (s.len > 0 && s.text[0] == '/') {
+		return true;
+	}
+#if defined(GB_SYSTEM_WINDOWS)
+	if (s.len >= 2 && s.text[1] == ':') {
+		return true;
+	}
+#endif
+	return false;
+}
+
+gb_internal isize confine__find_root(String path, isize scope, isize *matched) {
+	isize best = -1;
+	*matched = 0;
+	for (isize i = 0; i < confine_roots.count; i++) {
+		ConfineRoot const &r = confine_roots[i];
+		if (scope != CONFINE_ANY && !r.sandbox && i != scope) {
+			continue;
+		}
+		if (confine__prefix(path, r.spelled) && (best < 0 || r.spelled.len > *matched)) {
+			best = i;
+			*matched = r.spelled.len;
+		}
+		if (confine__prefix(path, r.real) && (best < 0 || r.real.len > *matched)) {
+			best = i;
+			*matched = r.real.len;
+		}
+	}
+	return best;
+}
+
+gb_internal isize confine_collection_scope(String dir) {
+	String n = confine__normalize(heap_allocator(), dir);
+	defer (gb_free(heap_allocator(), n.text));
+	for (isize i = 0; i < confine_roots.count; i++) {
+		ConfineRoot const &r = confine_roots[i];
+		if (!r.sandbox && (confine__path_eq(r.spelled, n) || confine__path_eq(r.real, n))) {
+			return i;
+		}
+	}
+	return CONFINE_SANDBOX;
+}
+
+gb_internal isize confine_scope_of(String dir) {
+	String n = confine__normalize(heap_allocator(), dir);
+	defer (gb_free(heap_allocator(), n.text));
+	isize best = CONFINE_SANDBOX;
+	isize best_len = 0;
+	for (isize i = 0; i < confine_roots.count; i++) {
+		ConfineRoot const &r = confine_roots[i];
+		if (r.sandbox) {
+			continue;
+		}
+		if (confine__prefix(n, r.spelled) && r.spelled.len > best_len) {
+			best = i;
+			best_len = r.spelled.len;
+		}
+		if (confine__prefix(n, r.real) && r.real.len > best_len) {
+			best = i;
+			best_len = r.real.len;
+		}
+	}
+	return best;
+}
+
+gb_internal void confine_close(ConfineHandle h) {
+	if (h == CONFINE_NO_HANDLE) {
+		return;
+	}
+#if defined(GB_SYSTEM_WINDOWS)
+	CloseHandle(h);
+#else
+	close(h);
+#endif
+}
+
+#if defined(GB_SYSTEM_WINDOWS)
+gb_internal ConfineResult confine__win32_error(DWORD err) {
+	switch (err) {
+	case ERROR_FILE_NOT_FOUND:
+	case ERROR_PATH_NOT_FOUND:
+	case ERROR_INVALID_DRIVE:
+	case ERROR_BAD_NETPATH:
+	case ERROR_BAD_NET_NAME:
+	case ERROR_DIRECTORY:
+		return Confine_NotExists;
+	case ERROR_ACCESS_DENIED:
+	case ERROR_INVALID_ACCESS:
+	case ERROR_SHARING_VIOLATION:
+		return Confine_Permission;
+	}
+	return Confine_Invalid;
+}
+
+gb_internal ConfineResult confine__ntstatus(LONG status) {
+	switch (cast(u32)status) {
+	case 0xC000000Fu:
+	case 0xC0000034u:
+	case 0xC000003Au:
+	case 0xC0000056u:
+	case 0xC0000103u:
+		return Confine_NotExists;
+	case 0xC0000022u:
+	case 0xC0000043u:
+		return Confine_Permission;
+	}
+	return Confine_Invalid;
+}
+
+gb_internal bool confine__final_path(HANDLE h, String *out) {
+	gbAllocator ha = heap_allocator();
+	DWORD n = GetFinalPathNameByHandleW(h, nullptr, 0, FILE_NAME_NORMALIZED|VOLUME_NAME_DOS);
+	if (n == 0) {
+		return false;
+	}
+	wchar_t *buf = gb_alloc_array(ha, wchar_t, n+1);
+	defer (gb_free(ha, buf));
+	DWORD m = GetFinalPathNameByHandleW(h, buf, n+1, FILE_NAME_NORMALIZED|VOLUME_NAME_DOS);
+	if (m == 0 || m > n) {
+		return false;
+	}
+	String s = string16_to_string(ha, make_string16(cast(u16 *)buf, m));
+	confine__slashes(s);
+	isize skip = 0;
+	if (string_starts_with(s, str_lit("//?/UNC/"))) {
+		skip = 6;
+	} else if (string_starts_with(s, str_lit("//?/"))) {
+		skip = 4;
+	}
+	if (skip > 0) {
+		gb_memmove(s.text, s.text + skip, s.len - skip);
+		s.len -= skip;
+		if (skip == 6) {
+			s.text[0] = '/';
+			s.text[1] = '/';
+		}
+	}
+	*out = s;
+	return true;
+}
+
+gb_internal ConfineResult confine__classify(HANDLE h, bool *is_dir) {
+	BY_HANDLE_FILE_INFORMATION info = {};
+	if (!GetFileInformationByHandle(h, &info)) {
+		return Confine_Invalid;
+	}
+	*is_dir = (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+	return Confine_Ok;
+}
+
+gb_internal ConfineResult confine_open_direct(String path, ConfineHandle *out, bool *is_dir) {
+	*out = CONFINE_NO_HANDLE;
+	*is_dir = false;
+	gbAllocator ha = heap_allocator();
+	String16 w = string_to_win32_path(ha, path);
+	defer (gb_free(ha, w.text));
+	if (w.len == 0) {
+		return Confine_Invalid;
+	}
+	HANDLE h = CreateFileW(cast(wchar_t *)w.text, FILE_GENERIC_READ, FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+	if (h == INVALID_HANDLE_VALUE) {
+		return confine__win32_error(GetLastError());
+	}
+	ConfineResult r = confine__classify(h, is_dir);
+	if (r != Confine_Ok) {
+		CloseHandle(h);
+		return r;
+	}
+	*out = h;
+	return Confine_Ok;
+}
+
+gb_internal ConfineResult confine__nt_open(HANDLE dir, String name, bool reparse, HANDLE *out) {
+	*out = CONFINE_NO_HANDLE;
+	if (confine_nt_create_file == nullptr) {
+		return Confine_Invalid;
+	}
+	gbAllocator ha = heap_allocator();
+	String16 w = string_to_string16(ha, name);
+	defer (gb_free(ha, w.text));
+	if ((name.len > 0 && w.len == 0) || w.len > 32767) {
+		return Confine_Invalid;
+	}
+	ConfineUnicodeString us = {};
+	us.Length        = cast(USHORT)(w.len*2);
+	us.MaximumLength = us.Length;
+	us.Buffer        = cast(PWSTR)w.text;
+
+	ConfineObjectAttributes oa = {};
+	oa.Length        = sizeof(oa);
+	oa.RootDirectory = dir;
+	oa.ObjectName    = &us;
+	oa.Attributes    = 0x40;
+
+	ConfineIoStatusBlock io = {};
+	HANDLE h = nullptr;
+	ULONG options = 0x20;
+	if (reparse) {
+		options |= 0x00200000;
+	}
+	LONG status = confine_nt_create_file(&h, FILE_GENERIC_READ, &oa, &io, nullptr, 0, FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, 1, options, nullptr, 0);
+	if (status < 0) {
+		return confine__ntstatus(status);
+	}
+	*out = h;
+	return Confine_Ok;
+}
+
+gb_internal bool confine__reparse_target(HANDLE h, u32 tag, String *target) {
+	*target = {};
+	u64 buf[16*1024/8];
+	DWORD got = 0;
+	if (!DeviceIoControl(h, 0x000900A8, nullptr, 0, buf, sizeof(buf), &got, nullptr) || got < 8) {
+		return false;
+	}
+	u8 *b = cast(u8 *)buf;
+	u32 btag     = *cast(u32 *)b;
+	u16 data_len = *cast(u16 *)(b+4);
+	if (btag != tag || 8 + cast(DWORD)data_len > got) {
+		return false;
+	}
+	gbAllocator ha = heap_allocator();
+	if (tag == CONFINE_TAG_LX_SYMLINK) {
+		if (data_len <= 4) {
+			return false;
+		}
+		*target = copy_string(ha, make_string(b+12, data_len-4));
+		return true;
+	}
+	isize header = tag == CONFINE_TAG_SYMLINK ? 12 : 8;
+	if (data_len < header) {
+		return false;
+	}
+	u16 sub_off = *cast(u16 *)(b+8);
+	u16 sub_len = *cast(u16 *)(b+10);
+	u32 flags   = tag == CONFINE_TAG_SYMLINK ? *cast(u32 *)(b+16) : 0;
+	if ((sub_off & 1) != 0 || (sub_len & 1) != 0 || sub_len == 0 || cast(isize)sub_off + sub_len > data_len - header) {
+		return false;
+	}
+	u8 *path_buffer = b + 8 + header;
+	String s = string16_to_string(ha, make_string16(cast(u16 *)(path_buffer + sub_off), sub_len/2));
+	if (s.len == 0) {
+		return false;
+	}
+	confine__slashes(s);
+	if ((flags & 1) == 0) {
+		if (string_starts_with(s, str_lit("/??/UNC/"))) {
+			gb_memmove(s.text + 2, s.text + 8, s.len - 8);
+			s.len -= 6;
+			s.text[0] = '/';
+			s.text[1] = '/';
+		} else if (string_starts_with(s, str_lit("/??/"))) {
+			gb_memmove(s.text, s.text + 4, s.len - 4);
+			s.len -= 4;
+		}
+	}
+	*target = s;
+	return true;
+}
+
+gb_internal ConfineResult confine__step(ConfineHandle dir, String name, bool more, ConfineHandle *out, ConfineKind *kind, String *target) {
+	gb_unused(more);
+	*out = CONFINE_NO_HANDLE;
+	*kind = ConfineKind_File;
+	*target = {};
+	HANDLE h = CONFINE_NO_HANDLE;
+	ConfineResult r = confine__nt_open(dir, name, true, &h);
+	if (r != Confine_Ok) {
+		return r;
+	}
+	FILE_ATTRIBUTE_TAG_INFO tag = {};
+	if (!GetFileInformationByHandleEx(h, FileAttributeTagInfo, &tag, sizeof(tag))) {
+		CloseHandle(h);
+		return Confine_Invalid;
+	}
+	if ((tag.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) {
+		u32 t = cast(u32)tag.ReparseTag;
+		if ((t & CONFINE_TAG_SURROGATE) != 0) {
+			bool ok = (t == CONFINE_TAG_SYMLINK || t == CONFINE_TAG_MOUNT_POINT || t == CONFINE_TAG_LX_SYMLINK) && confine__reparse_target(h, t, target);
+			CloseHandle(h);
+			if (!ok) {
+				return Confine_Invalid;
+			}
+			*kind = ConfineKind_Link;
+			return Confine_Ok;
+		}
+		CloseHandle(h);
+		r = confine__nt_open(dir, name, false, &h);
+		if (r != Confine_Ok) {
+			return r;
+		}
+		if (!GetFileInformationByHandleEx(h, FileAttributeTagInfo, &tag, sizeof(tag))) {
+			CloseHandle(h);
+			return Confine_Invalid;
+		}
+	}
+	*kind = (tag.FileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 ? ConfineKind_Dir : ConfineKind_File;
+	*out = h;
+	return Confine_Ok;
+}
+
+gb_internal ConfineResult confine__reopen(ConfineHandle dir, ConfineHandle *out) {
+	return confine__nt_open(dir, String{}, false, out);
+}
+
+gb_internal bool confine__fast(ConfineHandle root, String rest, ConfineHandle *out, bool *is_dir, ConfineResult *res) {
+	gb_unused(root);
+	gb_unused(rest);
+	gb_unused(out);
+	gb_unused(is_dir);
+	gb_unused(res);
+	return false;
+}
+
+gb_internal ConfineHandle confine__open_root(String dir, String *real) {
+	if (confine_nt_create_file == nullptr) {
+		HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+		if (ntdll != nullptr) {
+			confine_nt_create_file = cast(ConfineNtCreateFileProc)GetProcAddress(ntdll, "NtCreateFile");
+		}
+	}
+	ConfineHandle h = CONFINE_NO_HANDLE;
+	bool is_dir = false;
+	if (confine_open_direct(dir, &h, &is_dir) != Confine_Ok) {
+		return CONFINE_NO_HANDLE;
+	}
+	if (!is_dir) {
+		CloseHandle(h);
+		return CONFINE_NO_HANDLE;
+	}
+	if (!confine__final_path(h, real)) {
+		*real = {};
+	}
+	return h;
+}
+
+gb_internal i64 confine_size(ConfineHandle h) {
+	LARGE_INTEGER size = {};
+	if (!GetFileSizeEx(h, &size)) {
+		return -1;
+	}
+	return cast(i64)size.QuadPart;
+}
+
+gb_internal bool confine_read(ConfineHandle h, u8 *data, isize size, isize *got) {
+	*got = 0;
+	while (*got < size) {
+		DWORD want = cast(DWORD)gb_min(size - *got, cast(isize)(1<<30));
+		DWORD n = 0;
+		if (!ReadFile(h, data + *got, want, &n, nullptr)) {
+			return false;
+		}
+		if (n == 0) {
+			break;
+		}
+		*got += n;
+	}
+	return true;
+}
+
+gb_internal bool confine_file_id(ConfineHandle h, FileId *id) {
+	*id = {};
+	FILE_ID_INFO info = {};
+	if (GetFileInformationByHandleEx(h, FileIdInfo, &info, sizeof(info))) {
+		id->volume = info.VolumeSerialNumber;
+		gb_memmove(&id->id_lo, &info.FileId.Identifier[0], 8);
+		gb_memmove(&id->id_hi, &info.FileId.Identifier[8], 8);
+		return true;
+	}
+	BY_HANDLE_FILE_INFORMATION bhfi = {};
+	if (GetFileInformationByHandle(h, &bhfi)) {
+		id->volume = bhfi.dwVolumeSerialNumber;
+		id->id_lo  = (cast(u64)bhfi.nFileIndexHigh << 32) | bhfi.nFileIndexLow;
+		return true;
+	}
+	return false;
+}
+#else
+gb_internal ConfineResult confine__errno(int e) {
+	switch (e) {
+	case ENOENT:
+	case ENOTDIR:
+		return Confine_NotExists;
+	case EACCES:
+	case EPERM:
+		return Confine_Permission;
+	}
+	return Confine_Invalid;
+}
+
+gb_internal ConfineResult confine__classify(int fd, bool *is_dir) {
+	struct stat st = {};
+	if (fstat(fd, &st) != 0) {
+		return Confine_Invalid;
+	}
+	if (S_ISDIR(st.st_mode)) {
+		*is_dir = true;
+		return Confine_Ok;
+	}
+	if (S_ISREG(st.st_mode)) {
+		*is_dir = false;
+		return Confine_Ok;
+	}
+	return Confine_Invalid;
+}
+
+gb_internal ConfineResult confine_open_direct(String path, ConfineHandle *out, bool *is_dir) {
+	*out = CONFINE_NO_HANDLE;
+	*is_dir = false;
+	char *c = alloc_cstring(heap_allocator(), path);
+	defer (gb_free(heap_allocator(), c));
+	int fd = open(c, O_RDONLY|O_NONBLOCK|O_CLOEXEC);
+	if (fd < 0) {
+		return confine__errno(errno);
+	}
+	ConfineResult r = confine__classify(fd, is_dir);
+	if (r != Confine_Ok) {
+		close(fd);
+		return r;
+	}
+	*out = fd;
+	return Confine_Ok;
+}
+
+gb_internal ConfineResult confine__step(ConfineHandle dir, String name, bool more, ConfineHandle *out, ConfineKind *kind, String *target) {
+	*out = CONFINE_NO_HANDLE;
+	*kind = ConfineKind_File;
+	*target = {};
+	gbAllocator ha = heap_allocator();
+	char *c = alloc_cstring(ha, name);
+	defer (gb_free(ha, c));
+	int flags = O_RDONLY|O_NOFOLLOW|O_NONBLOCK|O_CLOEXEC;
+	if (more) {
+		flags |= O_DIRECTORY;
+	}
+	int fd = openat(dir, c, flags);
+	if (fd < 0) {
+		int e = errno;
+		char buf[4096];
+		ssize_t n = readlinkat(dir, c, buf, gb_size_of(buf));
+		if (n > 0 && n < gb_size_of(buf)) {
+			*target = copy_string(ha, make_string(cast(u8 *)buf, n));
+			*kind = ConfineKind_Link;
+			return Confine_Ok;
+		}
+		if (n >= 0) {
+			return Confine_Invalid;
+		}
+		return confine__errno(e);
+	}
+	bool is_dir = false;
+	ConfineResult r = confine__classify(fd, &is_dir);
+	if (r != Confine_Ok) {
+		close(fd);
+		return r;
+	}
+	*kind = is_dir ? ConfineKind_Dir : ConfineKind_File;
+	*out = fd;
+	return Confine_Ok;
+}
+
+gb_internal ConfineResult confine__reopen(ConfineHandle dir, ConfineHandle *out) {
+	int fd = openat(dir, ".", O_RDONLY|O_DIRECTORY|O_CLOEXEC);
+	if (fd < 0) {
+		*out = CONFINE_NO_HANDLE;
+		return confine__errno(errno);
+	}
+	*out = fd;
+	return Confine_Ok;
+}
+
+gb_internal bool confine__fast(ConfineHandle root, String rest, ConfineHandle *out, bool *is_dir, ConfineResult *res) {
+#if defined(GB_SYSTEM_LINUX) || (defined(GB_SYSTEM_FREEBSD) && defined(O_RESOLVE_BENEATH))
+	if (confine_fast_off.load(std::memory_order_relaxed)) {
+		return false;
+	}
+	while (rest.len > 0 && rest.text[0] == '/') {
+		rest = substring(rest, 1, rest.len);
+	}
+	gbAllocator ha = heap_allocator();
+	char *c = alloc_cstring(ha, rest.len > 0 ? rest : str_lit("."));
+	defer (gb_free(ha, c));
+#if defined(GB_SYSTEM_LINUX)
+	struct {
+		u64 flags;
+		u64 mode;
+		u64 resolve;
+	} how = {cast(u64)(O_RDONLY|O_NONBLOCK|O_CLOEXEC), 0, 0x08|0x02};
+	int fd = cast(int)syscall(437, root, c, &how, sizeof(how));
+#else
+	int fd = openat(root, c, O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_RESOLVE_BENEATH);
+#endif
+	if (fd < 0) {
+		int e = errno;
+		switch (e) {
+		case ENOENT:
+		case ENOTDIR:
+			*res = Confine_NotExists;
+			return true;
+		case EACCES:
+			*res = Confine_Permission;
+			return true;
+	#if defined(GB_SYSTEM_LINUX)
+		case ENOSYS:
+		case EPERM:
+			confine_fast_off.store(true, std::memory_order_relaxed);
+			return false;
+	#endif
+		}
+		return false;
+	}
+	*res = confine__classify(fd, is_dir);
+	if (*res != Confine_Ok) {
+		close(fd);
+		return true;
+	}
+	*out = fd;
+	return true;
+#else
+	gb_unused(root);
+	gb_unused(rest);
+	gb_unused(out);
+	gb_unused(is_dir);
+	gb_unused(res);
+	return false;
+#endif
+}
+
+gb_internal ConfineHandle confine__open_root(String dir, String *real) {
+	*real = {};
+	char *c = alloc_cstring(heap_allocator(), dir);
+	defer (gb_free(heap_allocator(), c));
+	int fd = open(c, O_RDONLY|O_DIRECTORY|O_CLOEXEC);
+	if (fd < 0) {
+		return CONFINE_NO_HANDLE;
+	}
+	char *r = realpath(c, nullptr);
+	if (r != nullptr) {
+		*real = copy_string(heap_allocator(), make_string_c(r));
+		free(r);
+	}
+	return fd;
+}
+
+gb_internal i64 confine_size(ConfineHandle h) {
+	struct stat st = {};
+	if (fstat(h, &st) != 0) {
+		return -1;
+	}
+	return cast(i64)st.st_size;
+}
+
+gb_internal bool confine_read(ConfineHandle h, u8 *data, isize size, isize *got) {
+	*got = 0;
+	while (*got < size) {
+		ssize_t n = read(h, data + *got, cast(size_t)(size - *got));
+		if (n < 0) {
+			if (errno == EINTR) {
+				continue;
+			}
+			return false;
+		}
+		if (n == 0) {
+			break;
+		}
+		*got += n;
+	}
+	return true;
+}
+
+gb_internal bool confine_file_id(ConfineHandle h, FileId *id) {
+	*id = {};
+	struct stat st = {};
+	if (fstat(h, &st) != 0) {
+		return false;
+	}
+	id->volume = cast(u64)st.st_dev;
+	id->id_lo  = cast(u64)st.st_ino;
+	return true;
+}
+#endif
+
+gb_internal void confine_add_root(String dir, bool sandbox) {
+	if (confine_roots.data == nullptr) {
+		array_init(&confine_roots, heap_allocator());
+	}
+	ConfineRoot root = {};
+	root.sandbox = sandbox;
+	root.spelled = confine__normalize(heap_allocator(), dir);
+	root.handle  = confine__open_root(root.spelled, &root.real);
+	if (root.handle == CONFINE_NO_HANDLE) {
+		gb_free(heap_allocator(), root.spelled.text);
+		return;
+	}
+	if (root.real.len == 0) {
+		root.real = root.spelled;
+	} else {
+		String real = confine__normalize(heap_allocator(), root.real);
+		gb_free(heap_allocator(), root.real.text);
+		root.real = real;
+	}
+	array_add(&confine_roots, root);
+}
+
+gb_internal ConfineResult confine__walk(String path, isize scope, ConfineHandle *out, bool *is_dir) {
+	gbAllocator ha = heap_allocator();
+	String cur = copy_string(ha, path);
+	Array<ConfineHandle> stack = {};
+	array_init(&stack, ha, 0, 16);
+	ConfineResult res = Confine_Outside;
+	isize links    = 0;
+	isize restarts = 0;
+
+	for (;;) {
+		isize matched = 0;
+		isize ri = confine__find_root(cur, scope, &matched);
+		if (ri < 0) {
+			res = Confine_Outside;
+			break;
+		}
+		ConfineRoot const &root = confine_roots[ri];
+		String todo = substring(cur, matched, cur.len);
+
+		if (confine__fast(root.handle, todo, out, is_dir, &res)) {
+			break;
+		}
+
+		array_add(&stack, root.handle);
+		String next = {};
+		bool restart = false;
+		for (;;) {
+			while (todo.len > 0 && confine_is_sep(todo.text[0])) {
+				todo = substring(todo, 1, todo.len);
+			}
+			if (todo.len == 0) {
+				if (stack.count == 1) {
+					res = confine__reopen(stack[0], out);
+				} else {
+					*out = array_pop(&stack);
+					res = Confine_Ok;
+				}
+				*is_dir = res == Confine_Ok;
+				break;
+			}
+			isize n = 0;
+			while (n < todo.len && !confine_is_sep(todo.text[n])) {
+				n += 1;
+			}
+			String comp = substring(todo, 0, n);
+			todo = substring(todo, n, todo.len);
+			if (comp == ".") {
+				continue;
+			}
+			if (comp == "..") {
+				if (stack.count > 1) {
+					confine_close(array_pop(&stack));
+					continue;
+				}
+				String up = path_parent(root.real);
+				if (up.len == 0) {
+					res = Confine_Outside;
+					break;
+				}
+				while (todo.len > 0 && confine_is_sep(todo.text[0])) {
+					todo = substring(todo, 1, todo.len);
+				}
+				String sep = up.text[up.len-1] == '/' ? str_lit("") : str_lit("/");
+				next = concatenate3_strings(ha, up, sep, todo);
+				confine__collapse(&next);
+				restart = true;
+				break;
+			}
+			ConfineHandle h = CONFINE_NO_HANDLE;
+			ConfineKind kind = ConfineKind_File;
+			String target = {};
+			res = confine__step(stack[stack.count-1], comp, todo.len > 0, &h, &kind, &target);
+			if (res != Confine_Ok) {
+				break;
+			}
+			if (kind == ConfineKind_Link) {
+				links += 1;
+				if (links > 40) {
+					gb_free(ha, target.text);
+					res = Confine_Invalid;
+					break;
+				}
+				confine__slashes(target);
+				while (todo.len > 0 && confine_is_sep(todo.text[0])) {
+					todo = substring(todo, 1, todo.len);
+				}
+				String joined = todo.len > 0 ? concatenate3_strings(ha, target, str_lit("/"), todo) : copy_string(ha, target);
+				gb_free(ha, target.text);
+				confine__collapse(&joined);
+				if (confine__is_absolute(joined)) {
+					next = joined;
+					restart = true;
+					break;
+				}
+				gb_free(ha, cur.text);
+				cur  = joined;
+				todo = cur;
+				continue;
+			}
+			if (kind == ConfineKind_Dir) {
+				array_add(&stack, h);
+				continue;
+			}
+			if (todo.len > 0) {
+				confine_close(h);
+				res = Confine_NotExists;
+				break;
+			}
+			*out = h;
+			*is_dir = false;
+			res = Confine_Ok;
+			break;
+		}
+		for (isize i = 1; i < stack.count; i++) {
+			confine_close(stack[i]);
+		}
+		stack.count = 0;
+		if (!restart) {
+			break;
+		}
+		gb_free(ha, cur.text);
+		cur = next;
+		restarts += 1;
+		if (restarts > 40) {
+			res = Confine_Invalid;
+			break;
+		}
+	}
+	array_free(&stack);
+	gb_free(ha, cur.text);
+	return res;
+}
+
+gb_internal ConfineResult confine_open(String path, isize scope, ConfineHandle *out, bool *is_dir) {
+	*out = CONFINE_NO_HANDLE;
+	*is_dir = false;
+	for (isize i = 0; i < path.len; i++) {
+		if (path.text[i] == 0) {
+			return Confine_Invalid;
+		}
+	}
+	if (!confine_active()) {
+		return confine_open_direct(path, out, is_dir);
+	}
+	String p = confine__normalize(heap_allocator(), path);
+	defer (gb_free(heap_allocator(), p.text));
+	return confine__walk(p, scope, out, is_dir);
+}
+
+gb_internal ConfineResult confine_probe(String path, isize scope, bool *is_dir) {
+	ConfineHandle h = CONFINE_NO_HANDLE;
+	ConfineResult r = confine_open(path, scope, &h, is_dir);
+	confine_close(h);
+	return r;
+}
+
+gb_internal ConfineResult confine_read_file(String path, gbAllocator a, String *data, bool *is_dir) {
+	*data = {};
+	ConfineHandle h = CONFINE_NO_HANDLE;
+	ConfineResult r = confine_open(path, CONFINE_ANY, &h, is_dir);
+	if (r != Confine_Ok) {
+		return r;
+	}
+	defer (confine_close(h));
+	if (*is_dir) {
+		return Confine_Ok;
+	}
+	i64 size = confine_size(h);
+	if (size < 0 || (gb_size_of(isize) < 8 && size >= I32_MAX)) {
+		return Confine_Invalid;
+	}
+	u8 *ptr = gb_alloc_array(a, u8, cast(isize)size+1);
+	isize got = 0;
+	if (!confine_read(h, ptr, cast(isize)size, &got)) {
+		gb_free(a, ptr);
+		return Confine_Invalid;
+	}
+	ptr[got] = 0;
+	*data = make_string(ptr, got);
+	return Confine_Ok;
+}
+
+gb_internal ReadDirectoryError confine_read_directory(String path, Array<FileInfo> *fi) {
+	GB_ASSERT(fi != nullptr);
+	while (path.len > 0 && confine_is_sep(path.text[path.len-1])) {
+		path.len -= 1;
+	}
+	if (path.len == 0) {
+		return ReadDirectory_InvalidPath;
+	}
+	ConfineHandle h = CONFINE_NO_HANDLE;
+	bool is_dir = false;
+	switch (confine_open(path, CONFINE_ANY, &h, &is_dir)) {
+	case Confine_Ok:         break;
+	case Confine_NotExists:  return ReadDirectory_NotExists;
+	case Confine_Outside:    return ReadDirectory_Outside;
+	case Confine_Permission: return ReadDirectory_Permission;
+	case Confine_Invalid:    return ReadDirectory_InvalidPath;
+	}
+	if (!is_dir) {
+		confine_close(h);
+		return ReadDirectory_NotDir;
+	}
+
+	gbAllocator a = heap_allocator();
+	array_init(fi, a, 0, 100);
+
+#if defined(GB_SYSTEM_WINDOWS)
+	u64 buf[64*1024/8];
+	FILE_INFO_BY_HANDLE_CLASS cls = FileIdBothDirectoryRestartInfo;
+	bool failed = false;
+	for (;;) {
+		if (!GetFileInformationByHandleEx(h, cls, buf, sizeof(buf))) {
+			failed = GetLastError() != ERROR_NO_MORE_FILES;
+			break;
+		}
+		cls = FileIdBothDirectoryInfo;
+		u8 *p = cast(u8 *)buf;
+		for (;;) {
+			FILE_ID_BOTH_DIR_INFO *e = cast(FILE_ID_BOTH_DIR_INFO *)p;
+			String name = string16_to_string(a, make_string16(cast(u16 *)e->FileName, e->FileNameLength/2));
+			if (name.len == 0 || name == "." || name == "..") {
+				gb_free(a, name.text);
+			} else {
+				FileInfo info = {};
+				info.name     = name;
+				info.fullpath = concatenate3_strings(a, path, str_lit("/"), name);
+				confine__slashes(info.fullpath);
+				info.size     = cast(i64)e->EndOfFile.QuadPart;
+				info.is_dir   = (e->FileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+				array_add(fi, info);
+			}
+			if (e->NextEntryOffset == 0) {
+				break;
+			}
+			p += e->NextEntryOffset;
+		}
+	}
+	CloseHandle(h);
+	if (failed) {
+		return ReadDirectory_Unknown;
+	}
+#else
+	DIR *dir = fdopendir(h);
+	if (dir == nullptr) {
+		close(h);
+		return ReadDirectory_Unknown;
+	}
+	defer (closedir(dir));
+	int dfd = dirfd(dir);
+
+	for (;;) {
+		struct dirent *entry = readdir(dir);
+		if (entry == nullptr) {
+			break;
+		}
+		String name = make_string_c(entry->d_name);
+		if (name == "." || name == "..") {
+			continue;
+		}
+		String filepath = concatenate3_strings(a, path, str_lit("/"), name);
+
+		struct stat st = {};
+		if (fstatat(dfd, entry->d_name, &st, AT_SYMLINK_NOFOLLOW) != 0) {
+			gb_free(a, filepath.text);
+			continue;
+		}
+		i64  size     = st.st_size;
+		bool entry_is_dir = S_ISDIR(st.st_mode);
+		if (S_ISLNK(st.st_mode)) {
+			ConfineHandle eh = CONFINE_NO_HANDLE;
+			bool e_dir = false;
+			ConfineResult er = confine_open(filepath, CONFINE_ANY, &eh, &e_dir);
+			if (er == Confine_NotExists) {
+				gb_free(a, filepath.text);
+				continue;
+			}
+			entry_is_dir = false;
+			size = 0;
+			if (er == Confine_Ok) {
+				entry_is_dir = e_dir;
+				size = confine_size(eh);
+				confine_close(eh);
+			}
+		}
+
+		FileInfo info = {};
+		info.name     = copy_string(a, name);
+		info.fullpath = filepath;
+		info.size     = size;
+		info.is_dir   = entry_is_dir;
+		array_add(fi, info);
+	}
+#endif
+
+	if (fi->count == 0) {
+		return ReadDirectory_Empty;
+	}
+	array_sort(*fi, file_info_name_cmp);
+	return ReadDirectory_None;
+}
 
 #if !defined(GB_SYSTEM_WINDOWS)
 gb_internal bool write_directory(String path) {

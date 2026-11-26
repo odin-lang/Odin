@@ -55,6 +55,7 @@ set ODIN_FULL=%CD%\..\..\..\odin.exe
 %ODIN% check "..\test_issue_global_when_cycle" -no-entry-point %COMMON% 2>&1 | find /c "Contradictory global" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_global_when_cycle_ambiguous" -no-entry-point %COMMON% 2>&1 | find /c "Ambiguous global" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_global_when_shadowing" -no-entry-point %COMMON% 2>&1 | find /c "within a global" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_nesting_limit" %COMMON% 2>&1 | find /c "nested too deeply" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_ellipsis_type_call" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "10" || exit /b
 %ODIN% check "..\test_issue_foreign_redeclaration" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_foreign_import_attributes" -no-entry-point %COMMON% || exit /b
@@ -63,6 +64,8 @@ set ODIN_FULL=%CD%\..\..\..\odin.exe
 %ODIN% check "..\test_issue_inferred_default_overflow" -no-entry-point %COMMON% 2>&1 | find /c "Error: Cannot convert numeric value" | findstr /x "6" || exit /b
 %ODIN% check "..\test_issue_fixed_point_scale" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_poly_proc_value" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_poly_recursion_limit" %COMMON% 2>&1 | find /c "Polymorphic instantiations are nested too deeply" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_poly_recursion_limit_record" %COMMON% 2>&1 | find /c "Polymorphic instantiations are nested too deeply" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_poly_variadic_errors" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_poly_variadic_errors" %COMMON% 2>&1 | find /c "Cannot infer the polymorphic type '$E' of the variadic parameter 'args'" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_atomic_orderings" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "13" || exit /b
@@ -70,13 +73,17 @@ set ODIN_FULL=%CD%\..\..\..\odin.exe
 %ODIN% check "..\test_issue_atomic_access" -no-entry-point -vet-atomic-access %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
 %ODIN% check "..\test_issue_escape_stored_field" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_escape_union_loop" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "1" || exit /b
-%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "4" || exit /b
-%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "holds a pointer into itself" | findstr /x "2" || exit /b
-%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "is taken at" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "5" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "holds a pointer into itself" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "is taken at" | findstr /x "5" || exit /b
 %ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "'temp.allocator.data' may refer to 'temp.arena' in the stack memory of the named result 'temp'" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "The call to" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "returns its parameter 'mem' in '.memory' of its result" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_escape_nested_calls" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "6" || exit /b
-%ODIN% check "..\test_issue_escape_cleared_stores" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "15" || exit /b
+%ODIN% check "..\test_issue_escape_cleared_stores" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "28" || exit /b
 %ODIN% check "..\test_issue_escape_cleared_stores" -no-entry-point %COMMON% 2>&1 | find /c "local variable 'y'" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_escape_deferred_procs" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "8" || exit /b
+%ODIN% check "..\test_issue_escape_deferred_procs" -no-entry-point %COMMON% 2>&1 | find /c "deferred by" | findstr /x "7" || exit /b
 %ODIN% test "..\test_issue_type_info_variant_shim" %COMMON% -ignore-warnings || exit /b
 %ODIN% check "..\test_issue_type_info_variant_shim" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "11" || exit /b
 %ODIN% check "..\test_issue_type_info_variant_shim_duplicate" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
@@ -268,6 +275,10 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% build "..\test_issue_wasi_wasm64p32_target" -target:wasi_wasm32 -build-mode:obj %COMMON% || exit /b
 %ODIN% build "..\test_issue_wasi_wasm64p32_target" -target:wasi_wasm64p32 -build-mode:obj %COMMON% || exit /b
 
+%ODIN% run "..\test_issue_8177" %COMMON% || exit /b
+%ODIN% build "..\test_issue_8177" -target:js_wasm64p32 -build-mode:obj %COMMON% || exit /b
+%ODIN% build "..\test_issue_8177" -target:wasi_wasm64p32 -build-mode:obj %COMMON% || exit /b
+
 @if "%ODIN_TESTS_NO_CLANG%" == "" (
 	clang -c "..\test_issue_sysv_abi\test_issue_sysv_abi.c" -o test_issue_sysv_abi_c.o || exit /b
 ) else (
@@ -440,6 +451,29 @@ if exist deps_test rmdir /S /Q deps_test
 %SystemRoot%\System32\find.exe "deps_test/a\ b\#$$/data.txt" deps.d || exit /b
 %ODIN% build "deps_test\a b#$" %COMMON% -export-dependencies:json -export-dependencies-file:deps.json -out:deps.exe || exit /b
 %SystemRoot%\System32\find.exe "deps_test/a b#$/data.txt" deps.json || exit /b
+
+set SB=..\test_paths_sandbox
+%ODIN% check %SB%\load -no-entry-point -sandbox-root:%SB%\load -collection:foo=%SB%\coll 2>&1 | find /c "is outside every -sandbox-root" | findstr /x "8" || exit /b
+%ODIN% check %SB%\load -no-entry-point -sandbox-root:%SB%\load -collection:foo=%SB%\coll 2>&1 | find /c "it contains a NUL byte" | findstr /x "1" || exit /b
+%ODIN% check %SB%\load -no-entry-point -sandbox-root:%SB%\load -collection:foo=%SB%\coll 2>&1 | find /c "collection and every -sandbox-root" | findstr /x "2" || exit /b
+%ODIN% check %SB%\load -no-entry-point -sandbox-root:%SB%\load -collection:foo=%SB%\coll 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
+%ODIN% check %SB%\foreign -no-entry-point -sandbox-root:%SB%\foreign 2>&1 | find /c "must be a name, not a path" | findstr /x "2" || exit /b
+%ODIN% check %SB%\foreign -no-entry-point -sandbox-root:%SB%\foreign 2>&1 | find /c "is outside every -sandbox-root" | findstr /x "1" || exit /b
+%ODIN% check %SB%\foreign -no-entry-point || exit /b
+%ODIN% check %SB%\roots -no-entry-point || exit /b
+%ODIN% check %SB%\roots -no-entry-point -sandbox-root:%SB%\roots -sandbox-root:..\..\.. || exit /b
+%ODIN% check %SB%\roots -no-entry-point -sandbox-root:%SB%\roots 2>&1 | find /c "is outside every -sandbox-root" | findstr /x "2" || exit /b
+%ODIN% check %SB%\roots -no-entry-point -sandbox-root:..\test_issue_6165 2>&1 | find /c "The main package" | findstr /x "1" || exit /b
+if exist sb_link rmdir /s /q sb_link
+mkdir sb_link\root
+echo ok> sb_link\root\x.txt
+mklink /J sb_link\root\up "%CD%\sb_link" > nul || exit /b
+echo package sb_link> sb_link\root\main.odin
+echo A :: #load("up/root/x.txt", string)>> sb_link\root\main.odin
+echo B :: #exists("up/root/missing.txt")>> sb_link\root\main.odin
+echo #assert(len(A) ^> 0)>> sb_link\root\main.odin
+echo #assert(B == false)>> sb_link\root\main.odin
+%ODIN% check sb_link\root -no-entry-point -sandbox-root:sb_link\root || exit /b
 
 @rem #########################################################################################################
 

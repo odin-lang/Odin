@@ -726,6 +726,22 @@ gb_internal bool poly_proc_lookup_operands_equal(Slice<PolyProcLookupOperand> co
 
 gb_internal bool check_proc_params_assignable(CheckerContext *c, Type *x, Type *y);
 
+// NOTE(bill): A polymorphic procedure or record that instantiates itself with a new type each time never finishes
+// 	`f :: proc(x: $T) { f([1]T{x}) }`.
+// Instantiations within core, vendor, examples, and tests nest at most 9 deep.
+enum { MAX_POLYMORPHIC_INSTANTIATION_DEPTH = 100 };
+
+gb_internal void check_polymorphic_instantiation_depth(isize depth, Token const &token, String const &name) {
+	if (depth <= MAX_POLYMORPHIC_INSTANTIATION_DEPTH) {
+		return;
+	}
+
+	// NOTE(bill): This stops the compiler and is reported even whilst errors are muted.
+	global_error_context.mute_depth = 0;
+	error(token, "Polymorphic instantiations are nested too deeply: the limit is %d levels. '%.*s' probably instantiates itself with a new type each time", MAX_POLYMORPHIC_INSTANTIATION_DEPTH, LIT(name));
+	exit_with_errors();
+}
+
 gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_entity, Type *type,
                                                         Array<Operand> const *param_operands, Ast *poly_def_node, PolyProcData *poly_proc_data) {
 	///////////////////////////////////////////////////////////////////////////////
@@ -985,6 +1001,15 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		}
 	}
 	rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
+
+	isize instantiation_depth = 1;
+	for (ProcInfo *pi = global_error_context.instantiations.proc; pi != nullptr; pi = pi->poly_parent) {
+		if (pi->generated_from_polymorphic) {
+			instantiation_depth += 1;
+		}
+	}
+	Token instantiation_token = poly_def_node != nullptr ? ast_token(poly_def_node) : base_entity->token;
+	check_polymorphic_instantiation_depth(instantiation_depth, instantiation_token, name);
 
 	// NOTE(bill): Clone a polymorphic procedure's body before taking `gen_procs`' exclusive lock so lookups of it don't wait on the clone
 	Ast *proc_lit = clone_ast(old_decl->proc_lit);
@@ -4882,13 +4907,9 @@ gb_internal void check_binary_expr_dependency(CheckerContext *c, Token op, Type 
 			break;
 		}
 	} else if (op.kind == Token_Shr || op.kind == Token_ShrEq) {
-		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
-		case Basic_u128:
-		case Basic_i128:
-			if (is_arch_wasm()) {
-				add_package_dependency(c, "runtime", "__lshrti3", REQUIRE);
-			}
-			break;
+		if (bt->kind == Type_Basic && is_arch_wasm()) switch (bt->Basic.kind) {
+		case Basic_u128: add_package_dependency(c, "runtime", "__lshrti3", REQUIRE); break;
+		case Basic_i128: add_package_dependency(c, "runtime", "__ashrti3", REQUIRE); break;
 		}
 	}
 }
@@ -9367,6 +9388,13 @@ gb_internal Type *instantiate_polymorphic_record(CheckerContext *c, Type *origin
 		failed_type = found_entity->type;
 	}
 
+	isize instantiation_depth = 1;
+	for (ErrorRecordInstantiation *r = global_error_context.instantiations.records; r != nullptr; r = r->prev) {
+		instantiation_depth += 1;
+	}
+	Token instantiation_token = call != nullptr ? ast_token(call) : original_type->Named.type_name->token;
+	check_polymorphic_instantiation_depth(instantiation_depth, instantiation_token, original_type->Named.name);
+
 	CheckerContext ctx = *c;
 
 	// NOTE(bill): We need to make sure the lookup scope for the record is the same as where it was created
@@ -10109,6 +10137,12 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		}
 		if (c->curr_proc_decl != nullptr && analysis_in_use(AnalysisFlag_Escape)) {
 			per_thread_array_add(&c->info->checked_calls_queue, CheckedCall{c->curr_proc_decl, callee});
+
+			// NOTE(bill): The deferred procedure is called at the end of the scope, see `escape_defer_call`.
+			Entity *deferred = callee->Procedure.deferred_procedure.entity;
+			if (deferred != nullptr) {
+				per_thread_array_add(&c->info->checked_calls_queue, CheckedCall{c->curr_proc_decl, deferred});
+			}
 		}
 		if (callee->Procedure.futex != ProcedureFutex_None && call->CallExpr.args.count > 0 && analysis_in_use(AnalysisFlag_Atomic)) {
 			per_thread_array_add(&c->info->checked_atomics_queue, CheckedAtomic{call, c->curr_proc_decl, BuiltinProc_Invalid, callee->Procedure.futex});

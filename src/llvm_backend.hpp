@@ -410,6 +410,7 @@ struct lbProcedure {
 	bool         is_export;
 	bool         is_entry_point;
 	bool         is_startup;
+	bool         sanitize_address;
 
 	lbFunctionType *abi_function_type;
 
@@ -673,6 +674,7 @@ gb_internal lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, As
 gb_internal lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *false_block);
 
 gb_internal LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValueRef *values, isize value_count_);
+gb_internal LLVMValueRef llvm_const_slice_with_type(lbModule *m, Type *t, LLVMValueRef data, LLVMValueRef len);
 gb_internal LLVMValueRef llvm_const_named_struct_internal(lbModule *m, LLVMTypeRef t, LLVMValueRef *values, isize value_count_, bool force_non_named=false);
 gb_internal void lb_set_entity_from_other_modules_linkage_correctly(lbModule *other_module, Entity *e, String const &name);
 

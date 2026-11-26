@@ -692,6 +692,7 @@ struct BuildContext {
 
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;
+	Array<String> sandbox_roots;
 
 	bool      test_all_packages;
 

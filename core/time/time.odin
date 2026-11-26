@@ -753,6 +753,9 @@ to_string_mm_dd_yy :: proc(t: Time, buf: []u8) -> (res: string) #no_bounds_check
 
 /*
 Read the timestamp counter of the CPU.
+
+On wasi, js and Orca, which have none, read a monotonic clock in nanoseconds
+instead. Freestanding wasm returns 0.
 */
 @(require_results)
 read_cycle_counter :: proc "contextless" () -> u64 {

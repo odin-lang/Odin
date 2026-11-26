@@ -213,13 +213,13 @@ wat_write_imports :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Pars
 			fi += 1
 		case .TABLE:
 			rt, _ := rd_byte(&r)
-			min, max, flags, _ := rd_limits(&r)
+			min, max, flags, _ := rd_limits(&r, true)
 			fmt.sbprintf(sb, "table (;%d;)", ti)
 			wat_write_limits(sb, min, max, flags)
 			fmt.sbprintf(sb, " %s", valtype_name(Value_Type(rt)))
 			ti += 1
 		case .MEMORY:
-			min, max, flags, _ := rd_limits(&r)
+			min, max, flags, _ := rd_limits(&r, false)
 			fmt.sbprintf(sb, "memory (;%d;)", mi)
 			wat_write_limits(sb, min, max, flags)
 			mi += 1
@@ -325,7 +325,7 @@ wat_write_tables :: proc(sb: ^strings.Builder, m: Module, unit: string) {
 		count := rd_u32(&r) or_break
 		for _ in 0..<count {
 			rt := rd_byte(&r) or_break
-			min, max, flags := rd_limits(&r) or_break
+			min, max, flags := rd_limits(&r, true) or_break
 			fmt.sbprintf(sb, "%s(table (;%d;)", unit, idx)
 			wat_write_limits(sb, min, max, flags)
 			fmt.sbprintf(sb, " %s)\n", valtype_name(Value_Type(rt)))
@@ -343,7 +343,7 @@ wat_write_memories :: proc(sb: ^strings.Builder, m: Module, unit: string) {
 		r := section_reader(m.data, sec)
 		count := rd_u32(&r) or_break
 		for _ in 0..<count {
-			min, max, flags := rd_limits(&r) or_break
+			min, max, flags := rd_limits(&r, false) or_break
 			fmt.sbprintf(sb, "%s(memory (;%d;)", unit, idx)
 			wat_write_limits(sb, min, max, flags)
 			strings.write_string(sb, ")\n")

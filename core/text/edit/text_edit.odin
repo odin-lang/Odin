@@ -246,10 +246,11 @@ undo_clear :: proc(s: ^State, undo: ^[dynamic]^Undo_State) {
 	}
 }
 
-// clear redo stack and check if the undo timeout gets hit
+// clear the redo stack, and push an undo step when the undo stack is empty
+// or the undo timeout gets hit
 undo_check :: proc(s: ^State) {
 	undo_clear(s, &s.redo)
-	if time.tick_diff(s.last_edit_time, s.current_time) > s.undo_timeout {
+	if undo_step_due(s) {
 		undo_state_push(s, &s.undo)
 	}
 	s.last_edit_time = s.current_time
@@ -273,6 +274,11 @@ undo_group_end :: proc(s: ^State) {
 }
 
 @(private)
+undo_step_due :: proc(s: ^State) -> bool {
+	return len(s.undo) == 0 || time.tick_diff(s.last_edit_time, s.current_time) > s.undo_timeout
+}
+
+@(private)
 undo_step :: proc(s: ^State, kind: Edit_Kind, at: int, first: rune) {
 	@(require_results)
 	starts_word :: proc(s: ^State, at: int, first: rune) -> bool {
@@ -289,7 +295,7 @@ undo_step :: proc(s: ^State, kind: Edit_Kind, at: int, first: rune) {
 			return true
 		}
 
-		if time.tick_diff(s.last_edit_time, s.current_time) > s.undo_timeout {
+		if undo_step_due(s) {
 			return true
 		}
 

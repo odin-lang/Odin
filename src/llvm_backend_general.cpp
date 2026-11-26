@@ -4258,10 +4258,9 @@ gb_internal lbValue lb_find_or_add_entity_string_byte_slice_with_type(lbModule *
 	}
 
 	LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), data_len, true);
-	LLVMValueRef values[2] = {ptr, len};
 
 	lbValue res = {};
-	res.value = llvm_const_named_struct(m, slice_type, values, 2);
+	res.value = llvm_const_slice_with_type(m, slice_type, ptr, len);
 	res.type = slice_type;
 	return res;
 }
@@ -4318,10 +4317,9 @@ gb_internal lbValue lb_find_or_add_entity_string16_slice_with_type(lbModule *m, 
 	}
 
 	LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), data_len, true);
-	LLVMValueRef values[2] = {ptr, len};
 
 	lbValue res = {};
-	res.value = llvm_const_named_struct(m, slice_type, values, 2);
+	res.value = llvm_const_slice_with_type(m, slice_type, ptr, len);
 	res.type = slice_type;
 	return res;
 }
@@ -4946,7 +4944,7 @@ gb_internal lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero
 		// NOTE(lucas): In LLVM 20 and below we do not have the option to have asan cleanup poisoned stack
 		// locals ourselves. So we need to manually track and unpoison these locals on proc return.
 		// LLVM 21 adds the 'use-after-scope' asan option which does this for us.
-		if (build_context.sanitizer_flags & SanitizerFlag_Address && !p->entity->Procedure.no_sanitize_address) {
+		if (p->sanitize_address) {
 			array_add(&p->asan_stack_locals, val);
 		}
 	}
