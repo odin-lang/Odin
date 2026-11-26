@@ -3198,6 +3198,23 @@ gb_internal void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type
 		}
 	} else if (are_types_identical(src, t_string) && is_type_u8_slice(dst)) {
 		error_line("\tSuggestion: a string may be transmuted to %s\n", b);
+	} else if ((is_type_soa_struct(src) && src->Struct.soa_kind == StructSoa_Fixed && dst->kind == Type_Array) ||
+	           (is_type_soa_struct(dst) && dst->Struct.soa_kind == StructSoa_Fixed && src->kind == Type_Array)) {
+		i64   src_count = src->kind == Type_Array ? src->Array.count : src->Struct.soa_count;
+		i64   dst_count = dst->kind == Type_Array ? dst->Array.count : dst->Struct.soa_count;
+		Type *src_elem  = src->kind == Type_Array ? src->Array.elem  : src->Struct.soa_elem;
+		Type *dst_elem  = dst->kind == Type_Array ? dst->Array.elem  : dst->Struct.soa_elem;
+		if (src_count != dst_count) {
+			error_line("\tNote: an #soa array and an array convert only at the same length, %lld vs %lld\n", cast(long long)src_count, cast(long long)dst_count);
+		} else {
+			gbString se = type_to_string(src_elem);
+			gbString de = type_to_string(dst_elem);
+			error_line("\tNote: an #soa array and an array convert only with the same element type, '%s' vs '%s'\n", se, de);
+			gb_string_free(de);
+			gb_string_free(se);
+		}
+	} else if ((is_type_soa_slice(src) && is_type_slice(dst)) || (is_type_slice(src) && is_type_soa_slice(dst))) {
+		error_line("\tSuggestion: 'copy' copies the elements between a slice and an #soa slice\n");
 	} else if (check_integer_exceed_suggestion(c, o, type)) {
 		return;
 	}
@@ -4121,6 +4138,11 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 		return are_types_identical(dst->Slice.elem, src->Slice.elem);
 	}
 
+	// NOTE(bill): `(#soa[N]T)(a)` and `([N]T)(s)` copy the elements into the other layout.
+	if (is_type_soa_of_array(dst, src) || is_type_soa_of_array(src, dst)) {
+		return true;
+	}
+
 	// Cast between booleans and integers
 	if (is_type_boolean(src) || is_type_integer(src)) {
 		if (is_type_boolean(dst) || is_type_integer(dst)) {
@@ -4509,7 +4531,7 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 
 	// In this case, the cast involves array programming
 	// so the operand needs to be a computed value
-	if (!is_type_array_like(x->type) && is_type_array_like(type)) {
+	if (!is_type_array_like(x->type) && is_type_array_like(type) && !is_type_soa_of_array(x->type, type)) {
 		x->mode = Addressing_Value;
 	}
 	x->type = type;

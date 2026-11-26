@@ -2368,6 +2368,50 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	return {};
 }
 
+// NOTE(bill): `(#soa[N]T)(a)` and `([N]T)(s)` copy one field at a time, a loop for each column.
+gb_internal lbValue lb_emit_soa_array_conv(lbProcedure *p, lbValue value, Type *t) {
+	lbValue src = lb_address_from_load_or_generate_local(p, value);
+	lbAddr  res = lb_add_local_generated(p, t, true);
+
+	lbValue aos     = src;
+	lbValue columns = res.addr;
+	Type   *soa     = base_type(t);
+	bool    to_soa  = is_type_soa_struct(t);
+	if (!to_soa) {
+		aos     = res.addr;
+		columns = src;
+		soa     = base_type(value.type);
+	}
+
+	Type *elem        = soa->Struct.soa_elem;
+	bool  lanes       = is_type_array(elem);
+	i32   field_count = cast(i32)soa_field_count(soa);
+	for (i32 f = 0; f < field_count; f++) {
+		lbValue column = lb_emit_struct_ep(p, columns, f);
+		if (type_size_of(type_deref(column.type)) == 0) {
+			continue;
+		}
+
+		lbLoopData loop = lb_loop_start(p, soa->Struct.soa_count, t_int);
+
+		lbValue a = lb_emit_array_ep(p, aos, loop.idx);
+		if (lanes) {
+			a = lb_emit_array_epi(p, a, f);
+		} else {
+			a = lb_emit_struct_ep(p, a, f);
+		}
+		lbValue s = lb_emit_array_ep(p, column, loop.idx);
+		if (to_soa) {
+			lb_emit_store(p, s, lb_emit_load(p, a));
+		} else {
+			lb_emit_store(p, a, lb_emit_load(p, s));
+		}
+
+		lb_loop_end(p, loop);
+	}
+	return lb_addr_load(p, res);
+}
+
 gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	lbModule *m = p->module;
 	t = reduce_tuple_to_single_type(t);
@@ -2447,6 +2491,9 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		return value;
 	}
 
+	if (is_type_soa_of_array(dst, src) || is_type_soa_of_array(src, dst)) {
+		return lb_emit_soa_array_conv(p, value, t);
+	}
 
 
 	// bool <-> llvm bool

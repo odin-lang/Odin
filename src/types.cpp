@@ -2117,6 +2117,16 @@ gb_internal bool is_type_soa_slice(Type *t) {
 	return t->kind == Type_Struct && t->Struct.soa_kind == StructSoa_Slice;
 }
 
+// `soa` is `#soa[N]T` and `array` is `[N]T`, for the same `N` and `T`
+gb_internal bool is_type_soa_of_array(Type *soa, Type *array) {
+	soa   = base_type(soa);
+	array = base_type(array);
+	if (soa == nullptr || array == nullptr) { return false; }
+	return soa->kind == Type_Struct && soa->Struct.soa_kind == StructSoa_Fixed &&
+	       array->kind == Type_Array && array->Array.count == soa->Struct.soa_count &&
+	       are_types_identical(array->Array.elem, soa->Struct.soa_elem);
+}
+
 gb_internal bool is_type_soa_dynamic_array(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }

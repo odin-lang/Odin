@@ -50,6 +50,9 @@ set ODIN_FULL=%CD%\..\..\..\odin.exe
 %ODIN% check "..\test_issue_soa_slice_escape" %COMMON% 2>&1 | find /c "It is unsafe to return" | findstr /x "5" || exit /b
 %ODIN% check "..\test_issue_soa_dynamic_literal" %COMMON% 2>&1 | find /c "cannot be a compound literal" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_soa_dynamic_literal" %COMMON% 2>&1 | find /c "Suggestion: Write a fixed set of elements" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_soa_conversion_errors" %COMMON% 2>&1 | find /c "Error:" | findstr /x "5" || exit /b
+%ODIN% check "..\test_issue_soa_conversion_errors" %COMMON% 2>&1 | find /c "an #soa array and an array convert only" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_soa_conversion_errors" %COMMON% 2>&1 | find /c "'copy' copies the elements" | findstr /x "2" || exit /b
 %ODIN% check "..\test_issue_array_conversion_parens" %COMMON% 2>&1 | find /c "needs parentheses" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_array_conversion_parens" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_7199" %COMMON% 2>&1 | find /c "..19988 chars.." | findstr /x "1" || exit /b
