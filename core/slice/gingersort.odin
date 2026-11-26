@@ -70,16 +70,18 @@ Sort_Shared_Call :: struct($T: typeid) {
 	call:    rawptr,
 }
 
-GINGER_SWAP_BYTES      :: 16 * 1024
-GINGER_OUT             :: 96
-GINGER_BLOCK           :: 16
-GINGER_SMALL           :: 96
-GINGER_LARGE           :: 1024
-GINGER_SMALL_BYTES     :: 2048
-GINGER_INSERTION_SMALL :: 8
-GINGER_INSERTION_LARGE :: 32
-GINGER_INSERTION_HUGE  :: 64
-GINGER_NETWORK_BYTES   :: 16
+GINGER_SWAP_BYTES       :: 16 * 1024
+GINGER_OUT              :: 96
+GINGER_BLOCK            :: 16
+GINGER_SMALL            :: 96
+GINGER_LARGE            :: 1024
+GINGER_SMALL_BYTES      :: 2048
+GINGER_INSERTION_SMALL  :: 8
+GINGER_INSERTION_LARGE  :: 32
+GINGER_INSERTION_HUGE   :: 64
+GINGER_NETWORK_BYTES    :: 16
+GINGER_PARTITION_BLOCKS :: 4096
+GINGER_PARTITION_HALVES :: 4
 
 gingersort :: proc(data: []$E, call: $P, $KIND: Sort_Kind) {
 	when size_of(E) == 0 {
@@ -1260,27 +1262,112 @@ ginger_median_of_cbrt :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) -> (pivot:
 	return
 }
 
+@(require_results)
+ginger_partition_keeps :: #force_inline proc(item, pivot: $E, call: $P, $KIND: Sort_Kind, $STRICT: bool) -> bool #no_bounds_check {
+	return ginger_greater(pivot, item, call, KIND) if STRICT else !ginger_greater(item, pivot, call, KIND)
+}
+
 // Moves the items not greater than `pivot` (less than it, when STRICT) to the front, keeping their order and that of the rest.
 @(require_results)
 ginger_stable_partition :: proc(a, s: []$E, pivot: E, call: $P, $KIND: Sort_Kind, $STRICT: bool) -> (count: int) #no_bounds_check {
 	n := len(a)
-	if n > len(s) {
-		half  := n / 2
-		left  := ginger_stable_partition(a[:half], s, pivot, call, KIND, STRICT)
-		right := ginger_stable_partition(a[half:], s, pivot, call, KIND, STRICT)
-		ginger_trinity_rotation(a[left:half+right], s, half-left)
-		return left + right
+	if n <= len(s) {
+		for k in 0..<n {
+			item := a[k]
+			a[count]   = item
+			s[k-count] = item
+			count += int(ginger_partition_keeps(item, pivot, call, KIND, STRICT))
+		}
+		copy(a[count:n], s[:n-count])
+		return
+	}
+	// Up to GINGER_PARTITION_HALVES levels of halving and rotating are cheaper than the block passes.
+	if n > len(s) << GINGER_PARTITION_HALVES && n <= GINGER_PARTITION_BLOCKS*(len(s)/2) {
+		return ginger_block_partition(a, s, pivot, call, KIND, STRICT)
 	}
 
+	half  := n / 2
+	left  := ginger_stable_partition(a[:half], s, pivot, call, KIND, STRICT)
+	right := ginger_stable_partition(a[half:], s, pivot, call, KIND, STRICT)
+	ginger_trinity_rotation(a[left:half+right], s, half-left)
+	return left + right
+}
+
+// Each half of the buffer collects one side and is written back as a whole block once full, into the part of `a` already read.
+// The blocks are then put in order. Every item moves a fixed number of times, not once per level of halving.
+@(require_results)
+ginger_block_partition :: proc(a, s: []$E, pivot: E, call: $P, $KIND: Sort_Kind, $STRICT: bool) -> (count: int) #no_bounds_check {
+	WORDS :: GINGER_PARTITION_BLOCKS / 64
+
+	n     := len(a)
+	b     := len(s) / 2
+	lows  := s[:b]
+	highs := s[b:2*b]
+
+	low_blocks: [WORDS]u64
+	blocks, nl, nh := 0, 0, 0
 	for k in 0..<n {
 		item := a[k]
-		keep := ginger_greater(pivot, item, call, KIND) if STRICT else !ginger_greater(item, pivot, call, KIND)
-		a[count]   = item
-		s[k-count] = item
-		count += int(keep)
+		keep := ginger_partition_keeps(item, pivot, call, KIND, STRICT)
+		lows[nl]  = item
+		highs[nh] = item
+		nl += int(keep)
+		nh += int(!keep)
+
+		if nl == b {
+			copy(a[blocks*b:][:b], lows)
+			low_blocks[blocks>>6] |= 1 << uint(blocks&63)
+			blocks += 1
+			nl = 0
+		} else if nh == b {
+			copy(a[blocks*b:][:b], highs)
+			blocks += 1
+			nh = 0
+		}
 	}
-	copy(a[count:n], s[:n-count])
-	return
+
+	tail := blocks*b
+	copy(a[tail:][:nl], lows[:nl])
+	copy(a[tail+nl:], highs[:nh])
+
+	ranks: [WORDS]int
+	low_count := 0
+	for i in 0..<(blocks+63)/64 {
+		ranks[i] = low_count
+		low_count += int(intrinsics.count_ones(low_blocks[i]))
+	}
+
+	destination :: #force_inline proc(i: int, low_blocks: []u64, ranks: []int, low_count: int) -> int {
+		word  := low_blocks[i>>6]
+		below := ranks[i>>6] + int(intrinsics.count_ones(word & (1 << uint(i&63) - 1)))
+		return below if word & (1 << uint(i&63)) != 0 else low_count + i - below
+	}
+
+	placed: [WORDS]u64
+	for start in 0..<blocks {
+		if placed[start>>6] & (1 << uint(start&63)) != 0 {
+			continue
+		}
+		placed[start>>6] |= 1 << uint(start&63)
+		d := destination(start, low_blocks[:], ranks[:], low_count)
+		if d == start {
+			continue
+		}
+
+		carry, spare := lows, highs
+		copy(carry, a[start*b:][:b])
+		for d != start {
+			placed[d>>6] |= 1 << uint(d&63)
+			copy(spare, a[d*b:][:b])
+			copy(a[d*b:][:b], carry)
+			carry, spare = spare, carry
+			d = destination(d, low_blocks[:], ranks[:], low_count)
+		}
+		copy(a[start*b:][:b], carry)
+	}
+
+	ginger_trinity_rotation(a[low_count*b:tail+nl], s, (blocks-low_count)*b)
+	return low_count*b + nl
 }
 
 ginger_partition :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
