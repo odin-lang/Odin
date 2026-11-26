@@ -371,14 +371,19 @@ memory_compare :: proc "contextless" (x, y: rawptr, n: int) -> int #no_bounds_ch
 	return memory_compare_chunks(a, b, n)
 }
 
-// Compares `n` bytes eight at a time, each chunk read as a big-endian number: the first chunk that differs orders
-// the two by their first differing byte, with no need to find where it is. The last chunk is the eight bytes ending
-// at `n`, overlapping bytes already found equal. Fewer than eight bytes go one at a time.
+// Compares `n` bytes eight at a time. Equal chunks are equal in any byte order. The first pair that differs is
+// compared as big-endian numbers, which orders the two by their first differing byte with no need to find where
+// it is. The last chunk is the eight bytes ending at `n`, overlapping bytes already found equal. Fewer than eight
+// bytes go one at a time.
 @(private)
 memory_compare_chunks :: #force_inline proc "contextless" (a, b: [^]byte, n: uint) -> int #no_bounds_check {
 	chunk :: #force_inline proc "contextless" (p: [^]byte) -> u64 {
-		x := intrinsics.unaligned_load(cast(^u64)p)
-		return intrinsics.byte_swap(x) when ODIN_ENDIAN == .Little else x
+		return intrinsics.unaligned_load(cast(^u64)p)
+	}
+	order :: #force_inline proc "contextless" (x, y: u64) -> int {
+		bx := intrinsics.byte_swap(x) when ODIN_ENDIAN == .Little else x
+		by := intrinsics.byte_swap(y) when ODIN_ENDIAN == .Little else y
+		return -1 if bx < by else +1
 	}
 
 	if n < 8 {
@@ -392,12 +397,12 @@ memory_compare_chunks :: #force_inline proc "contextless" (a, b: [^]byte, n: uin
 	for i := uint(0); n-i > 8; i += 8 {
 		ca, cb := chunk(a[i:]), chunk(b[i:])
 		if ca != cb {
-			return -1 if ca < cb else +1
+			return order(ca, cb)
 		}
 	}
 	ca, cb := chunk(a[n-8:]), chunk(b[n-8:])
 	if ca != cb {
-		return -1 if ca < cb else +1
+		return order(ca, cb)
 	}
 	return 0
 }
