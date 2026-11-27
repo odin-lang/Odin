@@ -287,6 +287,8 @@ g_split := #soa[2]Split_Particle{{pos = {1, 2, 3}, id = 4}, {col = {5, 6, 7, 8}}
 test_soa_split_constants_and_conversions :: proc(t: ^testing.T) {
 	testing.expect_value(t, SPLIT_CONSTANT.id, [2]i64{11, 12})
 	testing.expect_value(t, SPLIT_CONSTANT.vel, [2]Split_Vec{{4, 5, 6}, {}})
+	testing.expect_value(t, SPLIT_CONSTANT[0].pos, Split_Vec{1, 2, 3})
+	testing.expect_value(t, SPLIT_CONSTANT[1].id, 12)
 	testing.expect_value(t, g_split[0], Split_Particle{pos = {1, 2, 3}, id = 4})
 	testing.expect_value(t, g_split[1], Split_Particle{col = {5, 6, 7, 8}})
 

@@ -63,3 +63,28 @@ test_soa_slice_literals :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, sum(#soa[]P{{1, 0}, {2, 0}}), 3)
 }
+
+@(private="file")
+FIXED :: #soa[3]P{{1, 2}, {3, 4}, {5, 6}}
+
+@(private="file")
+INDEXED :: #soa[4]P{2 = {5, 6}}
+
+@(private="file")
+SLICE :: #soa[]P{{7, 8}, {9, 10}}
+
+@(private="file")
+LANES :: #soa[2][3]f32{{1, 2, 3}, {4, 5, 6}}
+
+// Indexing an #soa constant with a constant index gives a constant element, as indexing an array constant does
+@(test)
+test_soa_constant_index :: proc(t: ^testing.T) {
+	ELEM :: FIXED[1]
+	testing.expect_value(t, ELEM, P{3, 4})
+	testing.expect_value(t, FIXED[2], P{5, 6})
+	testing.expect_value(t, FIXED[0].y, 2)
+	testing.expect_value(t, INDEXED[2], P{5, 6})
+	testing.expect_value(t, SLICE[1], P{9, 10})
+	testing.expect_value(t, LANES[1], [3]f32{4, 5, 6})
+	testing.expect_value(t, LANES[1][2], 6)
+}

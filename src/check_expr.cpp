@@ -6124,7 +6124,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 				if (success_) *success_ = false;
 				if (finish_) *finish_ = true;
 				return empty_exact_value;
-			} else if (is_type_struct(node->tav.type) || is_type_bit_field(node->tav.type)) {
+			} else if ((is_type_struct(node->tav.type) && !is_type_soa_struct(node->tav.type)) || is_type_bit_field(node->tav.type)) {
 				bool found = false;
 				for (Ast *elem : cl->elems) {
 					if (elem->kind != Ast_FieldValue) {
@@ -6144,7 +6144,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 					// Use the zero value if it is not found
 					value = {};
 				}
-			} else if (is_type_array(node->tav.type) || is_type_enumerated_array(node->tav.type)) {
+			} else if (is_type_array(node->tav.type) || is_type_enumerated_array(node->tav.type) || is_type_soa_struct(node->tav.type)) {
 				for (Ast *elem : cl->elems) {
 					if (elem->kind != Ast_FieldValue) {
 						continue;
@@ -13596,6 +13596,8 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 		} else if (is_type_string(t)) {
 			// Okay
 		} else if (is_type_matrix(t)) {
+			// Okay
+		} else if (is_type_soa_struct(t) && t->Struct.soa_kind != StructSoa_Dynamic) {
 			// Okay
 		} else {
 			valid = false;
