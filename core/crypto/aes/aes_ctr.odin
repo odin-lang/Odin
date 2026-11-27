@@ -15,6 +15,7 @@ Context_CTR :: struct {
 	_off:            int,
 	_ctr_hi:         u64,
 	_ctr_lo:         u64,
+	_is_le64:        bool,
 	_is_initialized: bool,
 }
 
@@ -26,6 +27,22 @@ init_ctr :: proc(ctx: ^Context_CTR, key, iv: []byte, impl := DEFAULT_IMPLEMENTAT
 	ctx._off = BLOCK_SIZE
 	ctx._ctr_hi = endian.unchecked_get_u64be(iv[0:])
 	ctx._ctr_lo = endian.unchecked_get_u64be(iv[8:])
+	ctx._is_le64 = false
+	ctx._is_initialized = true
+}
+
+// init_ctr_le64 initializes a Context_CTR with the provided key and IV,
+// using the first 8 bytes of the IV as a 64-bit little-endian counter
+// that wraps at 2^64, with the last 8 bytes left as they are.  This is
+// a special case for WinZip AES (AE-1 and AE-2) as used by zip archives.
+init_ctr_le64 :: proc(ctx: ^Context_CTR, key, iv: []byte, impl := DEFAULT_IMPLEMENTATION) {
+	ensure(len(iv) == CTR_IV_SIZE, "crypto/aes: invalid CTR IV size")
+
+	init_impl(&ctx._impl, key, impl)
+	ctx._off = BLOCK_SIZE
+	ctx._ctr_hi = endian.unchecked_get_u64le(iv[8:])
+	ctx._ctr_lo = endian.unchecked_get_u64le(iv[0:])
+	ctx._is_le64 = true
 	ctx._is_initialized = true
 }
 
@@ -116,6 +133,7 @@ reset_ctr :: proc "contextless" (ctx: ^Context_CTR) {
 	ctx._off = 0
 	ctx._ctr_hi = 0
 	ctx._ctr_lo = 0
+	ctx._is_le64 = false
 	zero_explicit(&ctx._buffer, size_of(ctx._buffer))
 	ctx._is_initialized = false
 }
@@ -129,7 +147,13 @@ ctr_blocks :: proc(ctx: ^Context_CTR, dst, src: []byte, nr_blocks: int) #no_boun
 	}
 
 	// Portable implementation.
-	ct64_inc_ctr := #force_inline proc "contextless" (dst: []byte, hi, lo: u64) -> (u64, u64) {
+	ct64_inc_ctr := #force_inline proc "contextless" (dst: []byte, hi, lo: u64, is_le64: bool) -> (u64, u64) {
+		if is_le64 {
+			endian.unchecked_put_u64le(dst[0:], lo)
+			endian.unchecked_put_u64le(dst[8:], hi)
+			return hi, lo + 1
+		}
+
 		endian.unchecked_put_u64be(dst[0:], hi)
 		endian.unchecked_put_u64be(dst[8:], lo)
 
@@ -144,6 +168,7 @@ ctr_blocks :: proc(ctx: ^Context_CTR, dst, src: []byte, nr_blocks: int) #no_boun
 	src, dst := src, dst
 	nr_blocks := nr_blocks
 	ctr_hi, ctr_lo := ctx._ctr_hi, ctx._ctr_lo
+	is_le64 := ctx._is_le64
 
 	tmp: [ct64.STRIDE][BLOCK_SIZE]byte = ---
 	ctrs: [ct64.STRIDE][]byte = ---
@@ -155,7 +180,7 @@ ctr_blocks :: proc(ctx: ^Context_CTR, dst, src: []byte, nr_blocks: int) #no_boun
 		blocks := ctrs[:n]
 
 		for i in 0 ..< n {
-			ctr_hi, ctr_lo = ct64_inc_ctr(blocks[i], ctr_hi, ctr_lo)
+			ctr_hi, ctr_lo = ct64_inc_ctr(blocks[i], ctr_hi, ctr_lo, is_le64)
 		}
 		ct64.encrypt_blocks(impl, blocks, blocks)
 

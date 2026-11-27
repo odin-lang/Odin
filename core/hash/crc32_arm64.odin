@@ -19,7 +19,7 @@ crc32_hw_available :: #force_inline proc "contextless" () -> bool {
 }
 
 @(private, enable_target_feature="neon,aes,crc")
-crc32_hw :: proc "contextless" (crc: u32, data: [^]byte, length: int) -> (new_crc: u32, consumed: int) #no_bounds_check {
+crc32_hw :: proc "contextless" (crc: u32, dst, src: [^]byte, length: int, $COPY: bool) -> (new_crc: u32, consumed: int) #no_bounds_check {
 	K12 :: arm.uint64x2_t{0x154442bd4, 0x1c6e41596}
 	K34 :: arm.uint64x2_t{0x1751997d0, 0x0ccaa009e}
 
@@ -30,25 +30,29 @@ crc32_hw :: proc "contextless" (crc: u32, data: [^]byte, length: int) -> (new_cr
 		return transmute(arm.uint64x2_t)(lo ~ hi)
 	}
 	@(enable_target_feature="neon,aes")
-	load :: #force_inline proc "contextless" (p: [^]byte) -> arm.uint64x2_t {
-		return intrinsics.unaligned_load((^arm.uint64x2_t)(p))
+	load :: #force_inline proc "contextless" (dst, src: [^]byte, p: int, $COPY: bool) -> arm.uint64x2_t {
+		v := intrinsics.unaligned_load((^arm.uint64x2_t)(src[p:]))
+		when COPY {
+			intrinsics.unaligned_store((^arm.uint64x2_t)(dst[p:]), v)
+		}
+		return v
 	}
 
 	crc := crc
 	p   := 0
 
 	if length >= CRC32_FOLD_MIN {
-		x0 := load(data[0:]) ~ arm.uint64x2_t{u64(crc), 0}
-		x1 := load(data[16:])
-		x2 := load(data[32:])
-		x3 := load(data[48:])
+		x0 := load(dst, src, 0, COPY) ~ arm.uint64x2_t{u64(crc), 0}
+		x1 := load(dst, src, 16, COPY)
+		x2 := load(dst, src, 32, COPY)
+		x3 := load(dst, src, 48, COPY)
 		p = 64
 
 		for length - p >= 64 {
-			x0 = fold(x0, K12) ~ load(data[p:])
-			x1 = fold(x1, K12) ~ load(data[p + 16:])
-			x2 = fold(x2, K12) ~ load(data[p + 32:])
-			x3 = fold(x3, K12) ~ load(data[p + 48:])
+			x0 = fold(x0, K12) ~ load(dst, src, p, COPY)
+			x1 = fold(x1, K12) ~ load(dst, src, p + 16, COPY)
+			x2 = fold(x2, K12) ~ load(dst, src, p + 32, COPY)
+			x3 = fold(x3, K12) ~ load(dst, src, p + 48, COPY)
 			p += 64
 		}
 
@@ -56,7 +60,7 @@ crc32_hw :: proc "contextless" (crc: u32, data: [^]byte, length: int) -> (new_cr
 		x0 = fold(x0, K34) ~ x2
 		x0 = fold(x0, K34) ~ x3
 		for length - p >= 16 {
-			x0 = fold(x0, K34) ~ load(data[p:])
+			x0 = fold(x0, K34) ~ load(dst, src, p, COPY)
 			p += 16
 		}
 
@@ -65,11 +69,18 @@ crc32_hw :: proc "contextless" (crc: u32, data: [^]byte, length: int) -> (new_cr
 	}
 
 	for length - p >= 8 {
-		crc = arm.__crc32d(crc, intrinsics.unaligned_load((^u64)(data[p:])))
+		w := intrinsics.unaligned_load((^u64)(src[p:]))
+		when COPY {
+			intrinsics.unaligned_store((^u64)(dst[p:]), w)
+		}
+		crc = arm.__crc32d(crc, w)
 		p += 8
 	}
 	for p < length {
-		crc = arm.__crc32b(crc, data[p])
+		when COPY {
+			dst[p] = src[p]
+		}
+		crc = arm.__crc32b(crc, src[p])
 		p += 1
 	}
 	return crc, p

@@ -22,8 +22,14 @@ ctr_blocks_hw :: proc(ctx: ^Context_CTR, dst, src: []byte, nr_blocks: int) #no_b
 		sks[i] = intrinsics.unaligned_load((^simd.u8x16)(&hw_ctx._sk_exp_enc[i]))
 	}
 
-	hw_inc_ctr := #force_inline proc "contextless" (hi, lo: u64) -> (simd.u8x16, u64, u64) {
+	hw_inc_ctr := #force_inline proc "contextless" (hi, lo: u64, is_le64: bool) -> (simd.u8x16, u64, u64) {
 		buf: [BLOCK_SIZE]byte = ---
+		if is_le64 {
+			endian.unchecked_put_u64le(buf[0:], lo)
+			endian.unchecked_put_u64le(buf[8:], hi)
+			return intrinsics.unaligned_load((^simd.u8x16)(&buf)), hi, lo + 1
+		}
+
 		endian.unchecked_put_u64be(buf[0:], hi)
 		endian.unchecked_put_u64be(buf[8:], lo)
 		ret := intrinsics.unaligned_load((^simd.u8x16)(&buf))
@@ -42,16 +48,31 @@ ctr_blocks_hw :: proc(ctx: ^Context_CTR, dst, src: []byte, nr_blocks: int) #no_b
 	// - 3 -> Ice Lake and newer
 	//
 	// This implementation does 4 blocks at once, since performance
-	// should be "adequate" across most CPUs.
+	// should be "adequate" across most CPUs.  On amd64 with VAES,
+	// `ctr_blocks_vaes` first does groups of 16 blocks, stopping before
+	// the 128-bit counter's low half would carry; the rest come here.
 
 	src, dst := src, dst
 	nr_blocks := nr_blocks
 	ctr_hi, ctr_lo := ctx._ctr_hi, ctx._ctr_lo
+	is_le64 := ctx._is_le64
+
+	when ODIN_ARCH == .amd64 {
+		if nr_blocks >= CTR_STRIDE_VAES && aes_hw.is_vaes_supported() {
+			done: int
+			done, ctr_lo = ctr_blocks_vaes(&hw_ctx, dst, src, nr_blocks, ctr_hi, ctr_lo, is_le64)
+			if src != nil {
+				src = src[done * BLOCK_SIZE:]
+			}
+			dst = dst[done * BLOCK_SIZE:]
+			nr_blocks -= done
+		}
+	}
 
 	blks: [CTR_STRIDE_HW]simd.u8x16 = ---
 	for nr_blocks >= CTR_STRIDE_HW {
 		#unroll for i in 0..< CTR_STRIDE_HW {
-			blks[i], ctr_hi, ctr_lo = hw_inc_ctr(ctr_hi, ctr_lo)
+			blks[i], ctr_hi, ctr_lo = hw_inc_ctr(ctr_hi, ctr_lo, is_le64)
 		}
 
 		#unroll for i in 0 ..< CTR_STRIDE_HW {
@@ -98,7 +119,7 @@ ctr_blocks_hw :: proc(ctx: ^Context_CTR, dst, src: []byte, nr_blocks: int) #no_b
 
 	// Handle the remainder.
 	for nr_blocks > 0 {
-		blks[0], ctr_hi, ctr_lo = hw_inc_ctr(ctr_hi, ctr_lo)
+		blks[0], ctr_hi, ctr_lo = hw_inc_ctr(ctr_hi, ctr_lo, is_le64)
 
 		blks[0] = simd.bit_xor(blks[0], sks[0])
 		#unroll for i in 1 ..= 9 {

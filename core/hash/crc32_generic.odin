@@ -11,6 +11,6 @@ crc32_hw_available :: #force_inline proc "contextless" () -> bool {
 }
 
 @(private)
-crc32_hw :: proc "contextless" (crc: u32, data: [^]byte, length: int) -> (new_crc: u32, consumed: int) {
+crc32_hw :: proc "contextless" (crc: u32, dst, src: [^]byte, length: int, $COPY: bool) -> (new_crc: u32, consumed: int) {
 	return crc, 0
 }

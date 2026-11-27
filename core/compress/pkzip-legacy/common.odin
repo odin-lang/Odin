@@ -267,6 +267,13 @@ bits_refill :: #force_inline proc(z: ^compress.Context, pulled: ^i64, b: ^Bits) 
 }
 
 @(private)
+bits_hand_back :: proc(z: ^compress.Context, b: ^Bits) {
+	compress.rewind(z, int(b.count / 8))
+	z.code_buffer = 0
+	z.num_bits    = 0
+}
+
+@(private)
 bits_read :: #force_inline proc(z: ^compress.Context, pulled: ^i64, b: ^Bits, count: uint) -> (value: int, available: bool, err: Error) #no_bounds_check {
 	if b.count < u64(count) {
 		bits_refill(z, pulled, b) or_return
