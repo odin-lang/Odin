@@ -39,6 +39,8 @@ import "base:intrinsics"
 	A much longer one collects each side in blocks that are then put in order, like the block distribution of IPS4o [8].
 	Where a byte shuffle is one instruction, f32 keys move four lanes at a time with a shuffle table, after Gueron and Krasnov [9].
 	Integers in their own order take an in-place radix sort instead (hodgepodge_radix_sort): the American flag sort [10].
+	Where unsigned 32-bit min and max are one instruction, its small buckets of 4-byte integers sort with a bitonic
+	network in SIMD registers (hodgepodge_radix_network), after Batcher [11].
 
 	## Large elements and code size
 	Elements over 512 bytes, where fewer than 32 fit the buffer, are sorted by insertion in blocks of HODGEPODGE_BLOCK
@@ -61,6 +63,8 @@ import "base:intrinsics"
 	     2016: https://doi.org/10.1093/comjnl/bxv063
 	[10] Peter M. McIlroy, Keith Bostic, and M. Douglas McIlroy, "Engineering Radix Sort", Computing Systems 6(1), 1993:
 	     https://www.usenix.org/legacy/publications/compsystems/1993/win_mcilroy.pdf
+	[11] K. E. Batcher, "Sorting Networks and Their Applications", AFIPS Spring Joint Computer Conference, 1968:
+	     https://doi.org/10.1145/1468075.1468121
 */
 
 ORD :: intrinsics.type_is_ordered
@@ -139,6 +143,7 @@ HODGEPODGE_PARTITION_HALVES :: 4
 HODGEPODGE_MERGE_STEP       :: 32
 HODGEPODGE_MERGE_CARRIED    :: 2
 HODGEPODGE_RADIX_SMALL      :: 64
+HODGEPODGE_RADIX_NETWORK    :: 9
 HODGEPODGE_RUN_MIN          :: 32
 HODGEPODGE_DROP_DESCENTS    :: 16
 HODGEPODGE_DROP_NEW_RUN     :: 16
@@ -1927,6 +1932,87 @@ hodgepodge_block_partition :: proc(a, s: []$E, b: int, pivot: E, call: $P, $KIND
 	return low_count*b + nl
 }
 
+// Small buckets of 4-byte integers sort with a network in 4-lane vectors, where unsigned 32-bit min and max are one
+// instruction: SSE4.1 on x86, NEON on ARM, and simd128 on wasm.
+HODGEPODGE_RADIX_SIMD :: (ODIN_ARCH == .amd64  || ODIN_ARCH == .i386)      && intrinsics.has_target_feature("sse4.1") ||
+                         (ODIN_ARCH == .arm64  || ODIN_ARCH == .arm32)     && intrinsics.has_target_feature("neon")   ||
+                         (ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32) && intrinsics.has_target_feature("simd128")
+
+// Sorts N keys with Batcher's bitonic sorting network, four to a vector.
+// Lanes i and i~J compare at each step, the smaller going first unless i&K.
+// Steps across vectors take lane-wise mins and maxes. Steps within one swap lanes, and each lane keeps the min or the max.
+hodgepodge_lane_network :: proc "contextless" (keys: ^[$N]u32) #no_bounds_check {
+	V :: #simd[4]u32
+	LANE :: V{0, 1, 2, 3}
+
+	step :: #force_inline proc "contextless" (v: ^[N/4]V, $K, $J: int) {
+		when J >= 4 {
+			#unroll for r in 0..<N/4 {
+				p := r ~ J/4
+				if r < p {
+					lo := intrinsics.simd_min(v[r], v[p])
+					hi := intrinsics.simd_max(v[r], v[p])
+					if 4*r & K == 0 {
+						v[r], v[p] = lo, hi
+					} else {
+						v[r], v[p] = hi, lo
+					}
+				}
+			}
+		} else {
+			#unroll for r in 0..<N/4 {
+				when J == 2 {
+					t := intrinsics.simd_shuffle(v[r], v[r], 2, 3, 0, 1)
+				} else {
+					t := intrinsics.simd_shuffle(v[r], v[r], 1, 0, 3, 2)
+				}
+				upper := intrinsics.simd_lanes_ne(LANE & V(J), V{})
+				desc  := intrinsics.simd_lanes_ne((LANE + V(4*r)) & V(K), V{})
+				v[r] = intrinsics.simd_select(upper ~ desc, intrinsics.simd_max(v[r], t), intrinsics.simd_min(v[r], t))
+			}
+		}
+		when J > 1 {
+			step(v, K, J/2)
+		}
+	}
+	stage :: #force_inline proc "contextless" (v: ^[N/4]V, $K: int) {
+		step(v, K, K/2)
+		when K < N {
+			stage(v, K*2)
+		}
+	}
+
+	v := transmute([N/4]V)keys^
+	stage(&v, 2)
+	keys^ = transmute([N]u32)v
+}
+
+// Sorts a radix sort's small bucket of 4-byte integers as their unsigned keys `K(x) ~ FLIP` with a network. Unused
+// lanes take the largest key. Equal integers are the same bits: the padding cannot be told from a real key.
+hodgepodge_radix_network :: #force_no_inline proc(a: []$E, $FLIP: u32) #no_bounds_check {
+	sort :: #force_inline proc(a: []E, $N: int) #no_bounds_check {
+		keys: [N]u32 = ---
+		for x, i in a {
+			keys[i] = transmute(u32)x ~ FLIP
+		}
+		for i in len(a)..<N {
+			keys[i] = builtin.max(u32)
+		}
+		hodgepodge_lane_network(&keys)
+		for &x, i in a {
+			x = transmute(E)(keys[i] ~ FLIP)
+		}
+	}
+	switch n := len(a); {
+	case n <= 16:
+		sort(a, 16)
+	case n <= 32:
+		sort(a, 32)
+	case:
+		sort(a, 64)
+	}
+}
+
 // An in-place MSD radix sort, the American flag sort of McIlroy, Bostic and McIlroy, "Engineering Radix Sort" (1993).
 // It is unstable, but equal integers are the same bits: the result is exactly what a stable sort gives.
 hodgepodge_radix_sort :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
@@ -1948,6 +2034,12 @@ hodgepodge_radix_sort :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds
 
 	n := len(a)
 	if n <= HODGEPODGE_RADIX_SMALL {
+		when HODGEPODGE_RADIX_SIMD && size_of(E) == 4 {
+			if n >= HODGEPODGE_RADIX_NETWORK {
+				hodgepodge_radix_network(a, u32(FLIP))
+				return
+			}
+		}
 		hodgepodge_quadsort(a, s, call, KIND)
 		return
 	}
