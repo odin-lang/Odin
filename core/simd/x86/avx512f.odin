@@ -6250,6 +6250,938 @@ _mm512_set1_ps :: #force_inline proc "c" (a: f32) -> __m512 {
 	return __m512(a)
 }
 
+// Gather double-precision (64-bit) floating-point elements from memory using 32-bit indices.
+// 64-bit elements are loaded from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst`. `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i32gather_pd)
+@(require_results, enable_target_feature="avx512f")
+_mm512_i32gather_pd :: #force_inline proc "c" (offsets: __m256i, slice: ^f64, $SCALE: i32) -> __m512d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vgatherdpd(__m512d(0), slice, transmute(simd.i32x8)offsets, -1, SCALE)
+}
+
+// Gather double-precision (64-bit) floating-point elements from memory using 32-bit indices.
+// 64-bit elements are loaded from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i32gather_pd)
+@(require_results, enable_target_feature="avx512f")
+_mm512_mask_i32gather_pd :: #force_inline proc "c" (src: __m512d, mask: __mmask8, offsets: __m256i, slice: ^f64, $SCALE: i32) -> __m512d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vgatherdpd(src, slice, transmute(simd.i32x8)offsets, transmute(i8)mask, SCALE)
+}
+
+// Gather double-precision (64-bit) floating-point elements from memory using 64-bit indices.
+// 64-bit elements are loaded from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst`. `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i64gather_pd)
+@(require_results, enable_target_feature="avx512f")
+_mm512_i64gather_pd :: #force_inline proc "c" (offsets: __m512i, slice: ^f64, $SCALE: i32) -> __m512d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vgatherqpd(__m512d(0), slice, offsets, -1, SCALE)
+}
+
+// Gather double-precision (64-bit) floating-point elements from memory using 64-bit indices.
+// 64-bit elements are loaded from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i64gather_pd)
+@(require_results, enable_target_feature="avx512f")
+_mm512_mask_i64gather_pd :: #force_inline proc "c" (src: __m512d, mask: __mmask8, offsets: __m512i, slice: ^f64, $SCALE: i32) -> __m512d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vgatherqpd(src, slice, offsets, transmute(i8)mask, SCALE)
+}
+
+// Gather single-precision (32-bit) floating-point elements from memory using 32-bit indices.
+// 32-bit elements are loaded from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst`. `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i32gather_ps)
+@(require_results, enable_target_feature="avx512f")
+_mm512_i32gather_ps :: #force_inline proc "c" (offsets: __m512i, slice: ^f32, $SCALE: i32) -> __m512 where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vgatherdps(__m512(0), slice, transmute(simd.i32x16)offsets, -1, SCALE)
+}
+
+// Gather single-precision (32-bit) floating-point elements from memory using 32-bit indices.
+// 32-bit elements are loaded from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i32gather_ps)
+@(require_results, enable_target_feature="avx512f")
+_mm512_mask_i32gather_ps :: #force_inline proc "c" (src: __m512, mask: __mmask16, offsets: __m512i, slice: ^f32, $SCALE: i32) -> __m512 where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vgatherdps(src, slice, transmute(simd.i32x16)offsets, transmute(i16)mask, SCALE)
+}
+
+// Gather single-precision (32-bit) floating-point elements from memory using 64-bit indices.
+// 32-bit elements are loaded from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst`. `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i64gather_ps)
+@(require_results, enable_target_feature="avx512f")
+_mm512_i64gather_ps :: #force_inline proc "c" (offsets: __m512i, slice: ^f32, $SCALE: i32) -> __m256 where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vgatherqps(__m256(0), slice, offsets, -1, SCALE)
+}
+
+// Gather single-precision (32-bit) floating-point elements from memory using 64-bit indices.
+// 32-bit elements are loaded from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i64gather_ps)
+@(require_results, enable_target_feature="avx512f")
+_mm512_mask_i64gather_ps :: #force_inline proc "c" (src: __m256, mask: __mmask8, offsets: __m512i, slice: ^f32, $SCALE: i32) -> __m256 where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vgatherqps(src, slice, offsets, transmute(i8)mask, SCALE)
+}
+
+// Gather 32-bit integers from memory using 32-bit indices.
+// 32-bit elements are loaded from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst`. `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i32gather_epi32)
+@(require_results, enable_target_feature="avx512f")
+_mm512_i32gather_epi32 :: #force_inline proc "c" (offsets: __m512i, slice: ^i32, $SCALE: i32) -> __m512i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return transmute(__m512i)llvm_vpgatherdd(simd.i32x16(0), slice, transmute(simd.i32x16)offsets, -1, SCALE)
+}
+
+// Gather 32-bit integers from memory using 32-bit indices.
+// 32-bit elements are loaded from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i32gather_epi32)
+@(require_results, enable_target_feature="avx512f")
+_mm512_mask_i32gather_epi32 :: #force_inline proc "c" (src: __m512i, mask: __mmask16, offsets: __m512i, slice: ^i32, $SCALE: i32) -> __m512i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return transmute(__m512i)llvm_vpgatherdd(transmute(simd.i32x16)src, slice, transmute(simd.i32x16)offsets, transmute(i16)mask, SCALE)
+}
+
+// Gather 64-bit integers from memory using 32-bit indices.
+// 64-bit elements are loaded from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst`. `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i32gather_epi64)
+@(require_results, enable_target_feature="avx512f")
+_mm512_i32gather_epi64 :: #force_inline proc "c" (offsets: __m256i, slice: ^i64, $SCALE: i32) -> __m512i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherdq(__m512i(0), slice, transmute(simd.i32x8)offsets, -1, SCALE)
+}
+
+// Gather 64-bit integers from memory using 32-bit indices.
+// 64-bit elements are loaded from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i32gather_epi64)
+@(require_results, enable_target_feature="avx512f")
+_mm512_mask_i32gather_epi64 :: #force_inline proc "c" (src: __m512i, mask: __mmask8, offsets: __m256i, slice: ^i64, $SCALE: i32) -> __m512i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherdq(src, slice, transmute(simd.i32x8)offsets, transmute(i8)mask, SCALE)
+}
+
+// Gather 64-bit integers from memory using 64-bit indices.
+// 64-bit elements are loaded from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst`. `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i64gather_epi64)
+@(require_results, enable_target_feature="avx512f")
+_mm512_i64gather_epi64 :: #force_inline proc "c" (offsets: __m512i, slice: ^i64, $SCALE: i32) -> __m512i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherqq(__m512i(0), slice, offsets, -1, SCALE)
+}
+
+// Gather 64-bit integers from memory using 64-bit indices.
+// 64-bit elements are loaded from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i64gather_epi64)
+@(require_results, enable_target_feature="avx512f")
+_mm512_mask_i64gather_epi64 :: #force_inline proc "c" (src: __m512i, mask: __mmask8, offsets: __m512i, slice: ^i64, $SCALE: i32) -> __m512i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherqq(src, slice, offsets, transmute(i8)mask, SCALE)
+}
+
+// Gather 32-bit integers from memory using 64-bit indices.
+// 32-bit elements are loaded from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst`. `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i64gather_epi32)
+@(require_results, enable_target_feature="avx512f")
+_mm512_i64gather_epi32 :: #force_inline proc "c" (offsets: __m512i, slice: ^i32, $SCALE: i32) -> __m256i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return transmute(__m256i)llvm_vpgatherqd(simd.i32x8(0), slice, offsets, -1, SCALE)
+}
+
+// Gather 32-bit integers from memory using 64-bit indices.
+// 32-bit elements are loaded from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i64gather_epi32)
+@(require_results, enable_target_feature="avx512f")
+_mm512_mask_i64gather_epi32 :: #force_inline proc "c" (src: __m256i, mask: __mmask8, offsets: __m512i, slice: ^i32, $SCALE: i32) -> __m256i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return transmute(__m256i)llvm_vpgatherqd(transmute(simd.i32x8)src, slice, offsets, transmute(i8)mask, SCALE)
+}
+
+// Scatter double-precision (64-bit) floating-point elements from `src` into memory using 32-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i32scatter_pd)
+@(enable_target_feature="avx512f")
+_mm512_i32scatter_pd :: #force_inline proc "c" (slice: ^f64, offsets: __m256i, src: __m512d, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterdpd(slice, -1, transmute(simd.i32x8)offsets, src, SCALE)
+}
+
+// Scatter double-precision (64-bit) floating-point elements from `src` into memory using 32-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i32scatter_pd)
+@(enable_target_feature="avx512f")
+_mm512_mask_i32scatter_pd :: #force_inline proc "c" (slice: ^f64, mask: __mmask8, offsets: __m256i, src: __m512d, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterdpd(slice, transmute(i8)mask, transmute(simd.i32x8)offsets, src, SCALE)
+}
+
+// Scatter double-precision (64-bit) floating-point elements from `src` into memory using 64-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i64scatter_pd)
+@(enable_target_feature="avx512f")
+_mm512_i64scatter_pd :: #force_inline proc "c" (slice: ^f64, offsets: __m512i, src: __m512d, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterqpd(slice, -1, offsets, src, SCALE)
+}
+
+// Scatter double-precision (64-bit) floating-point elements from `src` into memory using 64-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i64scatter_pd)
+@(enable_target_feature="avx512f")
+_mm512_mask_i64scatter_pd :: #force_inline proc "c" (slice: ^f64, mask: __mmask8, offsets: __m512i, src: __m512d, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterqpd(slice, transmute(i8)mask, offsets, src, SCALE)
+}
+
+// Scatter single-precision (32-bit) floating-point elements from `src` into memory using 32-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i32scatter_ps)
+@(enable_target_feature="avx512f")
+_mm512_i32scatter_ps :: #force_inline proc "c" (slice: ^f32, offsets: __m512i, src: __m512, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterdps(slice, -1, transmute(simd.i32x16)offsets, src, SCALE)
+}
+
+// Scatter single-precision (32-bit) floating-point elements from `src` into memory using 32-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i32scatter_ps)
+@(enable_target_feature="avx512f")
+_mm512_mask_i32scatter_ps :: #force_inline proc "c" (slice: ^f32, mask: __mmask16, offsets: __m512i, src: __m512, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterdps(slice, transmute(i16)mask, transmute(simd.i32x16)offsets, src, SCALE)
+}
+
+// Scatter single-precision (32-bit) floating-point elements from `src` into memory using 64-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i64scatter_ps)
+@(enable_target_feature="avx512f")
+_mm512_i64scatter_ps :: #force_inline proc "c" (slice: ^f32, offsets: __m512i, src: __m256, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterqps(slice, -1, offsets, src, SCALE)
+}
+
+// Scatter single-precision (32-bit) floating-point elements from `src` into memory using 64-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i64scatter_ps)
+@(enable_target_feature="avx512f")
+_mm512_mask_i64scatter_ps :: #force_inline proc "c" (slice: ^f32, mask: __mmask8, offsets: __m512i, src: __m256, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterqps(slice, transmute(i8)mask, offsets, src, SCALE)
+}
+
+// Scatter 64-bit integers from `src` into memory using 32-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i32scatter_epi64)
+@(enable_target_feature="avx512f")
+_mm512_i32scatter_epi64 :: #force_inline proc "c" (slice: ^i64, offsets: __m256i, src: __m512i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterdq(slice, -1, transmute(simd.i32x8)offsets, src, SCALE)
+}
+
+// Scatter 64-bit integers from `src` into memory using 32-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i32scatter_epi64)
+@(enable_target_feature="avx512f")
+_mm512_mask_i32scatter_epi64 :: #force_inline proc "c" (slice: ^i64, mask: __mmask8, offsets: __m256i, src: __m512i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterdq(slice, transmute(i8)mask, transmute(simd.i32x8)offsets, src, SCALE)
+}
+
+// Scatter 64-bit integers from `src` into memory using 64-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i64scatter_epi64)
+@(enable_target_feature="avx512f")
+_mm512_i64scatter_epi64 :: #force_inline proc "c" (slice: ^i64, offsets: __m512i, src: __m512i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterqq(slice, -1, offsets, src, SCALE)
+}
+
+// Scatter 64-bit integers from `src` into memory using 64-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i64scatter_epi64)
+@(enable_target_feature="avx512f")
+_mm512_mask_i64scatter_epi64 :: #force_inline proc "c" (slice: ^i64, mask: __mmask8, offsets: __m512i, src: __m512i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterqq(slice, transmute(i8)mask, offsets, src, SCALE)
+}
+
+// Scatter 32-bit integers from `src` into memory using 32-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i32scatter_epi32)
+@(enable_target_feature="avx512f")
+_mm512_i32scatter_epi32 :: #force_inline proc "c" (slice: ^i32, offsets: __m512i, src: __m512i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterdd(slice, -1, transmute(simd.i32x16)offsets, transmute(simd.i32x16)src, SCALE)
+}
+
+// Scatter 32-bit integers from `src` into memory using 32-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i32scatter_epi32)
+@(enable_target_feature="avx512f")
+_mm512_mask_i32scatter_epi32 :: #force_inline proc "c" (slice: ^i32, mask: __mmask16, offsets: __m512i, src: __m512i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterdd(slice, transmute(i16)mask, transmute(simd.i32x16)offsets, transmute(simd.i32x16)src, SCALE)
+}
+
+// Scatter 32-bit integers from `src` into memory using 64-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i64scatter_epi32)
+@(enable_target_feature="avx512f")
+_mm512_i64scatter_epi32 :: #force_inline proc "c" (slice: ^i32, offsets: __m512i, src: __m256i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterqd(slice, -1, offsets, transmute(simd.i32x8)src, SCALE)
+}
+
+// Scatter 32-bit integers from `src` into memory using 64-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i64scatter_epi32)
+@(enable_target_feature="avx512f")
+_mm512_mask_i64scatter_epi32 :: #force_inline proc "c" (slice: ^i32, mask: __mmask8, offsets: __m512i, src: __m256i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterqd(slice, transmute(i8)mask, offsets, transmute(simd.i32x8)src, SCALE)
+}
+
+// Loads 8 64-bit integer elements
+// from memory starting at location `slice` at packed 32-bit integer indices
+// stored in the lower half of `offsets` scaled by `scale` and stores them in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i32logather_epi64)
+@(require_results, enable_target_feature="avx512f")
+_mm512_i32logather_epi64 :: #force_inline proc "c" (offsets: __m512i, slice: ^i64, $SCALE: i32) -> __m512i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return _mm512_i32gather_epi64(_mm512_castsi512_si256(offsets), slice, SCALE)
+}
+
+// Loads 8 64-bit integer elements
+// from memory starting at location `slice` at packed 32-bit integer indices
+// stored in the lower half of `offsets` scaled by `scale` into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set).
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i32logather_epi64)
+@(require_results, enable_target_feature="avx512f")
+_mm512_mask_i32logather_epi64 :: #force_inline proc "c" (src: __m512i, mask: __mmask8, offsets: __m512i, slice: ^i64, $SCALE: i32) -> __m512i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return _mm512_mask_i32gather_epi64(src, mask, _mm512_castsi512_si256(offsets), slice, SCALE)
+}
+
+// Loads 8 double-precision (64-bit) floating-point elements
+// from memory starting at location `slice` at packed 32-bit integer indices
+// stored in the lower half of `offsets` scaled by `scale` and stores them in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i32logather_pd)
+@(require_results, enable_target_feature="avx512f")
+_mm512_i32logather_pd :: #force_inline proc "c" (offsets: __m512i, slice: ^f64, $SCALE: i32) -> __m512d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return _mm512_i32gather_pd(_mm512_castsi512_si256(offsets), slice, SCALE)
+}
+
+// Loads 8 double-precision (64-bit) floating-point elements
+// from memory starting at location `slice` at packed 32-bit integer indices
+// stored in the lower half of `offsets` scaled by `scale` into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set).
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i32logather_pd)
+@(require_results, enable_target_feature="avx512f")
+_mm512_mask_i32logather_pd :: #force_inline proc "c" (src: __m512d, mask: __mmask8, offsets: __m512i, slice: ^f64, $SCALE: i32) -> __m512d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return _mm512_mask_i32gather_pd(src, mask, _mm512_castsi512_si256(offsets), slice, SCALE)
+}
+
+// Stores 8 packed 64-bit integer elements
+// located in `src` and stores them in memory locations starting at location `slice`
+// at packed 32-bit integer indices stored in `offsets` scaled by `scale`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i32loscatter_epi64)
+@(enable_target_feature="avx512f")
+_mm512_i32loscatter_epi64 :: #force_inline proc "c" (slice: ^i64, offsets: __m512i, src: __m512i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	_mm512_i32scatter_epi64(slice, _mm512_castsi512_si256(offsets), src, SCALE)
+}
+
+// Stores 8 packed 64-bit integer elements
+// located in `src` and stores them in memory locations starting at location `slice`
+// at packed 32-bit integer indices stored in `offsets` scaled by `scale` using writemask `mask`
+// (elements whose corresponding mask bit is not set are not written to memory).
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i32loscatter_epi64)
+@(enable_target_feature="avx512f")
+_mm512_mask_i32loscatter_epi64 :: #force_inline proc "c" (slice: ^i64, mask: __mmask8, offsets: __m512i, src: __m512i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	_mm512_mask_i32scatter_epi64(slice, mask, _mm512_castsi512_si256(offsets), src, SCALE)
+}
+
+// Stores 8 packed double-precision (64-bit) floating-point elements
+// located in `src` and stores them in memory locations starting at location `slice`
+// at packed 32-bit integer indices stored in `offsets` scaled by `scale`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_i32loscatter_pd)
+@(enable_target_feature="avx512f")
+_mm512_i32loscatter_pd :: #force_inline proc "c" (slice: ^f64, offsets: __m512i, src: __m512d, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	_mm512_i32scatter_pd(slice, _mm512_castsi512_si256(offsets), src, SCALE)
+}
+
+// Stores 8 packed double-precision (64-bit) floating-point elements
+// located in `src` to memory locations starting at location `slice`
+// at packed 32-bit integer indices stored in `offsets` scaled by `scale` using writemask `mask`
+// (elements whose corresponding mask bit is not set are not written to memory).
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_mask_i32loscatter_pd)
+@(enable_target_feature="avx512f")
+_mm512_mask_i32loscatter_pd :: #force_inline proc "c" (slice: ^f64, mask: __mmask8, offsets: __m512i, src: __m512d, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	_mm512_mask_i32scatter_pd(slice, mask, _mm512_castsi512_si256(offsets), src, SCALE)
+}
+
+// Scatter 32-bit integers from `src` into memory using 32-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_i32scatter_epi32)
+@(enable_target_feature="avx512f,avx512vl")
+_mm256_i32scatter_epi32 :: #force_inline proc "c" (slice: ^i32, offsets: __m256i, src: __m256i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterdd_256(slice, max(u8), transmute(simd.i32x8)offsets, transmute(simd.i32x8)src, SCALE)
+}
+
+// Scatter 32-bit integers from `src` into memory using 32-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mask_i32scatter_epi32)
+@(enable_target_feature="avx512f,avx512vl")
+_mm256_mask_i32scatter_epi32 :: #force_inline proc "c" (slice: ^i32, mask: __mmask8, offsets: __m256i, src: __m256i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterdd_256(slice, mask, transmute(simd.i32x8)offsets, transmute(simd.i32x8)src, SCALE)
+}
+
+// Scatter 64-bit integers from `src` into memory using 32-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_i32scatter_epi64)
+@(enable_target_feature="avx512f,avx512vl")
+_mm256_i32scatter_epi64 :: #force_inline proc "c" (slice: ^i64, offsets: __m128i, src: __m256i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterdq_256(slice, max(u8), transmute(simd.i32x4)offsets, src, SCALE)
+}
+
+// Scatter 64-bit integers from `src` into memory using 32-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mask_i32scatter_epi64)
+@(enable_target_feature="avx512f,avx512vl")
+_mm256_mask_i32scatter_epi64 :: #force_inline proc "c" (slice: ^i64, mask: __mmask8, offsets: __m128i, src: __m256i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterdq_256(slice, mask, transmute(simd.i32x4)offsets, src, SCALE)
+}
+
+// Scatter double-precision (64-bit) floating-point elements from `src` into memory using 32-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_i32scatter_pd)
+@(enable_target_feature="avx512f,avx512vl")
+_mm256_i32scatter_pd :: #force_inline proc "c" (slice: ^f64, offsets: __m128i, src: __m256d, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterdpd_256(slice, max(u8), transmute(simd.i32x4)offsets, src, SCALE)
+}
+
+// Scatter double-precision (64-bit) floating-point elements from `src` into memory using 32-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mask_i32scatter_pd)
+@(enable_target_feature="avx512f,avx512vl")
+_mm256_mask_i32scatter_pd :: #force_inline proc "c" (slice: ^f64, mask: __mmask8, offsets: __m128i, src: __m256d, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterdpd_256(slice, mask, transmute(simd.i32x4)offsets, src, SCALE)
+}
+
+// Scatter single-precision (32-bit) floating-point elements from `src` into memory using 32-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_i32scatter_ps)
+@(enable_target_feature="avx512f,avx512vl")
+_mm256_i32scatter_ps :: #force_inline proc "c" (slice: ^f32, offsets: __m256i, src: __m256, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterdps_256(slice, max(u8), transmute(simd.i32x8)offsets, src, SCALE)
+}
+
+// Scatter single-precision (32-bit) floating-point elements from `src` into memory using 32-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mask_i32scatter_ps)
+@(enable_target_feature="avx512f,avx512vl")
+_mm256_mask_i32scatter_ps :: #force_inline proc "c" (slice: ^f32, mask: __mmask8, offsets: __m256i, src: __m256, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterdps_256(slice, mask, transmute(simd.i32x8)offsets, src, SCALE)
+}
+
+// Scatter 32-bit integers from `src` into memory using 64-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_i64scatter_epi32)
+@(enable_target_feature="avx512f,avx512vl")
+_mm256_i64scatter_epi32 :: #force_inline proc "c" (slice: ^i32, offsets: __m256i, src: __m128i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterqd_256(slice, max(u8), offsets, transmute(simd.i32x4)src, SCALE)
+}
+
+// Scatter 32-bit integers from `src` into memory using 64-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mask_i64scatter_epi32)
+@(enable_target_feature="avx512f,avx512vl")
+_mm256_mask_i64scatter_epi32 :: #force_inline proc "c" (slice: ^i32, mask: __mmask8, offsets: __m256i, src: __m128i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterqd_256(slice, mask, offsets, transmute(simd.i32x4)src, SCALE)
+}
+
+// Scatter 64-bit integers from `src` into memory using 64-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_i64scatter_epi64)
+@(enable_target_feature="avx512f,avx512vl")
+_mm256_i64scatter_epi64 :: #force_inline proc "c" (slice: ^i64, offsets: __m256i, src: __m256i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterqq_256(slice, max(u8), offsets, src, SCALE)
+}
+
+// Scatter 64-bit integers from `src` into memory using 64-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mask_i64scatter_epi64)
+@(enable_target_feature="avx512f,avx512vl")
+_mm256_mask_i64scatter_epi64 :: #force_inline proc "c" (slice: ^i64, mask: __mmask8, offsets: __m256i, src: __m256i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterqq_256(slice, mask, offsets, src, SCALE)
+}
+
+// Scatter double-precision (64-bit) floating-point elements from `src` into memory using 64-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_i64scatter_pd)
+@(enable_target_feature="avx512f,avx512vl")
+_mm256_i64scatter_pd :: #force_inline proc "c" (slice: ^f64, offsets: __m256i, src: __m256d, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterqpd_256(slice, max(u8), offsets, src, SCALE)
+}
+
+// Scatter double-precision (64-bit) floating-point elements from `src` into memory using 64-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mask_i64scatter_pd)
+@(enable_target_feature="avx512f,avx512vl")
+_mm256_mask_i64scatter_pd :: #force_inline proc "c" (slice: ^f64, mask: __mmask8, offsets: __m256i, src: __m256d, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterqpd_256(slice, mask, offsets, src, SCALE)
+}
+
+// Scatter single-precision (32-bit) floating-point elements from `src` into memory using 64-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_i64scatter_ps)
+@(enable_target_feature="avx512f,avx512vl")
+_mm256_i64scatter_ps :: #force_inline proc "c" (slice: ^f32, offsets: __m256i, src: __m128, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterqps_256(slice, max(u8), offsets, src, SCALE)
+}
+
+// Scatter single-precision (32-bit) floating-point elements from `src` into memory using 64-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mask_i64scatter_ps)
+@(enable_target_feature="avx512f,avx512vl")
+_mm256_mask_i64scatter_ps :: #force_inline proc "c" (slice: ^f32, mask: __mmask8, offsets: __m256i, src: __m128, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterqps_256(slice, mask, offsets, src, SCALE)
+}
+
+// Gather 32-bit integers from memory using 32-bit indices.
+// 32-bit elements are loaded from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mmask_i32gather_epi32)
+@(require_results, enable_target_feature="avx512f,avx512vl")
+_mm256_mmask_i32gather_epi32 :: #force_inline proc "c" (src: __m256i, mask: __mmask8, offsets: __m256i, slice: ^i32, $SCALE: i32) -> __m256i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return transmute(__m256i)llvm_vpgatherdd_256(transmute(simd.i32x8)src, slice, transmute(simd.i32x8)offsets, mask, SCALE)
+}
+
+// Gather 64-bit integers from memory using 32-bit indices.
+// 64-bit elements are loaded from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mmask_i32gather_epi64)
+@(require_results, enable_target_feature="avx512f,avx512vl")
+_mm256_mmask_i32gather_epi64 :: #force_inline proc "c" (src: __m256i, mask: __mmask8, offsets: __m128i, slice: ^i64, $SCALE: i32) -> __m256i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherdq_256(src, slice, transmute(simd.i32x4)offsets, mask, SCALE)
+}
+
+// Gather double-precision (64-bit) floating-point elements from memory using 32-bit indices.
+// 64-bit elements are loaded from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mmask_i32gather_pd)
+@(require_results, enable_target_feature="avx512f,avx512vl")
+_mm256_mmask_i32gather_pd :: #force_inline proc "c" (src: __m256d, mask: __mmask8, offsets: __m128i, slice: ^f64, $SCALE: i32) -> __m256d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vgatherdpd_256(src, slice, transmute(simd.i32x4)offsets, mask, SCALE)
+}
+
+// Gather single-precision (32-bit) floating-point elements from memory using 32-bit indices.
+// 32-bit elements are loaded from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mmask_i32gather_ps)
+@(require_results, enable_target_feature="avx512f,avx512vl")
+_mm256_mmask_i32gather_ps :: #force_inline proc "c" (src: __m256, mask: __mmask8, offsets: __m256i, slice: ^f32, $SCALE: i32) -> __m256 where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vgatherdps_256(src, slice, transmute(simd.i32x8)offsets, mask, SCALE)
+}
+
+// Gather 32-bit integers from memory using 64-bit indices.
+// 32-bit elements are loaded from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mmask_i64gather_epi32)
+@(require_results, enable_target_feature="avx512f,avx512vl")
+_mm256_mmask_i64gather_epi32 :: #force_inline proc "c" (src: __m128i, mask: __mmask8, offsets: __m256i, slice: ^i32, $SCALE: i32) -> __m128i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return transmute(__m128i)llvm_vpgatherqd_256(transmute(simd.i32x4)src, slice, offsets, mask, SCALE)
+}
+
+// Gather 64-bit integers from memory using 64-bit indices.
+// 64-bit elements are loaded from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mmask_i64gather_epi64)
+@(require_results, enable_target_feature="avx512f,avx512vl")
+_mm256_mmask_i64gather_epi64 :: #force_inline proc "c" (src: __m256i, mask: __mmask8, offsets: __m256i, slice: ^i64, $SCALE: i32) -> __m256i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherqq_256(src, slice, offsets, mask, SCALE)
+}
+
+// Gather double-precision (64-bit) floating-point elements from memory using 64-bit indices.
+// 64-bit elements are loaded from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mmask_i64gather_pd)
+@(require_results, enable_target_feature="avx512f,avx512vl")
+_mm256_mmask_i64gather_pd :: #force_inline proc "c" (src: __m256d, mask: __mmask8, offsets: __m256i, slice: ^f64, $SCALE: i32) -> __m256d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vgatherqpd_256(src, slice, offsets, mask, SCALE)
+}
+
+// Gather single-precision (32-bit) floating-point elements from memory using 64-bit indices.
+// 32-bit elements are loaded from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mmask_i64gather_ps)
+@(require_results, enable_target_feature="avx512f,avx512vl")
+_mm256_mmask_i64gather_ps :: #force_inline proc "c" (src: __m128, mask: __mmask8, offsets: __m256i, slice: ^f32, $SCALE: i32) -> __m128 where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vgatherqps_256(src, slice, offsets, mask, SCALE)
+}
+
+// Scatter 32-bit integers from `src` into memory using 32-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_i32scatter_epi32)
+@(enable_target_feature="avx512f,avx512vl")
+_mm_i32scatter_epi32 :: #force_inline proc "c" (slice: ^i32, offsets: __m128i, src: __m128i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterdd_128(slice, max(u8), transmute(simd.i32x4)offsets, transmute(simd.i32x4)src, SCALE)
+}
+
+// Scatter 32-bit integers from `src` into memory using 32-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mask_i32scatter_epi32)
+@(enable_target_feature="avx512f,avx512vl")
+_mm_mask_i32scatter_epi32 :: #force_inline proc "c" (slice: ^i32, mask: __mmask8, offsets: __m128i, src: __m128i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterdd_128(slice, mask, transmute(simd.i32x4)offsets, transmute(simd.i32x4)src, SCALE)
+}
+
+// Scatter 64-bit integers from `src` into memory using 32-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_i32scatter_epi64)
+@(enable_target_feature="avx512f,avx512vl")
+_mm_i32scatter_epi64 :: #force_inline proc "c" (slice: ^i64, offsets: __m128i, src: __m128i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterdq_128(slice, max(u8), transmute(simd.i32x4)offsets, src, SCALE)
+}
+
+// Scatter 64-bit integers from `src` into memory using 32-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mask_i32scatter_epi64)
+@(enable_target_feature="avx512f,avx512vl")
+_mm_mask_i32scatter_epi64 :: #force_inline proc "c" (slice: ^i64, mask: __mmask8, offsets: __m128i, src: __m128i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterdq_128(slice, mask, transmute(simd.i32x4)offsets, src, SCALE)
+}
+
+// Scatter double-precision (64-bit) floating-point elements from `src` into memory using 32-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_i32scatter_pd)
+@(enable_target_feature="avx512f,avx512vl")
+_mm_i32scatter_pd :: #force_inline proc "c" (slice: ^f64, offsets: __m128i, src: __m128d, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterdpd_128(slice, max(u8), transmute(simd.i32x4)offsets, src, SCALE)
+}
+
+// Scatter double-precision (64-bit) floating-point elements from `src` into memory using 32-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mask_i32scatter_pd)
+@(enable_target_feature="avx512f,avx512vl")
+_mm_mask_i32scatter_pd :: #force_inline proc "c" (slice: ^f64, mask: __mmask8, offsets: __m128i, src: __m128d, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterdpd_128(slice, mask, transmute(simd.i32x4)offsets, src, SCALE)
+}
+
+// Scatter single-precision (32-bit) floating-point elements from `src` into memory using 32-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_i32scatter_ps)
+@(enable_target_feature="avx512f,avx512vl")
+_mm_i32scatter_ps :: #force_inline proc "c" (slice: ^f32, offsets: __m128i, src: __m128, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterdps_128(slice, max(u8), transmute(simd.i32x4)offsets, src, SCALE)
+}
+
+// Scatter single-precision (32-bit) floating-point elements from `src` into memory using 32-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mask_i32scatter_ps)
+@(enable_target_feature="avx512f,avx512vl")
+_mm_mask_i32scatter_ps :: #force_inline proc "c" (slice: ^f32, mask: __mmask8, offsets: __m128i, src: __m128, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterdps_128(slice, mask, transmute(simd.i32x4)offsets, src, SCALE)
+}
+
+// Scatter 32-bit integers from `src` into memory using 64-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_i64scatter_epi32)
+@(enable_target_feature="avx512f,avx512vl")
+_mm_i64scatter_epi32 :: #force_inline proc "c" (slice: ^i32, offsets: __m128i, src: __m128i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterqd_128(slice, max(u8), offsets, transmute(simd.i32x4)src, SCALE)
+}
+
+// Scatter 32-bit integers from `src` into memory using 64-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mask_i64scatter_epi32)
+@(enable_target_feature="avx512f,avx512vl")
+_mm_mask_i64scatter_epi32 :: #force_inline proc "c" (slice: ^i32, mask: __mmask8, offsets: __m128i, src: __m128i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterqd_128(slice, mask, offsets, transmute(simd.i32x4)src, SCALE)
+}
+
+// Scatter 64-bit integers from `src` into memory using 64-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_i64scatter_epi64)
+@(enable_target_feature="avx512f,avx512vl")
+_mm_i64scatter_epi64 :: #force_inline proc "c" (slice: ^i64, offsets: __m128i, src: __m128i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterqq_128(slice, max(u8), offsets, src, SCALE)
+}
+
+// Scatter 64-bit integers from `src` into memory using 64-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mask_i64scatter_epi64)
+@(enable_target_feature="avx512f,avx512vl")
+_mm_mask_i64scatter_epi64 :: #force_inline proc "c" (slice: ^i64, mask: __mmask8, offsets: __m128i, src: __m128i, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vpscatterqq_128(slice, mask, offsets, src, SCALE)
+}
+
+// Scatter double-precision (64-bit) floating-point elements from `src` into memory using 64-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_i64scatter_pd)
+@(enable_target_feature="avx512f,avx512vl")
+_mm_i64scatter_pd :: #force_inline proc "c" (slice: ^f64, offsets: __m128i, src: __m128d, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterqpd_128(slice, max(u8), offsets, src, SCALE)
+}
+
+// Scatter double-precision (64-bit) floating-point elements from `src` into memory using 64-bit indices.
+// 64-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mask_i64scatter_pd)
+@(enable_target_feature="avx512f,avx512vl")
+_mm_mask_i64scatter_pd :: #force_inline proc "c" (slice: ^f64, mask: __mmask8, offsets: __m128i, src: __m128d, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterqpd_128(slice, mask, offsets, src, SCALE)
+}
+
+// Scatter single-precision (32-bit) floating-point elements from `src` into memory using 64-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_i64scatter_ps)
+@(enable_target_feature="avx512f,avx512vl")
+_mm_i64scatter_ps :: #force_inline proc "c" (slice: ^f32, offsets: __m128i, src: __m128, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterqps_128(slice, max(u8), offsets, src, SCALE)
+}
+
+// Scatter single-precision (32-bit) floating-point elements from `src` into memory using 64-bit indices.
+// 32-bit elements are stored at addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`) subject to mask `mask`
+// (elements are not stored when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mask_i64scatter_ps)
+@(enable_target_feature="avx512f,avx512vl")
+_mm_mask_i64scatter_ps :: #force_inline proc "c" (slice: ^f32, mask: __mmask8, offsets: __m128i, src: __m128, $SCALE: i32) where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	llvm_vscatterqps_128(slice, mask, offsets, src, SCALE)
+}
+
+// Gather 32-bit integers from memory using 32-bit indices.
+// 32-bit elements are loaded from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mmask_i32gather_epi32)
+@(require_results, enable_target_feature="avx512f,avx512vl")
+_mm_mmask_i32gather_epi32 :: #force_inline proc "c" (src: __m128i, mask: __mmask8, offsets: __m128i, slice: ^i32, $SCALE: i32) -> __m128i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return transmute(__m128i)llvm_vpgatherdd_128(transmute(simd.i32x4)src, slice, transmute(simd.i32x4)offsets, mask, SCALE)
+}
+
+// Gather 64-bit integers from memory using 32-bit indices.
+// 64-bit elements are loaded from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mmask_i32gather_epi64)
+@(require_results, enable_target_feature="avx512f,avx512vl")
+_mm_mmask_i32gather_epi64 :: #force_inline proc "c" (src: __m128i, mask: __mmask8, offsets: __m128i, slice: ^i64, $SCALE: i32) -> __m128i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherdq_128(src, slice, transmute(simd.i32x4)offsets, mask, SCALE)
+}
+
+// Gather double-precision (64-bit) floating-point elements from memory using 32-bit indices.
+// 64-bit elements are loaded from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mmask_i32gather_pd)
+@(require_results, enable_target_feature="avx512f,avx512vl")
+_mm_mmask_i32gather_pd :: #force_inline proc "c" (src: __m128d, mask: __mmask8, offsets: __m128i, slice: ^f64, $SCALE: i32) -> __m128d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vgatherdpd_128(src, slice, transmute(simd.i32x4)offsets, mask, SCALE)
+}
+
+// Gather single-precision (32-bit) floating-point elements from memory using 32-bit indices.
+// 32-bit elements are loaded from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mmask_i32gather_ps)
+@(require_results, enable_target_feature="avx512f,avx512vl")
+_mm_mmask_i32gather_ps :: #force_inline proc "c" (src: __m128, mask: __mmask8, offsets: __m128i, slice: ^f32, $SCALE: i32) -> __m128 where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vgatherdps_128(src, slice, transmute(simd.i32x4)offsets, mask, SCALE)
+}
+
+// Gather 32-bit integers from memory using 64-bit indices.
+// 32-bit elements are loaded from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mmask_i64gather_epi32)
+@(require_results, enable_target_feature="avx512f,avx512vl")
+_mm_mmask_i64gather_epi32 :: #force_inline proc "c" (src: __m128i, mask: __mmask8, offsets: __m128i, slice: ^i32, $SCALE: i32) -> __m128i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return transmute(__m128i)llvm_vpgatherqd_128(transmute(simd.i32x4)src, slice, offsets, mask, SCALE)
+}
+
+// Gather 64-bit integers from memory using 64-bit indices.
+// 64-bit elements are loaded from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mmask_i64gather_epi64)
+@(require_results, enable_target_feature="avx512f,avx512vl")
+_mm_mmask_i64gather_epi64 :: #force_inline proc "c" (src: __m128i, mask: __mmask8, offsets: __m128i, slice: ^i64, $SCALE: i32) -> __m128i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherqq_128(src, slice, offsets, mask, SCALE)
+}
+
+// Gather double-precision (64-bit) floating-point elements from memory using 64-bit indices.
+// 64-bit elements are loaded from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mmask_i64gather_pd)
+@(require_results, enable_target_feature="avx512f,avx512vl")
+_mm_mmask_i64gather_pd :: #force_inline proc "c" (src: __m128d, mask: __mmask8, offsets: __m128i, slice: ^f64, $SCALE: i32) -> __m128d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vgatherqpd_128(src, slice, offsets, mask, SCALE)
+}
+
+// Gather single-precision (32-bit) floating-point elements from memory using 64-bit indices.
+// 32-bit elements are loaded from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into `dst` using writemask `mask`
+// (elements are copied from `src` when the corresponding mask bit is not set). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mmask_i64gather_ps)
+@(require_results, enable_target_feature="avx512f,avx512vl")
+_mm_mmask_i64gather_ps :: #force_inline proc "c" (src: __m128, mask: __mmask8, offsets: __m128i, slice: ^f32, $SCALE: i32) -> __m128 where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vgatherqps_128(src, slice, offsets, mask, SCALE)
+}
+
 // Shift packed 32-bit integers in `a` right by the amount specified by
 // the corresponding element in `count` while shifting in zeros, and store the results in `dst`.
 //
@@ -6333,6 +7265,14 @@ _mm512_xor_si512 :: #force_inline proc "c" (a, b: __m512i) -> __m512i {
 @(require_results, enable_target_feature="avx512f")
 _mm512_castps512_ps256 :: #force_inline proc "c" (a: __m512) -> __m256 {
 	return simd.shuffle(a, a, 0, 1, 2, 3, 4, 5, 6, 7)
+}
+
+// Cast vector of type `__m512i` to type `__m256i`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_castsi512_si256)
+@(require_results, enable_target_feature="avx512f")
+_mm512_castsi512_si256 :: #force_inline proc "c" (a: __m512i) -> __m256i {
+	return simd.shuffle(a, a, 0, 1, 2, 3)
 }
 
 when ODIN_ARCH == .amd64 {
@@ -7262,30 +8202,6 @@ foreign _ {
 	@(link_name="llvm.x86.avx512.vpermi2var.pd.512")          llvm_vpermi2pd           :: proc(a: simd.f64x8, idx: simd.i64x8, b: simd.f64x8) -> simd.f64x8 ---
 	@(link_name="llvm.x86.avx512.vpermi2var.pd.256")          llvm_vpermi2pd256        :: proc(a: simd.f64x4, idx: simd.i64x4, b: simd.f64x4) -> simd.f64x4 ---
 	@(link_name="llvm.x86.avx512.vpermi2var.pd.128")          llvm_vpermi2pd128        :: proc(a: simd.f64x2, idx: simd.i64x2, b: simd.f64x2) -> simd.f64x2 ---
-	@(link_name="llvm.x86.avx512.mask.compress.d.512")        llvm_vpcompressd         :: proc(a: simd.i32x16, src: simd.i32x16, mask: u16) -> simd.i32x16 ---
-	@(link_name="llvm.x86.avx512.mask.compress.d.256")        llvm_vpcompressd256      :: proc(a: simd.i32x8, src: simd.i32x8, mask: u8) -> simd.i32x8 ---
-	@(link_name="llvm.x86.avx512.mask.compress.d.128")        llvm_vpcompressd128      :: proc(a: simd.i32x4, src: simd.i32x4, mask: u8) -> simd.i32x4 ---
-	@(link_name="llvm.x86.avx512.mask.compress.q.512")        llvm_vpcompressq         :: proc(a: simd.i64x8, src: simd.i64x8, mask: u8) -> simd.i64x8 ---
-	@(link_name="llvm.x86.avx512.mask.compress.q.256")        llvm_vpcompressq256      :: proc(a: simd.i64x4, src: simd.i64x4, mask: u8) -> simd.i64x4 ---
-	@(link_name="llvm.x86.avx512.mask.compress.q.128")        llvm_vpcompressq128      :: proc(a: simd.i64x2, src: simd.i64x2, mask: u8) -> simd.i64x2 ---
-	@(link_name="llvm.x86.avx512.mask.compress.ps.512")       llvm_vcompressps         :: proc(a: simd.f32x16, src: simd.f32x16, mask: u16) -> simd.f32x16 ---
-	@(link_name="llvm.x86.avx512.mask.compress.ps.256")       llvm_vcompressps256      :: proc(a: simd.f32x8, src: simd.f32x8, mask: u8) -> simd.f32x8 ---
-	@(link_name="llvm.x86.avx512.mask.compress.ps.128")       llvm_vcompressps128      :: proc(a: simd.f32x4, src: simd.f32x4, mask: u8) -> simd.f32x4 ---
-	@(link_name="llvm.x86.avx512.mask.compress.pd.512")       llvm_vcompresspd         :: proc(a: simd.f64x8, src: simd.f64x8, mask: u8) -> simd.f64x8 ---
-	@(link_name="llvm.x86.avx512.mask.compress.pd.256")       llvm_vcompresspd256      :: proc(a: simd.f64x4, src: simd.f64x4, mask: u8) -> simd.f64x4 ---
-	@(link_name="llvm.x86.avx512.mask.compress.pd.128")       llvm_vcompresspd128      :: proc(a: simd.f64x2, src: simd.f64x2, mask: u8) -> simd.f64x2 ---
-	@(link_name="llvm.x86.avx512.mask.compress.store.d.512")  llvm_vcompressstored     :: proc(mem: rawptr, data: simd.i32x16, mask: u16) ---
-	@(link_name="llvm.x86.avx512.mask.compress.store.d.256")  llvm_vcompressstored256  :: proc(mem: rawptr, data: simd.i32x8, mask: u8) ---
-	@(link_name="llvm.x86.avx512.mask.compress.store.d.128")  llvm_vcompressstored128  :: proc(mem: rawptr, data: simd.i32x4, mask: u8) ---
-	@(link_name="llvm.x86.avx512.mask.compress.store.q.512")  llvm_vcompressstoreq     :: proc(mem: rawptr, data: simd.i64x8, mask: u8) ---
-	@(link_name="llvm.x86.avx512.mask.compress.store.q.256")  llvm_vcompressstoreq256  :: proc(mem: rawptr, data: simd.i64x4, mask: u8) ---
-	@(link_name="llvm.x86.avx512.mask.compress.store.q.128")  llvm_vcompressstoreq128  :: proc(mem: rawptr, data: simd.i64x2, mask: u8) ---
-	@(link_name="llvm.x86.avx512.mask.compress.store.ps.512") llvm_vcompressstoreps    :: proc(mem: rawptr, data: simd.f32x16, mask: u16) ---
-	@(link_name="llvm.x86.avx512.mask.compress.store.ps.256") llvm_vcompressstoreps256 :: proc(mem: rawptr, data: simd.f32x8, mask: u8) ---
-	@(link_name="llvm.x86.avx512.mask.compress.store.ps.128") llvm_vcompressstoreps128 :: proc(mem: rawptr, data: simd.f32x4, mask: u8) ---
-	@(link_name="llvm.x86.avx512.mask.compress.store.pd.512") llvm_vcompressstorepd    :: proc(mem: rawptr, data: simd.f64x8, mask: u8) ---
-	@(link_name="llvm.x86.avx512.mask.compress.store.pd.256") llvm_vcompressstorepd256 :: proc(mem: rawptr, data: simd.f64x4, mask: u8) ---
-	@(link_name="llvm.x86.avx512.mask.compress.store.pd.128") llvm_vcompressstorepd128 :: proc(mem: rawptr, data: simd.f64x2, mask: u8) ---
 	@(link_name="llvm.x86.avx512.mask.expand.d.512")          llvm_vpexpandd           :: proc(a: simd.i32x16, src: simd.i32x16, mask: u16) -> simd.i32x16 ---
 	@(link_name="llvm.x86.avx512.mask.expand.d.256")          llvm_vpexpandd256        :: proc(a: simd.i32x8, src: simd.i32x8, mask: u8) -> simd.i32x8 ---
 	@(link_name="llvm.x86.avx512.mask.expand.d.128")          llvm_vpexpandd128        :: proc(a: simd.i32x4, src: simd.i32x4, mask: u8) -> simd.i32x4 ---
