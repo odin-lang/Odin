@@ -5,13 +5,15 @@ import "core:c"
 
 when ODIN_OS == .Darwin {
 	foreign import lib "system:System"
-} else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD {
+} else when ODIN_OS == .FreeBSD {
 	foreign import lib "system:dl"
-} else {
+} else when ODIN_OS == .Linux {
 	foreign import lib {
 		"system:c",
 		"system:dl",
 	}
+} else {
+	foreign import lib "system:c"
 }
 
 // dlfcn.h - dynamic linking

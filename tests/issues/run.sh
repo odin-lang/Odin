@@ -944,13 +944,13 @@ ln -s ../src/f.odin identity/r4/d/f.odin
 $ODIN build identity/r4/d -out:identity_reached $COMMON
 ./identity_reached
 
-QDIR='q 100%s "x" \y'
+QDIR='q "x" \y'
 rm -rf "$QDIR"
 mkdir "$QDIR"
-$ODIN build ../test_paths_quoting $COMMON '-define:S=a"b"' '-define:T=c d\' "-out:$QDIR/q"
-"./$QDIR/q"
-$ODIN build ../test_paths_quoting $COMMON '-define:S=a"b"' '-define:T=c d\' -build-mode:lib "-out:$QDIR/q.a"
-[[ -f "$QDIR/q.a" ]]
+$ODIN build ../test_paths_quoting $COMMON '-define:S=a"b"' '-define:T=c d\' "-out:$QDIR/q 100%s"
+"./$QDIR/q 100%s"
+$ODIN build ../test_paths_quoting $COMMON '-define:S=a"b"' '-define:T=c d\' -build-mode:lib "-out:$QDIR/q 100%s.a"
+[[ -f "$QDIR/q 100%s.a" ]]
 
 rm -rf tempfiles
 mkdir -p tempfiles/dll
