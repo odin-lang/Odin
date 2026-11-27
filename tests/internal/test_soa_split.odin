@@ -277,6 +277,47 @@ test_soa_split_unzip :: proc(t: ^testing.T) {
 }
 
 @(private="file")
+Split_Six :: struct {
+	#soa_split pos: Split_Vec,
+	#soa_split vel: Split_Vec,
+}
+
+@(private="file")
+Split_Three :: struct {
+	#soa_split p: [2]f64,
+	w:            i64,
+}
+
+// Columns of one size that fill the element are copied in transposed blocks, which '#soa_split' fields can make
+@(test)
+test_soa_split_copy :: proc(t: ^testing.T) {
+	testing.expect_value(t, intrinsics.type_soa_field_sizes(#soa[]Split_Six)^, [6]int{4, 4, 4, 4, 4, 4})
+	testing.expect_value(t, intrinsics.type_soa_field_sizes(#soa[]Split_Three)^, [3]int{8, 8, 8})
+
+	six:   [37]Split_Six
+	three: [37]Split_Three
+	for i in 0..<len(six) {
+		f := f32(i)
+		six[i]   = {{f, f + 1, f + 2}, {-f, -f - 1, -f - 2}}
+		three[i] = {{f64(i), f64(i)*2}, i64(i)*3}
+	}
+
+	soa_six:   #soa[37]Split_Six
+	soa_three: #soa[37]Split_Three
+	testing.expect_value(t, copy(soa_six[:], six[:]), 37)
+	testing.expect_value(t, copy(soa_three[:], three[:]), 37)
+	testing.expect_value(t, ([37]Split_Six)(soa_six), six)
+	testing.expect_value(t, ([37]Split_Three)(soa_three), three)
+
+	back_six:   [37]Split_Six
+	back_three: [37]Split_Three
+	copy(back_six[:], soa_six[:])
+	copy(back_three[:], soa_three[:])
+	testing.expect_value(t, back_six, six)
+	testing.expect_value(t, back_three, three)
+}
+
+@(private="file")
 SPLIT_CONSTANT :: #soa[2]Split_Particle{{{1, 2, 3}, {4, 5, 6}, {7, 8, 9, 10}, 11}, {id = 12}}
 
 @(private="file", rodata)
