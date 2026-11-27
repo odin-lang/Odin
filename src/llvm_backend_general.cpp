@@ -2454,9 +2454,28 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			len = lb_soa_struct_len(p, addr.addr);
 		}
 
+		bool bounds_check = addr.soa.index_expr != nullptr && (!lb_is_const(addr.soa.index) || t->Struct.soa_kind != StructSoa_Fixed);
+
+		if (is_type_array(elem) && is_type_numeric(base_type(elem)->Array.elem)) {
+			// NOTE(bill): each lane of an array of numbers is a column, and the value is built from them directly: arithmetic
+			// on a load of a local holding it would be done as a vector, which a loop over the elements cannot vectorize.
+			// Numbers have no padding the local would have zeroed.
+			if (bounds_check) {
+				lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), addr.soa.index, len);
+			}
+			lbValue res = {};
+			res.type  = elem;
+			res.value = LLVMConstNull(lb_type(p->module, elem));
+			for (i64 i = 0; i < base_type(elem)->Array.count; i++) {
+				lbValue lane = lb_emit_load(p, lb_soa_field_elem_ptr(p, addr.addr, addr.soa.column + cast(i32)i, addr.soa.index));
+				res.value = LLVMBuildInsertValue(p->builder, res.value, lane.value, cast(unsigned)i, "");
+			}
+			return res;
+		}
+
 		lbAddr res = lb_add_local_generated(p, elem, true);
 
-		if (addr.soa.index_expr != nullptr && (!lb_is_const(addr.soa.index) || t->Struct.soa_kind != StructSoa_Fixed)) {
+		if (bounds_check) {
 			lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), addr.soa.index, len);
 		}
 
