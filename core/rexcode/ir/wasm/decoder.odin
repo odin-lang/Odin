@@ -61,11 +61,18 @@ decode_ops :: proc(
 		op, next, dok := decode_one(data, relocs, byte_count, allocator)
 		if !dok {
 			append(errors, Error{location = byte_count, code = .INVALID_OPCODE})
-			append(&acc, operation(.INVALID))
+			if _, err := append(&acc, operation(.INVALID)); err != nil {
+				append(errors, Error{location = byte_count, code = .MALFORMED_MODULE})
+				break
+			}
 			byte_count += 1
 			continue
 		}
-		append(&acc, op)
+		if _, err := append(&acc, op); err != nil {
+			delete(op.operands, allocator)
+			append(errors, Error{location = byte_count, code = .MALFORMED_MODULE})
+			break
+		}
 		byte_count = next
 	}
 
@@ -93,13 +100,13 @@ decode_one :: proc(
 	m: Opcode = .INVALID
 	switch b0 {
 	case PREFIX_MISC:
-		sub := read_uleb(data, &off) or_return
+		sub := read_uleb(data, &off, 32) or_return
 		if sub < u64(DECODE_MISC_COUNT)   { m = DECODE_MISC[sub] }
 	case PREFIX_SIMD:
-		sub := read_uleb(data, &off) or_return
+		sub := read_uleb(data, &off, 32) or_return
 		if sub < u64(DECODE_SIMD_COUNT)   { m = DECODE_SIMD[sub] }
 	case PREFIX_ATOM:
-		sub := read_uleb(data, &off) or_return
+		sub := read_uleb(data, &off, 32) or_return
 		if sub < u64(DECODE_ATOMIC_COUNT) { m = DECODE_ATOMIC[sub] }
 	case:
 		m = DECODE_MAIN[b0]
@@ -111,6 +118,13 @@ decode_one :: proc(
 
 	form := encoding_form(m)
 	operands := make([dynamic]Operand, allocator)
+	defer if !ok {
+		delete(operands)
+	}
+	if reserve(&operands, imm_operand_count(form)) != nil {
+		next = pc
+		return
+	}
 
 	for k, ki in form.imm {
 		switch k {
@@ -118,15 +132,19 @@ decode_one :: proc(
 			// nothing
 
 		case .BLOCKTYPE:
-			v := read_sleb(data, &off) or_return
+			v := read_sleb(data, &off, 33) or_return
+			if v < 0 && !block_type_known(v) {
+				next = pc
+				return
+			}
 			append(&operands, Operand{kind = .ATTRIBUTE, imm = v, aux = u16(Attr.BLOCKTYPE)})
 
 		case .I32:
-			v := read_sleb(data, &off) or_return
+			v := read_sleb(data, &off, 32) or_return
 			append(&operands, op_int(v))
 
 		case .I64:
-			v := read_sleb(data, &off) or_return
+			v := read_sleb(data, &off, 64) or_return
 			append(&operands, op_int(v))
 
 		case .F32:
@@ -139,7 +157,7 @@ decode_one :: proc(
 
 		case .IDX:
 			field := off
-			raw := read_uleb(data, &off) or_return
+			raw := read_uleb(data, &off, 32) or_return
 			kind := idx_kind_for(m, ki)
 			o := op_wasm_index(kind, u32(raw))
 			// An index is symbolic only when an input relocation actually lands
@@ -151,13 +169,21 @@ decode_one :: proc(
 			append(&operands, o)
 
 		case .MEMARG:
-			align  := read_uleb(data, &off) or_return
-			offset := read_uleb(data, &off) or_return
-			// Stored as log2 on the wire; expand back to a byte alignment.
-			append(&operands, op_memarg(Memarg{align = u32(1 << align), offset = u32(offset)}))
+			flags := read_uleb(data, &off, 32) or_return
+			if flags >= 128 {
+				next = pc
+				return
+			}
+			memory: u64
+			if flags >= 64 {
+				memory = read_uleb(data, &off, 32) or_return
+				flags -= 64
+			}
+			offset := read_uleb(data, &off, 64) or_return
+			append(&operands, op_memarg(Memarg{align = u8(flags), offset = offset, memory = u32(memory)}))
 
 		case .REFTYPE:
-			if off >= u32(len(data)) {
+			if off >= u32(len(data)) || !value_type_is_ref(Value_Type(data[off])) {
 				next = pc
 				return
 			}
@@ -166,19 +192,26 @@ decode_one :: proc(
 			append(&operands, Operand{kind = .ATTRIBUTE, imm = i64(t), aux = u16(Attr.REFTYPE)})
 
 		case .BR_TABLE:
-			count := int(read_uleb(data, &off) or_return)
+			count := read_uleb(data, &off, 32) or_return
+			if count >= u64(u32(len(data)) - off) {
+				next = pc
+				return
+			}
 			default_index := len(operands)
-			reserve(&operands, count+1)
+			if reserve(&operands, len(operands) + int(count) + 1) != nil {
+				next = pc
+				return
+			}
 			append(&operands, Operand{}) // dummy for default
-			for _ in 0..<int(count) {
-				t := read_uleb(data, &off) or_return
+			for _ in 0..<count {
+				t := read_uleb(data, &off, 32) or_return
 				append(&operands, op_labelidx(u32(t)))
 			}
-			def := read_uleb(data, &off) or_return
+			def := read_uleb(data, &off, 32) or_return
 			operands[default_index] = op_labelidx(u32(def)) // default first
 
 		case .ZERO_BYTE:
-			if off >= u32(len(data)) {
+			if off >= u32(len(data)) || data[off] != 0 {
 				next = pc
 				return
 			}
@@ -204,6 +237,26 @@ decode_one :: proc(
 			lo, hi := op_v128(bytes)
 			append(&operands, lo)
 			append(&operands, hi)
+
+		case .VALTYPES:
+			count := read_uleb(data, &off, 32) or_return
+			if count > u64(u32(len(data)) - off) {
+				next = pc
+				return
+			}
+			if reserve(&operands, len(operands) + int(count)) != nil {
+				next = pc
+				return
+			}
+			for _ in 0..<count {
+				t := Value_Type(data[off])
+				if !value_type_is_known(t) {
+					next = pc
+					return
+				}
+				off += 1
+				append(&operands, op_valtype(t))
+			}
 		}
 	}
 
@@ -218,18 +271,35 @@ decode_one :: proc(
 @(private="file", require_results)
 idx_kind_for :: #force_inline proc "contextless" (m: Opcode, which: int) -> Index_Kind {
 	#partial switch m {
-	case .BR, .BR_IF:                           return .LABEL
-	case .CALL, .REF_FUNC:                      return .FUNC
-	case .CALL_INDIRECT:                        return .TYPE if which == 0 else .TABLE
-	case .LOCAL_GET, .LOCAL_SET, .LOCAL_TEE:    return .LOCAL
-	case .GLOBAL_GET, .GLOBAL_SET:              return .GLOBAL
-	case .MEMORY_INIT, .DATA_DROP:              return .DATA
-	case .TABLE_INIT:                           return .ELEM if which == 0 else .TABLE
-	case .ELEM_DROP:                            return .ELEM
-	case .TABLE_COPY:                           return .TABLE
-	case .TABLE_GROW, .TABLE_SIZE, .TABLE_FILL: return .TABLE
+	case .BR, .BR_IF:                                        return .LABEL
+	case .CALL, .RETURN_CALL, .REF_FUNC:                     return .FUNC
+	case .CALL_INDIRECT, .RETURN_CALL_INDIRECT:              return .TYPE if which == 0 else .TABLE
+	case .LOCAL_GET, .LOCAL_SET, .LOCAL_TEE:                 return .LOCAL
+	case .GLOBAL_GET, .GLOBAL_SET:                           return .GLOBAL
+	case .TABLE_GET, .TABLE_SET:                             return .TABLE
+	case .MEMORY_INIT:                                       return .DATA if which == 0 else .MEMORY
+	case .DATA_DROP:                                         return .DATA
+	case .MEMORY_SIZE, .MEMORY_GROW, .MEMORY_COPY, .MEMORY_FILL: return .MEMORY
+	case .TABLE_INIT:                                        return .ELEM if which == 0 else .TABLE
+	case .ELEM_DROP:                                         return .ELEM
+	case .TABLE_COPY:                                        return .TABLE
+	case .TABLE_GROW, .TABLE_SIZE, .TABLE_FILL:              return .TABLE
 	}
 	return .NONE
+}
+
+@(private="file", require_results)
+imm_operand_count :: proc "contextless" (form: ^Encoding) -> int {
+	n := 0
+	for k in form.imm {
+		#partial switch k {
+		case .BLOCKTYPE, .I32, .I64, .F32, .F64, .IDX, .MEMARG, .REFTYPE, .LANE:
+			n += 1
+		case .LANES16:
+			n += 2
+		}
+	}
+	return n
 }
 
 @(private="file", require_results)

@@ -442,32 +442,28 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 	// These two will be used like an Odin slice later.
 	char const *line_text = the_line;
 	i32 line_length_bytes = cast(i32)gb_string_length(the_line);
+	i32 const full_line_length_bytes = line_length_bytes;
 
-	ucg_grapheme* graphemes;
 	i32 line_length_runes = 0;
 	i32 line_length_graphemes = 0;
 	i32 line_width = 0;
 
-	int ucg_result = ucg_decode_grapheme_clusters(
-		permanent_allocator(), (const uint8_t*)line_text, line_length_bytes,
-		&graphemes, &line_length_runes, &line_length_graphemes, &line_width);
+	i32 error_start_index_graphemes = -1;
+	i32 error_start_width = 0;
+	i32 error_start_index_runes = 0;
 
-	if (ucg_result < 0) {
-		// There was a UTF-8 parsing error.
-		// Insert a dummy grapheme so the start of the invalid rune can be pointed at.
-		graphemes = (ucg_grapheme*)gb_resize(permanent_allocator(),
-			graphemes,
-			sizeof(ucg_grapheme) * (line_length_graphemes),
-			sizeof(ucg_grapheme) * (1 + line_length_graphemes));
-
-		ucg_grapheme append = {
-			error_start_index_bytes,
-			line_length_runes,
-			1,
-		};
-
-		graphemes[line_length_graphemes] = append;
+	ucg_grapheme_iterator it = ucg_grapheme_iterator_make((const uint8_t*)line_text, line_length_bytes);
+	ucg_grapheme g = {};
+	while (ucg_next_grapheme(&it, &g) > 0) {
+		if (error_start_index_graphemes < 0 && g.byte_index == error_start_index_bytes) {
+			error_start_index_graphemes = line_length_graphemes;
+			error_start_width = line_width;
+			error_start_index_runes = g.rune_index;
+		}
+		line_width += g.width;
+		line_length_graphemes += 1;
 	}
+	line_length_runes = it.state.rune_count;
 
 	// The units below are counted in visual, monospace cells.
 	enum {
@@ -482,12 +478,10 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 		MAX_LINE_LENGTH_PADDED = MAX_LINE_LENGTH - MAX_INSERTED_WIDTH,
 	};
 
-	i32 error_start_index_graphemes = 0;
-	for (i32 i = 0; i < line_length_graphemes; i += 1) {
-		if (graphemes[i].byte_index == error_start_index_bytes) {
-			error_start_index_graphemes = i;
-			break;
-		}
+	if (error_start_index_graphemes < 0) {
+		error_start_index_graphemes = 0;
+		error_start_width = 0;
+		error_start_index_runes = 0;
 	}
 
 	if (error_start_index_graphemes == 0 && error_start_index_bytes != 0 && line_length_graphemes != 0) {
@@ -496,6 +490,8 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 		// This is an edge case where the error is sitting on a newline or the
 		// end of the line, as that is the only location we could not have checked.
 		error_start_index_graphemes = line_length_graphemes;
+		error_start_width = line_width;
+		error_start_index_runes = line_length_runes;
 	}
 
 	error_out("\t");
@@ -505,43 +501,48 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 	i32 squiggle_padding = 0;
 	i32 window_open_bytes = 0;
 	i32 window_close_bytes = 0;
+	i32 window_open_width = 0;
 	if (line_width > MAX_LINE_LENGTH_PADDED) {
 		// Now that we know the line is over the length limit, we have to
 		// compose a visual window in which to display the error.
-		i32 window_size_left = 0;
-		i32 window_size_right = 0;
 		i32 window_open_graphemes = 0;
+		bool window_closed = false;
 
-		for (i32 i = error_start_index_graphemes - 1; i > 0; i -= 1) {
-			window_size_left += graphemes[i].width;
-			if (window_size_left >= MIN_LEFT_VIEW) {
-				window_open_graphemes = i;
-				window_open_bytes = graphemes[i].byte_index;
-				break;
+		i32 index = 0;
+		i32 width_before = 0;
+		it = ucg_grapheme_iterator_make((const uint8_t*)the_line, full_line_length_bytes);
+		while (ucg_next_grapheme(&it, &g) > 0) {
+			if (index >= 1 && index < error_start_index_graphemes && error_start_width - width_before >= MIN_LEFT_VIEW) {
+				window_open_graphemes = index;
+				window_open_width = width_before;
+				window_open_bytes = g.byte_index;
 			}
-		}
-
-		for (i32 i = error_start_index_graphemes; i < line_length_graphemes; i += 1) {
-			window_size_right += graphemes[i].width;
-			if (window_size_right >= MAX_LINE_LENGTH_PADDED - MIN_LEFT_VIEW) {
-				window_close_bytes = graphemes[i].byte_index;
-				break;
+			if (!window_closed && index >= error_start_index_graphemes && width_before + g.width - error_start_width >= MAX_LINE_LENGTH_PADDED - MIN_LEFT_VIEW) {
+				window_closed = true;
+				window_close_bytes = g.byte_index;
 			}
+			width_before += g.width;
+			index += 1;
 		}
 		if (window_close_bytes == 0) {
 			// The window ends at the end of the line.
 			window_close_bytes = line_length_bytes;
 		}
 
-		if (window_size_right < MAX_LINE_LENGTH_PADDED - MIN_LEFT_VIEW) {
+		if (!window_closed) {
 			// Hit the end of the string early on the right side; expand backwards.
-			for (i32 i = window_open_graphemes - 1; i > 0; i -= 1) {
-				window_size_left += graphemes[i].width;
-				if (window_size_left + window_size_right >= MAX_LINE_LENGTH_PADDED) {
-					window_open_graphemes = i;
-					window_open_bytes = graphemes[i].byte_index;
-					break;
+			i32 expand_limit = window_open_graphemes;
+			index = 0;
+			width_before = 0;
+			it = ucg_grapheme_iterator_make((const uint8_t*)the_line, full_line_length_bytes);
+			while (index < expand_limit && ucg_next_grapheme(&it, &g) > 0) {
+				if (index >= 1 && line_width - width_before >= MAX_LINE_LENGTH_PADDED) {
+					window_open_graphemes = index;
+					window_open_width = width_before;
+					window_open_bytes = g.byte_index;
 				}
+				width_before += g.width;
+				index += 1;
 			}
 		}
 
@@ -570,14 +571,8 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 		window_close_bytes = line_length_bytes;
 	}
 
-	// counts the graphemes before the error. It must not read the one at it: an error at the
-	// end of a line indexes one past the last grapheme
-	for (i32 i = error_start_index_graphemes-1; i >= 0; i -= 1) {
-		if (graphemes[i].byte_index < window_open_bytes) {
-			break;
-		}
-		squiggle_padding += graphemes[i].width;
-	}
+	// the width of the graphemes between the window's start and the error
+	squiggle_padding += error_start_width - window_open_width;
 
 	// Start printing code.
 
@@ -587,11 +582,6 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 	i32 squiggle_length = 0;
 	bool trailing_squiggle = false;
 
-	i32 error_start_index_runes = line_length_runes;
-	if (error_start_index_graphemes < line_length_graphemes) {
-		error_start_index_runes = graphemes[error_start_index_graphemes].rune_index;
-	}
-
 	if (end.file_id == pos.file_id) {
 		// The error has an endpoint.
 
@@ -600,23 +590,27 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 			// Always show the ellipsis in this case
 			show_right_ellipsis = true;
 
-			for (i32 i = error_start_index_graphemes; i < line_length_graphemes; i += 1) {
-				squiggle_length += graphemes[i].width;
-				trailing_squiggle = true;
-			}
+			squiggle_length = line_width - error_start_width;
+			trailing_squiggle = error_start_index_graphemes < line_length_graphemes;
 
 		} else if (end.line == pos.line && end.column > pos.column) {
 			// Error terminates before line end.
 			i32 error_end_index_runes = error_start_index_runes + end.column - pos.column;
 
-			for (i32 i = error_start_index_graphemes; i < line_length_graphemes; i += 1) {
-				if (graphemes[i].rune_index >= error_end_index_runes) {
+			i32 index = 0;
+			it = ucg_grapheme_iterator_make((const uint8_t*)the_line, full_line_length_bytes);
+			while (ucg_next_grapheme(&it, &g) > 0) {
+				index += 1;
+				if (index <= error_start_index_graphemes) {
+					continue;
+				}
+				if (g.rune_index >= error_end_index_runes) {
 					break;
-				} else if (graphemes[i].byte_index >= window_close_bytes) {
+				} else if (g.byte_index >= window_close_bytes) {
 					trailing_squiggle = true;
 					break;
 				}
-				squiggle_length += graphemes[i].width;
+				squiggle_length += g.width;
 			}
 		}
 	}
@@ -640,23 +634,25 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 		if (window_open_bytes > 0) {
 			sec_pad += 4;
 		}
-		for (i32 i = 0; i < line_length_graphemes; i += 1) {
-			if (graphemes[i].byte_index < window_open_bytes) {
+		it = ucg_grapheme_iterator_make((const uint8_t*)the_line, full_line_length_bytes);
+		while (ucg_next_grapheme(&it, &g) > 0) {
+			if (g.byte_index < window_open_bytes) {
 				continue;
 			}
-			if (graphemes[i].rune_index >= sec_start_rune) {
+			if (g.rune_index >= sec_start_rune) {
 				break;
 			}
-			sec_pad += graphemes[i].width;
+			sec_pad += g.width;
 		}
-		for (i32 i = 0; i < line_length_graphemes; i += 1) {
-			if (graphemes[i].rune_index < sec_start_rune) {
+		it = ucg_grapheme_iterator_make((const uint8_t*)the_line, full_line_length_bytes);
+		while (ucg_next_grapheme(&it, &g) > 0) {
+			if (g.rune_index < sec_start_rune) {
 				continue;
 			}
-			if (graphemes[i].rune_index >= sec_end_rune) {
+			if (g.rune_index >= sec_end_rune) {
 				break;
 			}
-			sec_len += graphemes[i].width;
+			sec_len += g.width;
 		}
 		if (sec_len < 1) {
 			sec_len = 1;
@@ -1139,6 +1135,26 @@ gb_internal String error_article(String context_name) {
 
 gb_internal bool errors_already_printed = false;
 
+gb_internal gbString json_escape_char(gbString res, u8 c) {
+	switch (c) {
+	case '\n': res = gb_string_append_length(res, "\\n",  2); break;
+	case '"':  res = gb_string_append_length(res, "\\\"", 2); break;
+	case '\\': res = gb_string_append_length(res, "\\\\", 2); break;
+	case '\b': res = gb_string_append_length(res, "\\b",  2); break;
+	case '\f': res = gb_string_append_length(res, "\\f",  2); break;
+	case '\r': res = gb_string_append_length(res, "\\r",  2); break;
+	case '\t': res = gb_string_append_length(res, "\\t",  2); break;
+	default:
+		if (c <= '\x1f') {
+			res = gb_string_append_fmt(res, "\\u%04x", c);
+		} else {
+			res = gb_string_append_length(res, &c, 1);
+		}
+		break;
+	}
+	return res;
+}
+
 gb_internal void print_all_errors(void) {
 	if (errors_already_printed) {
 		if (global_error_collector.warning_count.load() == global_error_collector.error_values.count) {
@@ -1150,26 +1166,6 @@ gb_internal void print_all_errors(void) {
 		}
 		return;
 	}
-
-	auto const &escape_char = [](gbString res, u8 c) -> gbString {
-		switch (c) {
-		case '\n': res = gb_string_append_length(res, "\\n",  2); break;
-		case '"':  res = gb_string_append_length(res, "\\\"", 2); break;
-		case '\\': res = gb_string_append_length(res, "\\\\", 2); break;
-		case '\b': res = gb_string_append_length(res, "\\b",  2); break;
-		case '\f': res = gb_string_append_length(res, "\\f",  2); break;
-		case '\r': res = gb_string_append_length(res, "\\r",  2); break;
-		case '\t': res = gb_string_append_length(res, "\\t",  2); break;
-		default:
-			if ('\x00' <= c && c <= '\x1f') {
-				res = gb_string_append_fmt(res, "\\u%04x", c);
-			} else {
-				res = gb_string_append_length(res, &c, 1);
-			}
-			break;
-		}
-		return res;
-	};
 
 	GB_ASSERT(any_errors() || any_warnings());
 
@@ -1242,7 +1238,7 @@ gb_internal void print_all_errors(void) {
 				res = gb_string_append_fmt(res, "\t\t\t\t\"file\": \"");
 				String file = get_file_path_string(ev.pos.file_id);
 				for (isize k = 0; k < file.len; k++) {
-					res = escape_char(res, file.text[k]);
+					res = json_escape_char(res, file.text[k]);
 				}
 				res = gb_string_append_fmt(res, "\",\n");
 				res = gb_string_append_fmt(res, "\t\t\t\t\"offset\": %d,\n", ev.pos.offset);
@@ -1267,7 +1263,7 @@ gb_internal void print_all_errors(void) {
 					String line = lines[j];
 					for (isize k = 0; k < line.len; k++) {
 						u8 c = line.text[k];
-						res = escape_char(res, c);
+						res = json_escape_char(res, c);
 					}
 					if (j+1 < lines.count) {
 						res = gb_string_append_fmt(res, "\",\n");

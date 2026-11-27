@@ -107,6 +107,7 @@ init_preopens :: proc "contextless" () {
 
 			if err = wasi.fd_prestat_dir_name(fd, buf); err != .SUCCESS {
 				print_error(stderr, _get_platform_error(err), "could not get filesystem preopen dir name")
+				delete(buf, file_allocator())
 				continue loop
 			}
 
@@ -200,7 +201,11 @@ _open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, 
 		return
 	}
 
-	return _new_file(uintptr(fd), name, file_allocator())
+	f, err = _new_file(uintptr(fd), name, file_allocator())
+	if err != nil {
+		wasi.fd_close(fd)
+	}
+	return
 }
 
 _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -> (f: ^File, err: Error) {
@@ -235,18 +240,18 @@ _clone :: proc(f: ^File) -> (clone: ^File, err: Error) {
 		return nil, .Invalid_Path
 	}
 
-	fd, fderr := wasi.path_open(dir_fd, {.SYMLINK_FOLLOW}, relative, {}, {}, {}, {})
+	stat, stat_err := wasi.fd_fdstat_get(__fd(f))
+	if stat_err != nil {
+		err = _get_platform_error(stat_err)
+		return
+	}
+
+	fd, fderr := wasi.path_open(dir_fd, {.SYMLINK_FOLLOW}, relative, {}, stat.fs_rights_base, stat.fs_rights_inheriting, stat.fs_flags)
 	if fderr != nil {
 		err = _get_platform_error(fderr)
 		return
 	}
 	defer if err != nil { wasi.fd_close(fd) }
-
-	fderr = wasi.fd_renumber((^File_Impl)(f.impl).fd, fd)
-	if fderr != nil {
-		err = _get_platform_error(fderr)
-		return
-	}
 
 	return _new_file(uintptr(fd), name(f), file_allocator())
 }
@@ -449,7 +454,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 		}
 
 		to_read := min(len(p), MAX_RW)
-		_n, _err := wasi.fd_read(fd, {p[:to_read]})
+		_n, _err := wasi.fd_read(fd, {{raw_data(p), wasi.size_t(to_read)}})
 		n = i64(_n)
 
 		if _err != nil {
@@ -474,7 +479,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 		offset := offset
 		for len(p) > 0 {
 			to_read := min(len(p), MAX_RW)
-			_n, _err := wasi.fd_pread(fd, {p[:to_read]}, wasi.filesize_t(offset))
+			_n, _err := wasi.fd_pread(fd, {{raw_data(p), wasi.size_t(to_read)}}, wasi.filesize_t(offset))
 			if _err != nil {
 				err = _get_platform_error(_err)
 				return
@@ -493,7 +498,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 		p := p
 		for len(p) > 0 {
 			to_write := min(len(p), MAX_RW)
-			_n, _err := wasi.fd_write(fd, {p[:to_write]})
+			_n, _err := wasi.fd_write(fd, {{raw_data(p), wasi.size_t(to_write)}})
 			if _err != nil {
 				err = _get_platform_error(_err)
 				return
@@ -518,7 +523,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 
 		for len(p) > 0 {
 			to_write := min(len(p), MAX_RW)
-			_n, _err := wasi.fd_pwrite(fd, {p[:to_write]}, wasi.filesize_t(offset))
+			_n, _err := wasi.fd_pwrite(fd, {{raw_data(p), wasi.size_t(to_write)}}, wasi.filesize_t(offset))
 			if _err != nil {
 				err = _get_platform_error(_err)
 				return

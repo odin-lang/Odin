@@ -999,6 +999,7 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 			case StructSoa_Fixed:   type_writer_append_fmt(w, "#soa[%lld]", cast(long long)type->Struct.soa_count); break;
 			case StructSoa_Slice:   type_writer_appendc(w,    "#soa[]");                                    break;
 			case StructSoa_Dynamic: type_writer_appendc(w,    "#soa[dynamic]");                             break;
+			case StructSoa_FixedCapacityDynamic: type_writer_append_fmt(w, "#soa[dynamic; %lld]", cast(long long)type->Struct.soa_count); break;
 			default: GB_PANIC("Unknown StructSoaKind"); break;
 			}
 			return write_type_to_canonical_string(w, type->Struct.soa_elem);
@@ -1030,6 +1031,9 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 
 			if (f->flags & EntityFlag_Using) {
 				type_writer_appendc(w, "using ");
+			}
+			if (f->flags & EntityFlag_SoaSplit) {
+				type_writer_appendc(w, "#soa_split ");
 			}
 			type_writer_append(w, f->token.string.text, f->token.string.len);
 			type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);

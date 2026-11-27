@@ -78,6 +78,11 @@ memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags
 	committed := committed
 	reserved  := reserved
 
+	overhead := size_of(Platform_Memory_Block) + 3*page_size
+	if alignment > (max(uint) - overhead) / 2 || reserved > max(uint) - overhead - 2*alignment {
+		return nil, .Out_Of_Memory
+	}
+
 	committed = align_formula(committed, page_size)
 	reserved  = align_formula(reserved, page_size)
 	committed = clamp(committed, 0, reserved)
@@ -98,7 +103,10 @@ memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags
 	pmblock := platform_memory_alloc(0, total_size) or_return
 	
 	pmblock.block.base = ([^]byte)(pmblock)[base_offset:]
-	platform_memory_commit(pmblock, uint(base_offset) + committed) or_return
+	if commit_err := platform_memory_commit(pmblock, uint(base_offset) + committed); commit_err != nil {
+		platform_memory_free(pmblock)
+		return nil, commit_err
+	}
 
 	// Should be zeroed
 	assert(pmblock.block.used == 0)

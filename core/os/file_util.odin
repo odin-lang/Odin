@@ -157,8 +157,9 @@ read_entire_file :: proc{
 }
 
 /*
-	`read_entire_file_from_path` reads the entire named file `name` into memory allocated with `allocator`.
-	A slice of bytes and an error is returned, if any error is encountered.
+	`read_entire_file_from_path` reads the entire named file `name` into memory allocated
+	with `allocator`.
+	On an error nothing stays allocated, and `nil` is returned with the error.
 */
 @(require_results)
 read_entire_file_from_path :: proc(name: string, allocator: runtime.Allocator, loc := #caller_location) -> (data: []byte, err: Error) {
@@ -172,7 +173,7 @@ read_entire_file_from_path :: proc(name: string, allocator: runtime.Allocator, l
 
 /*
 	`read_entire_file_from_file` reads the entire file `f` into memory allocated with `allocator`.
-	A slice of bytes and an error is returned, if any error is encountered.
+	On an error nothing stays allocated, and `nil` is returned with the error.
 */
 @(require_results)
 read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator, loc := #caller_location) -> (data: []byte, err: Error) {
@@ -186,36 +187,35 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator, loc :
 	}
 
 	if has_size && size > 0 {
+		buf := non_zero_make([]byte, size, allocator, loc) or_return
 		total: int
-		data = make([]byte, size, allocator, loc) or_return
-		for total < len(data) {
-			n: int
-			n, err = read(f, data[total:])
+		for total < len(buf) {
+			n, read_err := read(f, buf[total:])
 			total += n
-			if err != nil {
-				if err == .EOF {
-					err = nil
+			if read_err != nil {
+				if read_err != .EOF {
+					delete(buf, allocator, loc)
+					return nil, read_err
 				}
-				data = data[:total]
 				break
 			}
 		}
-		return
+		return buf[:total], nil
 	} else {
 		buffer: [1024]u8
 		out_buffer := make([dynamic]u8, 0, 0, allocator, loc) or_return
 		for {
-			n: int
-			n, err = read(f, buffer[:])
-			if _, aerr := append_elems(&out_buffer, ..buffer[:n], loc=loc); aerr != nil {
-				return out_buffer[:], aerr
+			n, read_err := read(f, buffer[:])
+			if _, append_err := non_zero_append_elems(&out_buffer, ..buffer[:n], loc=loc); append_err != nil {
+				delete(out_buffer, loc)
+				return nil, append_err
 			}
-			if err != nil {
-				if err == .EOF || err == .Broken_Pipe {
-					err = nil
+			if read_err != nil {
+				if read_err != .EOF && read_err != .Broken_Pipe {
+					delete(out_buffer, loc)
+					return nil, read_err
 				}
-				data = out_buffer[:]
-				return
+				return out_buffer[:], nil
 			}
 		}
 	}

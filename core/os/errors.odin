@@ -19,6 +19,7 @@ General_Error :: enum u32 {
 
 	Invalid_File,
 	Invalid_Dir,
+	Is_Dir,
 	Invalid_Path,
 	Invalid_Callback,
 	Invalid_Command,
@@ -71,6 +72,7 @@ error_string :: proc(ferr: Error) -> string {
 		case .Broken_Pipe:            return "Broken pipe"
 		case .Invalid_File:           return "invalid file"
 		case .Invalid_Dir:            return "invalid directory"
+		case .Is_Dir:                 return "is a directory"
 		case .Invalid_Path:           return "invalid path"
 		case .Invalid_Callback:       return "invalid callback"
 		case .Invalid_Command:        return "invalid command"
@@ -118,6 +120,7 @@ error_string :: proc(ferr: Error) -> string {
 
 /*
 	`print_error` is a utility procedure which will print an error `ferr` to a specified file `f`.
+	If its buffer can't be allocated, it writes `msg`, ": ", the error and "\n" one by one.
 */
 print_error :: proc(f: ^File, ferr: Error, msg: string) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
@@ -125,7 +128,11 @@ print_error :: proc(f: ^File, ferr: Error, msg: string) {
 
 	// msg + ": " + err_str + '\n'
 	length := len(msg) + 2 + len(err_str) + 1
-	buf := make([]u8, length, temp_allocator)
+	buf, buf_err := make([]u8, length, temp_allocator)
+	if buf_err != nil {
+		write_strings(f, msg, ": ", err_str, "\n")
+		return
+	}
 
 	copy(buf, msg)
 	buf[len(msg)] = ':'

@@ -4,6 +4,7 @@ set -eu
 mkdir -p build
 pushd build
 ODIN=../../../odin
+ODIN_FULL="$(pwd)/../../../odin"
 COMMON="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings -microarch:native"
 COMMON_CHECK="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings"
 
@@ -41,6 +42,13 @@ $ODIN test ../test_simple.odin -file -all-packages $COMMON
 # "odin check" tests:
 #
 
+if [[ $($ODIN check ../test_issue_1909 $COMMON_CHECK 2>&1 >/dev/null | grep -c "of a built-in procedure cannot be determined") -eq 3 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_3973 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 28 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
@@ -71,6 +79,81 @@ fi
 
 $ODIN check ../test_issue_7429 $COMMON_CHECK
 $ODIN check ../test_issue_7260 -no-entry-point $COMMON_CHECK
+$ODIN check ../test_issue_soa_no_rtti -target:freestanding_amd64_sysv -no-rtti -no-entry-point $COMMON_CHECK
+
+if [[ $($ODIN check ../test_issue_soa_field_unroll $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_soa_of_soa $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 8 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_soa_column_not_addressable $COMMON_CHECK 2>&1 >/dev/null | grep -c "value is not addressable") -eq 3 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_soa_column_escape $COMMON_CHECK 2>&1 >/dev/null | grep -c "It is unsafe to return") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_soa_slice_escape $COMMON_CHECK 2>&1 >/dev/null | grep -c "It is unsafe to return") -eq 9 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_soa_dynamic_literal $COMMON_CHECK 2>&1 >/dev/null | grep -c "cannot be a compound literal") -eq 4 ]] &&
+   [[ $($ODIN check ../test_issue_soa_dynamic_literal $COMMON_CHECK 2>&1 >/dev/null | grep -c "Suggestion: Write a fixed set of elements") -eq 4 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_soa_conversion_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 5 ]] &&
+   [[ $($ODIN check ../test_issue_soa_conversion_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "an #soa array and an array convert only") -eq 3 ]] &&
+   [[ $($ODIN check ../test_issue_soa_conversion_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "'copy' copies the elements") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+$ODIN test ../../core/runtime $COMMON -define:ODIN_TEST_NAMES=test_core_runtime.test_copy_soa_blocks
+$ODIN test ../test_range_snapshot $COMMON -o:speed
+
+if [[ $($ODIN check ../test_issue_soa_split_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "'#soa_split' cannot be applied") -eq 7 ]] &&
+   [[ $($ODIN check ../test_issue_soa_split_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 8 ]] &&
+   [[ $($ODIN check ../test_issue_soa_split_address $COMMON_CHECK 2>&1 >/dev/null | grep -c "which is a '#soa_split' field of an #soa element") -eq 8 ]] &&
+   [[ $($ODIN check ../test_issue_soa_split_address $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 10 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_array_conversion_parens $COMMON_CHECK 2>&1 >/dev/null | grep -c "needs parentheses") -eq 3 ]] &&
+   [[ $($ODIN check ../test_issue_array_conversion_parens $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 $ODIN check ../test_issue_7336 -no-entry-point $COMMON_CHECK
 
 if [[ $($ODIN check ../test_issue_ambiguous_union_literal $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
@@ -95,6 +178,13 @@ else
 fi
 
 if [[ $($ODIN check ../test_issue_global_when_shadowing -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "within a global 'when' shadows") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_nesting_limit $COMMON_CHECK 2>&1 >/dev/null | grep -c "nested too deeply") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
@@ -144,6 +234,13 @@ fi
 $ODIN check ../test_issue_6979 -no-entry-point $COMMON_CHECK
 $ODIN check ../test_issue_7012 -no-entry-point $COMMON_CHECK
 
+if [[ $($ODIN check ../test_issue_7199 $COMMON_CHECK 2>&1 >/dev/null | grep -c "\.\.19988 chars\.\.") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_7708_mismatch $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
@@ -173,6 +270,22 @@ else
 fi
 
 if [[ $($ODIN check ../test_issue_poly_proc_value $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_poly_variadic_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 3 &&
+      $($ODIN check ../test_issue_poly_variadic_errors $COMMON_CHECK 2>&1 >/dev/null | grep -cF "Cannot infer the polymorphic type '\$E' of the variadic parameter 'args'") -eq 3 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_poly_recursion_limit $COMMON_CHECK 2>&1 >/dev/null | grep -c "Polymorphic instantiations are nested too deeply") -eq 1 &&
+      $($ODIN check ../test_issue_poly_recursion_limit_record $COMMON_CHECK 2>&1 >/dev/null | grep -c "Polymorphic instantiations are nested too deeply") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
@@ -214,11 +327,20 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_escape_union_loop -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Warning:") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 ESCAPE_OUT=$($ODIN check ../test_issue_escape_diagnostics -no-entry-point $COMMON_CHECK 2>&1 >/dev/null)
-if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 4 &&
-      $(grep -c "holds a pointer into itself" <<< "$ESCAPE_OUT") -eq 2 &&
-      $(grep -c "is taken at" <<< "$ESCAPE_OUT") -eq 4 &&
-      $(grep -c "'temp.allocator.data' may refer to 'temp.arena' in the stack memory of the named result 'temp'" <<< "$ESCAPE_OUT") -eq 1 ]]; then
+if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 5 &&
+      $(grep -c "holds a pointer into itself" <<< "$ESCAPE_OUT") -eq 3 &&
+      $(grep -c "is taken at" <<< "$ESCAPE_OUT") -eq 5 &&
+      $(grep -c "'temp.allocator.data' may refer to 'temp.arena' in the stack memory of the named result 'temp'" <<< "$ESCAPE_OUT") -eq 1 &&
+      $(grep -c "The call to" <<< "$ESCAPE_OUT") -eq 3 &&
+      $(grep -c "returns its parameter 'mem' in '.memory' of its result" <<< "$ESCAPE_OUT") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
@@ -233,8 +355,17 @@ else
 fi
 
 ESCAPE_OUT=$($ODIN check ../test_issue_escape_cleared_stores -no-entry-point $COMMON_CHECK 2>&1 >/dev/null)
-if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 15 &&
+if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 28 &&
       $(grep -c "local variable 'y'" <<< "$ESCAPE_OUT") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+ESCAPE_OUT=$($ODIN check ../test_issue_escape_deferred_procs -no-entry-point $COMMON_CHECK 2>&1 >/dev/null)
+if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 8 &&
+      $(grep -c "deferred by" <<< "$ESCAPE_OUT") -eq 7 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
@@ -299,6 +430,13 @@ else
 fi
 
 if [[ $($ODIN check ../test_issue_8455 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]] && [[ $($ODIN check ../test_issue_8455 $COMMON_CHECK 2>&1 >/dev/null | grep -c "it is a directory") -eq 3 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_8513_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
@@ -374,6 +512,9 @@ else
 fi
 
 $ODIN build ../test_issue_5043 $COMMON
+$ODIN build ../test_issue_8554 -build-mode:obj $COMMON
+$ODIN build ../test_issue_8555 -build-mode:obj -target:linux_arm64 -target-features:contextidrel2,NeoverseV3ae,-CRC $COMMON_CHECK
+$ODIN build ../test_issue_8555 -build-mode:obj -target:linux_arm32 -target-features:+slow-load-d-subreg $COMMON_CHECK
 $ODIN build ../test_issue_5097 $COMMON
 $ODIN build ../test_issue_5097-2 $COMMON
 $ODIN build ../test_issue_5265 $COMMON
@@ -610,6 +751,22 @@ if [[ "$(uname -m)" == "x86_64" || "$(uname -m)" == "amd64" ]]; then
 		echo "SUCCESSFUL 0/1"
 		exit 1
 	fi
+	if [[ $($ODIN check ../test_issue_asm_shift_cl_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 12 &&
+	      $($ODIN check ../test_issue_asm_shift_cl_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "8-bit operand pinned to") -eq 5 &&
+	      $($ODIN check ../test_issue_asm_shift_cl_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "expects 3 operands, got 2") -eq 1 &&
+	      $($ODIN check ../test_issue_asm_shift_cl_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "is declared but never used") -eq 1 ]]; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1"
+		exit 1
+	fi
+	if [[ $($ODIN check ../test_issue_asm_accumulator_forms $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 &&
+	      $($ODIN check ../test_issue_asm_accumulator_forms $COMMON_CHECK 2>&1 >/dev/null | grep -c "takes no implicit accumulator") -eq 4 ]]; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1"
+		exit 1
+	fi
 fi
 if [[ $($ODIN check ../test_issue_asm_writeback_errors -target:linux_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 &&
       $($ODIN check ../test_issue_asm_writeback_errors -target:linux_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "writes back its base register") -eq 1 &&
@@ -632,6 +789,15 @@ fi
 $ODIN build ../test_issue_asm_baseless_riscv -target:linux_riscv64 -build-mode:obj $COMMON_CHECK
 $ODIN build ../test_issue_asm_keyword_mnemonic -target:linux_amd64 -build-mode:obj $COMMON_CHECK
 
+$ODIN run ../test_issue_wasm_union_i128 $COMMON
+$ODIN build ../test_issue_wasm_union_i128 -target:js_wasm32 -build-mode:obj $COMMON_CHECK
+$ODIN build ../test_issue_wasm_union_i128 -target:js_wasm64p32 -build-mode:obj $COMMON_CHECK
+$ODIN build ../test_issue_wasm_union_i128 -target:wasi_wasm32 -build-mode:obj $COMMON_CHECK
+if command -v wasmtime > /dev/null; then
+	$ODIN build ../test_issue_wasm_union_i128 -target:wasi_wasm32 $COMMON_CHECK
+	wasmtime ./test_issue_wasm_union_i128.wasm
+fi
+
 $ODIN test ../test_lifetime_markers $COMMON -o:size -lifetime-markers
 $ODIN test ../test_lifetime_markers $COMMON -o:speed -lifetime-markers
 
@@ -652,9 +818,260 @@ if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	fi
 fi
 
+# 32-byte vectors in YMM registers, both sides built with AVX2; needs a CPU that has it
+if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
+	if grep -qw avx2 /proc/cpuinfo 2>/dev/null; then
+		clang -c ../test_issue_sysv_wide_vectors/test_issue_sysv_wide_vectors.c -o test_issue_sysv_wide_vectors_c.o -mavx2
+		$ODIN test ../test_issue_sysv_wide_vectors $COMMON_CHECK -microarch:haswell
+	fi
+fi
+
 $ODIN test ../test_issue_disabled_proc_value $COMMON -disable-assert
 $ODIN test ../test_issue_loaded_pointer_alignment $COMMON -o:speed
 $ODIN test ../test_issue_max_simd_align $COMMON -o:speed
+
+$ODIN build ../test_issue_wasi_wasm64p32_target -target:wasi_wasm32 -build-mode:obj $COMMON_CHECK
+$ODIN build ../test_issue_wasi_wasm64p32_target -target:wasi_wasm64p32 -build-mode:obj $COMMON_CHECK
+if command -v wasmtime > /dev/null; then
+	for target in wasi_wasm32 wasi_wasm64p32; do
+		for microarch in generic mvp; do
+			$ODIN build ../test_issue_wasi_wasm64p32_target -target:$target -microarch:$microarch $COMMON_CHECK
+			wasmtime run --dir . --env ODIN_WASI_TEST=value ./test_issue_wasi_wasm64p32_target.wasm first second
+		done
+	done
+fi
+
+$ODIN run ../test_issue_8177 $COMMON
+$ODIN build ../test_issue_8177 -target:js_wasm64p32 -build-mode:obj $COMMON_CHECK
+$ODIN build ../test_issue_8177 -target:wasi_wasm64p32 -build-mode:obj $COMMON_CHECK
+if command -v wasmtime > /dev/null; then
+	$ODIN build ../test_issue_8177 -target:wasi_wasm64p32 $COMMON_CHECK
+	wasmtime run ./test_issue_8177.wasm
+fi
+
+# wasm32 C vectors, both sides without and with simd128; needs wasmtime and a clang that targets wasm32
+if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]] && command -v wasmtime > /dev/null; then
+	for simd in "" simd128; do
+		if clang --target=wasm32 ${simd:+-m$simd} -c ../test_issue_wasm_c_vectors/test_issue_wasm_c_vectors.c -o test_issue_wasm_c_vectors_c.o 2> /dev/null; then
+			$ODIN build ../test_issue_wasm_c_vectors -target:wasi_wasm32 ${simd:+-target-features:$simd} $COMMON_CHECK
+			wasmtime run ./test_issue_wasm_c_vectors.wasm
+		fi
+	done
+fi
+rm -rf issue_7990
+mkdir -p issue_7990/test_issue_7990/build issue_7990/test_issue_7990/deep/build issue_7990/directory.data issue_7990/collision issue_7990/.hiddendir
+cp ../test_issue_7990/test_issue_7990.odin issue_7990/test_issue_7990/
+cp ../test_issue_7990/.hidden.odin issue_7990/
+cp ../test_issue_7990/directory.data/main.odin issue_7990/directory.data/
+cp ../test_issue_7990/collision.odin issue_7990/
+cp ../test_issue_7990/.hiddendir/main.odin issue_7990/.hiddendir/
+
+pushd issue_7990/test_issue_7990/build
+"$ODIN_FULL" build ..
+test -f test_issue_7990
+popd
+
+pushd issue_7990/test_issue_7990/deep/build
+"$ODIN_FULL" build ../..
+test -f test_issue_7990
+popd
+
+$ODIN build issue_7990/directory.data
+test -f directory.data
+
+$ODIN build issue_7990/.hiddendir
+test -f .hiddendir
+
+"$ODIN_FULL" build issue_7990/.hidden.odin -file
+test -f .hidden
+
+pushd issue_7990
+"$ODIN_FULL" build collision.odin -file
+# This script could be run on Windows as well.
+test -f collision.bin || test -f collision.exe
+popd
+
+"$ODIN_FULL" build issue_7990/collision.odin -file
+test -f collision || test -f collision.exe
+test ! -e collision.bin
+
+mkdir -p links
+ln -s ../issue_7990/.hiddendir links/spelled_link
+$ODIN build links/spelled_link
+test -f spelled_link || test -f spelled_link.exe
+
+if [[ $($ODIN build issue_7990/.hiddendir -out:no_such_dir/x 2>&1 | grep -c "does not exist") -eq 1 &&
+      $($ODIN build issue_7990/.hiddendir -out:issue_7990 2>&1 | grep -c "is a directory") -eq 1 &&
+      $($ODIN build issue_7990/.hiddendir -out:no_such_dir/ 2>&1 | grep -c "give a file name") -eq 1 &&
+      $($ODIN build issue_7990/collision.odin -file -out:issue_7990/collision.odin 2>&1 | grep -c "would overwrite the input") -eq 1 &&
+      $($ODIN build issue_7990/.hiddendir -build-mode:llvm-ir -out:x.ll 2>&1 | grep -c "existing directory") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+test ! -e no_such_dir
+
+$ODIN build issue_7990/.hiddendir -build-mode:dll -out:no_extension
+test -f no_extension.so || test -f no_extension.dylib || test -f no_extension.dll
+
+DIRECTIVES_OUT=$($ODIN check ../test_paths_directives -no-entry-point $COMMON_CHECK 2>&1 || true)
+if [[ $(echo "$DIRECTIVES_OUT" | grep -c "it contains a NUL byte") -eq 1 &&
+      $(echo "$DIRECTIVES_OUT" | grep -c "Unknown library collection") -eq 1 &&
+      $(echo "$DIRECTIVES_OUT" | grep -c "Error:") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+rm -rf identity
+cp -R ../test_paths_identity identity
+ln -s pkg identity/alias
+$ODIN build identity/main -out:identity_main $COMMON
+./identity_main
+mkdir identity/loaddir/files
+echo b > identity/loaddir/files/b.txt
+echo a > identity/loaddir/files/a.txt
+echo z > identity/loaddir/z_target.txt
+ln -s ../z_target.txt identity/loaddir/files/c_link.txt
+$ODIN build identity/loaddir -out:identity_loaddir $COMMON
+[[ "$(./identity_loaddir)" == $'a.txt\nb.txt\nc_link.txt' ]]
+mkdir -p identity/r4/d identity/r4/src
+mv identity/reached/f.odin identity/r4/src/f.odin
+cp -R identity/helper identity/r4/d/helper
+ln -s ../src/f.odin identity/r4/d/f.odin
+$ODIN build identity/r4/d -out:identity_reached $COMMON
+./identity_reached
+
+QDIR='q 100%s "x" \y'
+rm -rf "$QDIR"
+mkdir "$QDIR"
+$ODIN build ../test_paths_quoting $COMMON '-define:S=a"b"' '-define:T=c d\' "-out:$QDIR/q"
+"./$QDIR/q"
+$ODIN build ../test_paths_quoting $COMMON '-define:S=a"b"' '-define:T=c d\' -build-mode:lib "-out:$QDIR/q.a"
+[[ -f "$QDIR/q.a" ]]
+
+rm -rf tempfiles
+mkdir -p tempfiles/dll
+echo keep > tempfiles/t-helper.ll
+echo keep > tempfiles/dll/t-helper.o
+$ODIN build ../test_paths_tempfiles $COMMON -out:tempfiles/t
+./tempfiles/t
+$ODIN build ../test_paths_tempfiles $COMMON -build-mode:dll -out:tempfiles/dll/t.so
+[[ -f tempfiles/t-helper.ll ]]
+[[ -f tempfiles/dll/t-helper.o ]]
+
+rm -rf needed
+mkdir -p needed
+cp -R ../test_paths_needed/lib ../test_paths_needed/app needed/
+if [[ $(uname) == Darwin ]]; then
+	$ODIN build ../test_paths_needed/darwin $COMMON -out:needed/darwin_system_dylib
+	./needed/darwin_system_dylib
+elif command -v readelf > /dev/null; then
+	$ODIN build needed/lib $COMMON -build-mode:dll -out:needed/lib/libtpneeded.so
+	$ODIN build needed/app $COMMON -out:needed/lib/app
+	./needed/lib/app
+	[[ $(readelf -d needed/lib/app | grep -c -F '[libtpneeded.so]') -eq 1 ]]
+fi
+
+SYMBOLIZER=""
+for candidate in llvm-symbolizer-22 llvm-symbolizer-21 llvm-symbolizer-20 llvm-symbolizer-19 llvm-symbolizer; do
+	if command -v $candidate > /dev/null; then
+		SYMBOLIZER=$candidate
+		break
+	fi
+done
+if [[ $(uname) != Darwin ]] && [[ -n $SYMBOLIZER ]] && command -v nm > /dev/null; then
+	$ODIN build ../test_paths_debug $COMMON -debug -out:debug_names
+	DEBUG_ADDR=$(nm debug_names | grep ' lib::hello$' | awk '{print $1}')
+	[[ $($SYMBOLIZER --obj=debug_names 0x$DEBUG_ADDR | grep -c -F 'test_paths_debug/lib/main.odin:') -eq 1 ]]
+fi
+
+rm -rf sdk_loop walk_outside walk_cache
+mkdir -p sdk_loop/lib walk_outside walk_cache/.odin-cache
+ln -s .. sdk_loop/lib/up
+if command -v timeout > /dev/null; then
+	WALK_STATUS=0
+	timeout 120 $ODIN build ../test_paths_debug -target:windows_amd64 -linker:lld -windows-sdk-root:sdk_loop -out:walk.exe > /dev/null 2>&1 || WALK_STATUS=$?
+	[[ $WALK_STATUS -ne 124 ]]
+fi
+echo keep > walk_outside/keep.txt
+ln -s ../../walk_outside walk_cache/.odin-cache/outside
+echo gone > walk_cache/.odin-cache/gone.txt
+(cd walk_cache && "$ODIN_FULL" clear-cache)
+[[ ! -e walk_cache/.odin-cache ]]
+[[ -f walk_outside/keep.txt ]]
+
+ROOT_OUT="$($ODIN root)"
+ODIN_ROOT="$ROOT_OUT" $ODIN check ../test_paths_debug $COMMON_CHECK
+ODIN_ROOT="$ROOT_OUT//" $ODIN check ../test_paths_debug $COMMON_CHECK
+ODIN_ROOT="${ROOT_OUT%/}" $ODIN check ../test_paths_debug $COMMON_CHECK
+rm -f "space_out "
+$ODIN build ../test_paths_debug $COMMON "-out:space_out "
+[[ -f "space_out " ]]
+
+rm -rf cache_test
+mkdir -p cache_test/src
+cp -R ../test_paths_debug/. cache_test/src/
+$ODIN build cache_test/src -internal-cached -show-timings -out:cache_test/one
+CACHE_OUT=$($ODIN build cache_test/src -internal-cached -show-timings -out:cache_test/two 2>&1)
+[[ $(grep -c "type check" <<< "$CACHE_OUT") -eq 0 ]]
+./cache_test/two
+echo "// changed" >> cache_test/src/lib/main.odin
+CACHE_OUT=$($ODIN build cache_test/src -internal-cached -show-timings -out:cache_test/three 2>&1)
+[[ $(grep -c "type check" <<< "$CACHE_OUT") -eq 1 ]]
+"$ODIN_FULL" clear-cache -out:cache_test/x
+[[ ! -e cache_test/.odin-cache ]]
+
+PREFIX_DIR="$(cd ../test_paths_prefix_map && pwd -P)"
+$ODIN build ../test_paths_prefix_map $COMMON -debug "-path-prefix-map:..=wrong" "-path-prefix-map:$ROOT_OUT=root" "-path-prefix-map:../test_paths_prefix_map=src" -out:prefix_map
+./prefix_map
+if grep -qaF "$PREFIX_DIR" prefix_map; then exit 1; fi
+if grep -qaF "${ROOT_OUT%/}" prefix_map; then exit 1; fi
+
+rm -rf deps_test
+mkdir -p 'deps_test/q"x b#$'
+cp -R ../test_paths_deps/. 'deps_test/q"x b#$/'
+$ODIN build 'deps_test/q"x b#$' $COMMON -export-dependencies:make -export-dependencies-file:deps.d -out:deps
+grep -qF 'q"x\ b\#$$/data.txt' deps.d
+$ODIN build 'deps_test/q"x b#$' $COMMON -export-dependencies:json -export-dependencies-file:deps.json -out:deps
+grep -qF 'q\"x b#$/data.txt"' deps.json
+
+printf '#!/bin/sh\nexit 128\n' > fake_cc_128
+printf '#!/bin/sh\nkill -TERM $$\n' > fake_cc_sig
+chmod +x fake_cc_128 fake_cc_sig
+if ODIN_CLANG_PATH="$PWD/fake_cc_128" $ODIN build ../test_paths_debug $COMMON -out:fake_link; then exit 1; fi
+SIG_OUT=$(ODIN_CLANG_PATH="$PWD/fake_cc_sig" $ODIN build ../test_paths_debug $COMMON -out:fake_link 2>&1 || true)
+grep -q "terminated by signal 15" <<< "$SIG_OUT"
+
+SB=../test_paths_sandbox
+LOAD_OUT=$($ODIN check $SB/load -no-entry-point -sandbox-root:$SB/load -collection:foo=$SB/coll 2>&1 || true)
+FOREIGN_OUT=$($ODIN check $SB/foreign -no-entry-point -sandbox-root:$SB/foreign 2>&1 || true)
+ROOTS_OUT=$($ODIN check $SB/roots -no-entry-point -sandbox-root:$SB/roots 2>&1 || true)
+MAIN_OUT=$($ODIN check $SB/roots -no-entry-point -sandbox-root:../test_issue_6165 2>&1 || true)
+if [[ $(echo "$LOAD_OUT" | grep -c "is outside every -sandbox-root") -eq 8 &&
+      $(echo "$LOAD_OUT" | grep -c "it contains a NUL byte") -eq 1 &&
+      $(echo "$LOAD_OUT" | grep -c "collection and every -sandbox-root") -eq 2 &&
+      $(echo "$LOAD_OUT" | grep -c "Error:") -eq 11 &&
+      $(echo "$FOREIGN_OUT" | grep -c "must be a name, not a path") -eq 2 &&
+      $(echo "$FOREIGN_OUT" | grep -c "is outside every -sandbox-root") -eq 1 &&
+      $(echo "$ROOTS_OUT" | grep -c "is outside every -sandbox-root") -eq 2 &&
+      $(echo "$MAIN_OUT" | grep -c "The main package") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+$ODIN check $SB/foreign -no-entry-point
+$ODIN check $SB/roots -no-entry-point
+$ODIN check $SB/roots -no-entry-point -sandbox-root:$SB/roots -sandbox-root:../../..
+rm -rf sb_link
+mkdir -p sb_link/root
+printf 'ok\n' > sb_link/root/x.txt
+ln -sfn "$PWD/sb_link" sb_link/root/up
+printf 'package sb_link\n\nA :: #load("up/root/x.txt", string)\nB :: #exists("up/root/missing.txt")\n\n#assert(A == "ok\\n")\n#assert(!B)\n' > sb_link/root/main.odin
+$ODIN check sb_link/root -no-entry-point -sandbox-root:sb_link/root
 
 #########################################################################################################
 
@@ -668,3 +1085,5 @@ set +x
 
 popd
 rm -rf build
+
+echo "Issue tests successful."

@@ -563,13 +563,12 @@ Inputs:
 - allocator: (default: context.allocator)
 
 Returns:
-- result: The `Capture` with the maximum number of groups allocated.
+- result: The `Capture` with the maximum number of groups allocated, or an empty
+  `Capture` if an allocation failed.
 */
 @require_results
 preallocate_capture :: proc(allocator := context.allocator) -> (result: Capture) {
-	context.allocator = allocator
-	result.pos    = make([][2]int, common.MAX_CAPTURE_GROUPS)
-	result.groups = make([]string, common.MAX_CAPTURE_GROUPS)
+	result, _ = allocate_capture(allocator)
 	return
 }
 
@@ -627,4 +626,18 @@ destroy :: proc {
 	destroy_regex,
 	destroy_capture,
 	destroy_iterator,
+}
+
+@(private)
+allocate_capture :: proc(allocator: runtime.Allocator) -> (result: Capture, err: runtime.Allocator_Error) {
+	context.allocator = allocator
+
+	capture: Capture
+	defer if err != nil {
+		destroy_capture(capture, allocator)
+	}
+
+	capture.pos    = make([][2]int, common.MAX_CAPTURE_GROUPS) or_return
+	capture.groups = make([]string, common.MAX_CAPTURE_GROUPS) or_return
+	return capture, nil
 }

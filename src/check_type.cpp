@@ -202,8 +202,9 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 			type = t_invalid;
 		}
 
-		bool is_using = (p->flags&FieldFlag_using) != 0;
-		bool is_subtype = (p->flags&FieldFlag_subtype) != 0;
+		bool is_using     = (p->flags&FieldFlag_using) != 0;
+		bool is_subtype   = (p->flags&FieldFlag_subtype) != 0;
+		bool is_soa_split = (p->flags&FieldFlag_soa_split) != 0;
 
 		for_array(j, p->names) {
 			Ast *name = p->names[j];
@@ -230,6 +231,9 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 			field->Variable.field_group_index = field_group_index;
 			if (is_subtype) {
 				field->flags |= EntityFlag_Subtype;
+			}
+			if (is_soa_split) {
+				field->flags |= EntityFlag_SoaSplit;
 			}
 
 			if (j == 0) {
@@ -278,6 +282,17 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 				Token name_token = p->names[0]->Ident.token;
 				gbString type_str = type_to_string(first_type);
 				error(name_token, "'subtype' cannot be applied to the field '%.*s' of type '%s'", LIT(name_token.string), type_str);
+				gb_string_free(type_str);
+			}
+		}
+
+		if (is_soa_split && p->names.count > 0 && p->names[0]->kind == Ast_Ident) {
+			Token name_token = p->names[0]->Ident.token;
+			if (struct_type->Struct.is_raw_union) {
+				error(name_token, "'#soa_split' cannot be applied to a field of a 'struct #raw_union'");
+			} else if (!is_type_polymorphic(type) && !is_type_soa_splittable(type)) {
+				gbString type_str = type_to_string(type);
+				error(name_token, "'#soa_split' cannot be applied to the field '%.*s' of type '%s', expected a struct or an array of length 4 or below", LIT(name_token.string), type_str);
 				gb_string_free(type_str);
 			}
 		}
@@ -371,9 +386,12 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 		e = alloc_entity_type_name(s, token, named_type);
 		e->state = EntityState_Resolved;
 
-		// NOTE(bille): the generic's file as its token is not that of whichever instantiated it first
+		// NOTE(bill): the generic's file as its token is not that of whichever instantiated it first
 		e->file = original_type->Named.type_name && original_type->Named.type_name->file ? original_type->Named.type_name->file : ctx->file;
 		e->pkg = pkg;
+		if (original_type->Named.type_name && (original_type->Named.type_name->flags & EntityFlag_NotExported)) {
+			e->flags |= EntityFlag_NotExported;
+		}
 		e->TypeName.original_type_for_parapoly = original_type;
 		e->decl_info = ctx->decl;
 		add_entity_use(ctx, node, e);
@@ -2306,6 +2324,20 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 			if (pattern->Struct.soa_kind != source->Struct.soa_kind) {
 				return Subst_NoMatch;
 			}
+			if (pattern->Struct.soa_generic_count != nullptr) {
+				if (pattern->Struct.soa_generic_count->Generic.specialized != nullptr) {
+					return Subst_Unhandled;
+				}
+				Entity *ne = poly_generic_entity(pattern->Struct.soa_generic_count);
+				if (ne == nullptr) {
+					return Subst_Unhandled;
+				}
+				if (!poly_subst_bind_value(subst, ne, exact_value_i64(source->Struct.soa_count), t_untyped_integer)) {
+					return Subst_NoMatch;
+				}
+			} else if (pattern->Struct.soa_count != source->Struct.soa_count) {
+				return Subst_NoMatch;
+			}
 			return subst_unify(c, pattern->Struct.soa_elem, source->Struct.soa_elem, subst);
 		}
 		// Anonymous struct with field-level polymorphism (e.g. `struct{x: $T, y: [2]T}`): match fields
@@ -2582,10 +2614,17 @@ gb_internal Type *subst_apply(CheckerContext *c, Type *pattern, Type *source, Po
 			return source;
 		}
 		Type *elem = subst_apply(c, pattern->Struct.soa_elem, source->Struct.soa_elem, subst);
+		i64 count = pattern->Struct.soa_count;
+		if (pattern->Struct.soa_generic_count != nullptr) {
+			PolyBinding *b = poly_subst_find(subst, poly_generic_entity(pattern->Struct.soa_generic_count));
+			GB_ASSERT(b != nullptr && b->kind == PolyBind_Value);
+			count = poly_binding_count(b);
+		}
 		switch (pattern->Struct.soa_kind) {
-		case StructSoa_Fixed:   return make_soa_struct_fixed(c, nullptr, pattern->Struct.node, elem, pattern->Struct.soa_count, nullptr);
+		case StructSoa_Fixed:   return make_soa_struct_fixed(c, nullptr, pattern->Struct.node, elem, count, nullptr);
 		case StructSoa_Slice:   return make_soa_struct_slice(c, nullptr, pattern->Struct.node, elem);
 		case StructSoa_Dynamic: return make_soa_struct_dynamic_array(c, nullptr, pattern->Struct.node, elem);
+		case StructSoa_FixedCapacityDynamic: return make_soa_struct_fixed_capacity_dynamic_array(c, nullptr, pattern->Struct.node, elem, count, nullptr);
 		}
 		GB_PANIC("subst_apply: unhandled soa struct kind");
 		return nullptr;
@@ -3600,6 +3639,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				}
 			} else {
 				ExactValue poly_const = {};
+				bool is_variadic_param = is_variadic && variadic_index == variables.count;
 
 				if (operands != nullptr && variables.count < operands->count) {
 					Operand op = (*operands)[variables.count];
@@ -3615,7 +3655,11 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 							op.type = t_invalid;
 						}
 					}
-					if (is_type_polymorphic_type) {
+					if (is_type_polymorphic_type && is_variadic_param && !ctx->no_polymorphic_errors && (is_type_polymorphic(op.type) || is_type_untyped_nil(op.type))) {
+						// NOTE(bill): The variadic arguments gave no element type, or there are none.
+						// The call reports it, and the procedure is not generated with the type left polymorphic.
+						success = false;
+					} else if (is_type_polymorphic_type) {
 						type = determine_type_from_polymorphic(ctx, type, op);
 						if (type == t_invalid) {
 							success = false;
@@ -3687,7 +3731,10 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						allow_array_programming = false;
 					}
 
-					if (type != t_invalid && !check_is_assignable_to(ctx, &op, type, allow_array_programming)) {
+					// NOTE(bill): The operand of a variadic parameter only stands for its arguments.
+					// Its type is a hint taken from them, e.g. `[]int` for an untyped `1` passed to `..f32`.
+					// The arguments themselves are checked against the parameter after the procedure is generated.
+					if (type != t_invalid && !is_variadic_param && !check_is_assignable_to(ctx, &op, type, allow_array_programming)) {
 						bool ok = true;
 						if (p->flags&FieldFlag_any_int) {
 							if (op.type == nullptr) {
@@ -3999,7 +4046,7 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 			param_value = handle_parameter_value(ctx, nullptr, &type, default_value, false, operands == nullptr && params_are_polymorphic);
 		} else {
 			if (ctx->allow_polymorphic_types && ast_references_poly_params(ctx->scope, field->type)) {
-				gbString name = expr_to_string(field->type);
+				gbString name = expr_to_string_exact(field->type);
 				type = alloc_type_generic(ctx->scope, 0, string_interner_insert(make_string_c(name)), nullptr);
 				gb_string_free(name);
 			} else {
@@ -4723,25 +4770,18 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 	case StructSoa_Fixed:	extra_field_count = 0; break;
 	case StructSoa_Slice:	extra_field_count = 1; break;
 	case StructSoa_Dynamic:	extra_field_count = 3; break;
+	case StructSoa_FixedCapacityDynamic: extra_field_count = 1; break;
 	}
 
 	Scope *scope = t->Struct.scope;
-	i64 soa_count = t->Struct.soa_count;
 	Type *elem = t->Struct.soa_elem;
-	Type *old_struct = base_type(elem);
-	GB_ASSERT(old_struct->kind == Type_Struct);
+	GB_ASSERT(base_type(elem)->kind == Type_Struct);
 
 	if (wait_to_finish) {
-		wait_for_record_signal(&old_struct->Struct.fields_wait_signal, &old_struct->Struct.checking_thread);
+		wait_for_soa_split_types(elem);
 	} else {
-		GB_ASSERT(old_struct->Struct.fields_wait_signal.futex.load() != 0);
+		GB_ASSERT(soa_split_types_complete(elem));
 	}
-
-	field_count = old_struct->Struct.fields.count;
-
-	t->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
-	t->Struct.tags = permanent_alloc_array<String>(field_count+extra_field_count);
-
 
 	auto const &add_entity = [](Scope *scope, Entity *entity) {
 		String name = entity->token.string;
@@ -4753,29 +4793,10 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 		}
 	};
 
-
-	for_array(i, old_struct->Struct.fields) {
-		Entity *old_field = old_struct->Struct.fields[i];
-		if (old_field->kind == Entity_Variable) {
-			Type *field_type = nullptr;
-			if (t->Struct.soa_kind == StructSoa_Fixed) {
-				GB_ASSERT(soa_count >= 0);
-				field_type = alloc_type_array(old_field->type, soa_count);
-			} else {
-				field_type = alloc_type_multi_pointer(old_field->type);
-			}
-			Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_index);
-			t->Struct.fields[i] = new_field;
-			add_entity(scope, new_field);
-			new_field->flags |= EntityFlag_Used;
-			if (t->Struct.soa_kind != StructSoa_Fixed) {
-				new_field->flags |= EntityFlag_SoaPtrField;
-			}
-		} else {
-			t->Struct.fields[i] = old_field;
-		}
-
-		t->Struct.tags[i] = old_struct->Struct.tags[i];
+	field_count = soa_make_columns(t, scope, extra_field_count);
+	for (isize i = 0; i < field_count; i++) {
+		add_entity(scope, t->Struct.fields[i]);
+		t->Struct.fields[i]->flags |= EntityFlag_Used;
 	}
 
 	if (t->Struct.soa_kind != StructSoa_Fixed) {
@@ -4811,6 +4832,14 @@ gb_internal WORKER_TASK_PROC(complete_soa_type_worker) {
 }
 
 
+gb_internal isize add_soa_columns(CheckerContext *ctx, Type *soa, Scope *scope, isize extra_field_count) {
+	isize count = soa_make_columns(soa, scope, extra_field_count);
+	for (isize i = 0; i < count; i++) {
+		add_entity(ctx, scope, nullptr, soa->Struct.fields[i]);
+		add_entity_use(ctx, nullptr, soa->Struct.fields[i]);
+	}
+	return count;
+}
 
 gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem, i64 count, Type *generic_type, StructSoaKind soa_kind) {
 	Type *bt_elem = base_type(elem);
@@ -4823,6 +4852,17 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		gb_string_free(str);
 		return alloc_type_array(elem, count, generic_type);
 	}
+	if (is_type_soa_struct(elem)) {
+		gbString str = type_to_string(elem);
+		error(elem_expr, "Invalid type for an #soa array, the element type cannot be an #soa type, got '%s'", str);
+		gb_string_free(str);
+		return alloc_type_array(elem, count, generic_type);
+	}
+
+	// NOTE(bill): `#soa[$N]T` is polymorphic in its count, even when `T` is not.
+	if (generic_type != nullptr) {
+		is_polymorphic = true;
+	}
 
 	Type * soa_struct  = nullptr;
 	Scope *scope       = nullptr;
@@ -4834,11 +4874,13 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	case StructSoa_Fixed:	extra_field_count = 0; break;
 	case StructSoa_Slice:	extra_field_count = 1; break;
 	case StructSoa_Dynamic:	extra_field_count = 3; break;
+	case StructSoa_FixedCapacityDynamic: extra_field_count = 1; break;
 	}
 
 	soa_struct = alloc_type_struct();
 	soa_struct->Struct.soa_kind = soa_kind;
 	soa_struct->Struct.soa_elem = elem;
+	soa_struct->Struct.soa_generic_count = generic_type;
 	soa_struct->Struct.is_polymorphic = is_polymorphic;
 	soa_struct->Struct.node = array_typ_expr;
 
@@ -4860,82 +4902,15 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 
 		soa_struct->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
 		soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
-		soa_struct->Struct.soa_count = 0;
 
 		is_complete = true;
 
-	} else if (is_type_array(elem)) {
-		Type *old_array = base_type(elem);
-		field_count = cast(isize)old_array->Array.count;
+	} else if (soa_split_types_complete(elem)) {
+		GB_ASSERT(is_type_array(elem) || is_type_struct(elem));
+		GB_ASSERT(!soa_has_inline_fields(soa_struct) || count >= 0);
 
-		soa_struct->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
-		soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
-
-		String params_xyzw[4] = {
-			str_lit("x"),
-			str_lit("y"),
-			str_lit("z"),
-			str_lit("w")
-		};
-
-		for (isize i = 0; i < cast(isize)old_array->Array.count; i++) {
-			Type *field_type = nullptr;
-			if (soa_kind == StructSoa_Fixed) {
-				GB_ASSERT(count >= 0);
-				field_type = alloc_type_array(old_array->Array.elem, count);
-			} else {
-				field_type = alloc_type_multi_pointer(old_array->Array.elem);
-			}
-			Token token = {};
-			token.string = params_xyzw[i];
-
-			Entity *new_field = alloc_entity_field(scope, token, field_type, false, cast(i32)i);
-			soa_struct->Struct.fields[i] = new_field;
-			add_entity(ctx, scope, nullptr, new_field);
-			add_entity_use(ctx, nullptr, new_field);
-			if (soa_kind != StructSoa_Fixed) {
-				new_field->flags |= EntityFlag_SoaPtrField;
-			}
-		}
-
+		field_count = add_soa_columns(ctx, soa_struct, scope, extra_field_count);
 		is_complete = true;
-
-	} else {
-		GB_ASSERT(is_type_struct(elem));
-
-		Type *old_struct = base_type(elem);
-
-		if (old_struct->Struct.fields_wait_signal.futex.load()) {
-			field_count = old_struct->Struct.fields.count;
-
-			soa_struct->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
-			soa_struct->Struct.tags = permanent_alloc_array<String>(field_count+extra_field_count);
-
-			for_array(i, old_struct->Struct.fields) {
-				Entity *old_field = old_struct->Struct.fields[i];
-				if (old_field->kind == Entity_Variable) {
-					Type *field_type = nullptr;
-					if (soa_kind == StructSoa_Fixed) {
-						GB_ASSERT(count >= 0);
-						field_type = alloc_type_array(old_field->type, count);
-					} else {
-						field_type = alloc_type_multi_pointer(old_field->type);
-					}
-					Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_index);
-					soa_struct->Struct.fields[i] = new_field;
-					add_entity(ctx, scope, nullptr, new_field);
-					add_entity_use(ctx, nullptr, new_field);
-					if (soa_kind != StructSoa_Fixed) {
-						new_field->flags |= EntityFlag_SoaPtrField;
-					}
-				} else {
-					soa_struct->Struct.fields[i] = old_field;
-				}
-
-				soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
-			}
-			is_complete = true;
-		}
 	}
 
 	if (is_complete && soa_kind != StructSoa_Fixed) {
@@ -4996,8 +4971,57 @@ gb_internal Type *make_soa_struct_dynamic_array(CheckerContext *ctx, Ast *array_
 	return make_soa_struct_internal(ctx, array_typ_expr, elem_expr, elem, -1, nullptr, StructSoa_Dynamic);
 }
 
+gb_internal Type *make_soa_struct_fixed_capacity_dynamic_array(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem, i64 capacity, Type *generic_type) {
+	return make_soa_struct_internal(ctx, array_typ_expr, elem_expr, elem, capacity, generic_type, StructSoa_FixedCapacityDynamic);
+}
+
+// NOTE(bill): `[N]T(x)` is an array of `T(x)`, not a conversion to `[N]T`, which is written `([N]T)(x)`.
+// When `T` is a type that takes no parameters, `T(x)` cannot be a type, so it was meant as that conversion.
+gb_internal bool check_array_elem_is_conversion(CheckerContext *ctx, Ast *e) {
+	ast_node(at, ArrayType, e);
+	if (at->elem->kind != Ast_CallExpr) {
+		return false;
+	}
+	ast_node(ce, CallExpr, at->elem);
+
+	Operand o = {};
+	check_expr_or_type(ctx, &o, ce->proc);
+	if (o.mode != Addressing_Type || is_type_polymorphic_record(o.type)) {
+		return false;
+	}
+
+	gbString whole = expr_to_string(e);
+	gbString call  = expr_to_string(at->elem);
+	gbString proc  = expr_to_string(ce->proc);
+	defer (gb_string_free(proc));
+	defer (gb_string_free(call));
+	defer (gb_string_free(whole));
+
+	String whole_str = make_string_c(whole);
+	String call_str  = make_string_c(call);
+	String proc_str  = make_string_c(proc);
+
+	char const *kind = "an array";
+	if (at->count == nullptr) {
+		kind = "a slice";
+	}
+
+	ERROR_BLOCK();
+	error(at->elem, "'%s' is not a type, so '%s' is not %s type", call, whole, kind);
+	if (string_ends_with(whole_str, call_str) && string_starts_with(call_str, proc_str)) {
+		String array = substring(whole_str, 0, whole_str.len - call_str.len);
+		String args  = substring(call_str, proc_str.len, call_str.len);
+		error_line("\tSuggestion: A conversion to %s type needs parentheses: '(%.*s%.*s)%.*s'\n", kind, LIT(array), LIT(proc_str), LIT(args));
+	}
+	return true;
+}
+
 gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_type) {
 	ast_node(at, ArrayType, e);
+	if (check_array_elem_is_conversion(ctx, e)) {
+		*type = t_invalid;
+		return;
+	}
 	if (at->count != nullptr) {
 		Operand o = {};
 		i64 count = check_array_count(ctx, &o, at->count);
@@ -5409,6 +5433,11 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 		if (dat->tag != nullptr) {
 			GB_ASSERT(dat->tag->kind == Ast_BasicDirective);
 			String name = dat->tag->BasicDirective.name.string;
+			if (name == "soa") {
+				*type = make_soa_struct_fixed_capacity_dynamic_array(ctx, e, dat->elem, elem, capacity, generic_type);
+				set_base_type(named_type, *type);
+				return true;
+			}
 			error(dat->tag, "Invalid tag applied to fixed capacity dynamic array, got #%.*s", LIT(name));
 		}
 		*type = alloc_type_fixed_capacity_dynamic_array(elem, capacity, generic_type);

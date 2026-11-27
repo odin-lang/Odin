@@ -67,6 +67,7 @@ decompress_from_context :: proc(z: ^compress.Context, flags := Decode_Flags{}, e
 	append(&buffer, ..z.window) or_return
 	z.window = z.window[len(z.window):]
 	chunk: [64 * 1024]u8
+	stalled := 0
 	for {
 		n, read_err := io.read(z.input, chunk[:])
 		if n > limit - len(buffer) {
@@ -82,6 +83,14 @@ decompress_from_context :: proc(z: ^compress.Context, flags := Decode_Flags{}, e
 		}
 		if read_err != nil {
 			return read_err
+		}
+		if n > 0 {
+			stalled = 0
+		} else {
+			stalled += 1
+			if stalled > 100 {
+				return io.Error.No_Progress
+			}
 		}
 	}
 	inner := options

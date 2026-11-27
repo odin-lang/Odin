@@ -35,7 +35,7 @@ aesimc :: #force_inline proc "c" (data: simd.u8x16) -> simd.u8x16 {
 }
 
 @(require_results, enable_target_feature = "aes")
-aeskeygenassist :: #force_inline proc "c" (data: simd.u8x16, $IMM8: u8) -> simd.u8x16 {
+aeskeygenassist :: #force_inline proc "c" (data: simd.u8x16, $IMM8: i32) -> simd.u8x16 where 0 <= IMM8, IMM8 < 256 {
 	return transmute(simd.u8x16)(x86._mm_aeskeygenassist_si128(transmute(x86.__m128i)(data), IMM8))
 }
 

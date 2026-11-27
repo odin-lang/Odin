@@ -1139,7 +1139,7 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 			/*
 				Find left hand.
 			*/
-			internal_zero(t1)
+			internal_zero(t1) or_return
 			t1.digit[0] = ((t - 1) < 0) ? 0 : y.digit[t - 1]
 			t1.digit[1] = y.digit[t]
 			t1.used = 2
@@ -1837,15 +1837,14 @@ _private_gcd_u64 :: proc "contextless" (a, b: u64) -> u64 {
 	Assumes `a` not to be `nil` and to have been initialized.
 */
 _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -> (res: int, err: Error) {
+	context.allocator = allocator
+
 	bracket_low, bracket_high, bracket_mid, t, bi_base := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
 	defer internal_destroy(bracket_low, bracket_high, bracket_mid, t, bi_base)
 
 	ic := #force_inline internal_cmp(a, base)
 	if ic <= 0 {
 		return 1 if ic == 0 else 0, nil
-	}
-	defer if err != nil {
-		res = -1
 	}
 
 	internal_set(bi_base, base, true, allocator)       or_return
@@ -2154,7 +2153,7 @@ _private_int_montgomery_calc_normalization :: proc(a, b: ^Int, allocator := cont
 /*
 	Sets up the Montgomery reduction stuff.
 */
-_private_int_montgomery_setup :: proc(n: ^Int, allocator := context.allocator) -> (rho: DIGIT, err: Error) {
+_private_int_montgomery_setup :: proc(n: ^Int) -> (rho: DIGIT, err: Error) {
 	/*
 		Fast inversion mod 2**k
 		Based on the fact that:

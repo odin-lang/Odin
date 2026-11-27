@@ -86,6 +86,7 @@ Type_Info_Struct_Soa_Kind :: enum u8 {
 	Fixed   = 1,
 	Slice   = 2,
 	Dynamic = 3,
+	Fixed_Capacity_Dynamic = 4, // `#soa[dynamic; N]T`, with `soa_len` as the capacity
 }
 
 Type_Info_String_Encoding_Kind :: enum u8 {
@@ -166,15 +167,22 @@ Type_Info_Struct_Flag :: enum u8 {
 	simple      = 4,
 }
 
+Type_Info_Struct_Field_Flags :: distinct bit_set[Type_Info_Struct_Field_Flag; u8]
+Type_Info_Struct_Field_Flag :: enum u8 {
+	Using     = 0,
+	Subtype   = 1,
+	Soa_Split = 2,
+}
+
 Type_Info_Struct :: struct {
 	using header: Type_Info,
 
 	// Slice these with `field_count`
-	types:   [^]^Type_Info `fmt:"v,field_count"`,
-	names:   [^]string     `fmt:"v,field_count"`,
-	offsets: [^]uintptr    `fmt:"v,field_count"`,
-	usings:  [^]bool       `fmt:"v,field_count"`,
-	tags:    [^]string     `fmt:"v,field_count"`,
+	types:       [^]^Type_Info                   `fmt:"v,field_count"`,
+	names:       [^]string                       `fmt:"v,field_count"`,
+	offsets:     [^]uintptr                      `fmt:"v,field_count"`,
+	field_flags: [^]Type_Info_Struct_Field_Flags `fmt:"v,field_count"`,
+	tags:        [^]string                       `fmt:"v,field_count"`,
 
 	field_count: i32,
 
@@ -846,29 +854,29 @@ type_info_underlying :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 // This is also aliased as `type_info_core`
 type_info_base_without_enum :: type_info_core
 
-@(require_results)
-__type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check {
-	n := uint(len(type_table))
-	i: uint
-	when size_of(uintptr) == 8 {
-		i = uint((u128(transmute(u64)id << 1) * u128(n)) >> 64)
-	} else {
-		i = uint((((transmute(u64)id << 1) >> 32) * u64(n)) >> 32)
-	}
-	for _ in 0..<n {
-		ptr := type_table[i]
-		if ptr == nil {
-			break
-		}
-		if ptr.id == id {
-			return ptr
-		}
-		i = i+1 if i+1 < n else 0
-	}
-	return type_table[0]
-}
-
 when !ODIN_NO_RTTI {
+	@(require_results)
+	__type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check {
+		n := uint(len(type_table))
+		i: uint
+		when size_of(uintptr) == 8 {
+			i = uint((u128(transmute(u64)id << 1) * u128(n)) >> 64)
+		} else {
+			i = uint((((transmute(u64)id << 1) >> 32) * u64(n)) >> 32)
+		}
+		for _ in 0..<n {
+			ptr := type_table[i]
+			if ptr == nil {
+				break
+			}
+			if ptr.id == id {
+				return ptr
+			}
+			i = i+1 if i+1 < n else 0
+		}
+		return type_table[0]
+	}
+
 	// typeid_base returns the base-type of a `typeid` stripping the `distinct`ness from the first level
 	@(require_results)
 	typeid_base :: proc "contextless" (id: typeid) -> typeid {

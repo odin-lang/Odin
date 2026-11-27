@@ -1,6 +1,7 @@
 package odin_parser
 
 import "base:runtime"
+import "core:slice"
 import "core:strings"
 import "core:reflect"
 
@@ -123,7 +124,7 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 				groups_loop: for {
 					index_start := len(build_project_name_strings)
 
-					defer append(build_project_names, build_project_name_strings[index_start:])
+					defer append(build_project_names, slice.clone(build_project_name_strings[index_start:]))
 
 					for {
 						skip_whitespace(text, &i)
@@ -144,8 +145,6 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 						scan_value(text, &i)
 						append(build_project_name_strings, text[name_start:i])
 					}
-
-					append(build_project_names, build_project_name_strings[index_start:])
 				}
 			case "build":
 

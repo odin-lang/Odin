@@ -29,6 +29,7 @@ load_from_context :: proc(ctx: ^compress.Context, options := Default_Options, al
 	}
 
 	img = new(Image)
+	img.pixels.allocator = allocator
 	img.which = .BNG
 
 	if .return_metadata in options {
@@ -226,6 +227,7 @@ destroy :: proc(img: ^Image) {
 	if img == nil {
 		return
 	}
+	context.allocator = img.pixels.allocator if img.pixels.allocator.procedure != nil else context.allocator
 
 	delete(img.pixels)
 
@@ -240,10 +242,7 @@ decode_body :: proc(img: ^Image, body: []u8) -> (err: Error) {
 	width  := img.width
 	height := img.height
 
-	scratch, scratch_err := make([]u8, 12 * width)
-	if scratch_err != nil {
-		return .Unable_To_Allocate_Or_Resize
-	}
+	scratch := make([]u8, 12 * width) or_return
 	defer delete(scratch)
 
 	cur, prv, res: [4][]u8

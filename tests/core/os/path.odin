@@ -59,6 +59,11 @@ test_clean_path :: proc(t: ^testing.T) {
 			{`C:\a\..`,                            `C:\`},
 			{`C:\あ/a/..`,                          `C:\あ`},
 			{`C:\あ/a/../あ`,                       `C:\あ\あ`},
+			{`\a`,                                 `\a`},
+			{`/a/../b/`,                           `\b`},
+			{`\`,                                  `\`},
+			{`\..\..`,                             `\`},
+			{`a\..\..`,                            `..`},
 		}
 	} else {
 		test_cases := [?]Test_Case {
@@ -129,6 +134,34 @@ test_is_absolute_path :: proc(t: ^testing.T) {
 		testing.expect(t, os.is_absolute_path("/home"))
 	}
 	testing.expect(t, !os.is_absolute_path("home"))
+}
+
+when ODIN_OS == .WASI {
+	@(test)
+	test_get_absolute_path_wasi :: proc(t: ^testing.T) {
+		Test_Case :: struct {
+			path, expected: string,
+		}
+
+		test_cases := [?]Test_Case {
+			{``,              `/`},
+			{`.`,             `/`},
+			{`..`,            `/`},
+			{`../..`,         `/`},
+			{`a`,             `/a`},
+			{`a/b/../c`,      `/a/c`},
+			{`a//b/./`,       `/a/b`},
+			{`/`,             `/`},
+			{`//x/./y/`,      `/x/y`},
+			{`/../x`,         `/x`},
+			{`/no/such/あ/..`, `/no/such`},
+		}
+
+		for tc in test_cases {
+			abs, err := os.get_absolute_path(tc.path, context.temp_allocator)
+			testing.expectf(t, abs == tc.expected && err == nil, "expected get_absolute_path(%q) -> %q; got: %q, %v", tc.path, tc.expected, abs, err)
+		}
+	}
 }
 
 @(test)
@@ -276,6 +309,22 @@ test_join_path :: proc(t: ^testing.T) {
 		result, err := os.join_path(tc.elems, context.temp_allocator)
 		testing.expectf(t, result == tc.expected && err == nil, "expected join_path(%v) -> %q; got: %q, %v", tc.elems, tc.expected, result, err)
 	}
+
+	when ODIN_OS == .Windows {
+		windows_cases := [?]Test_Case {
+			{ {"/", "a"},                 `\a`                },
+			{ {"/", "/a"},                `\a`                },
+			{ {"//", "b"},                `\b`                },
+			{ {`\`, "..", "a"},           `\a`                },
+			{ {`\\server\share`, "a"},    `\\server\share\a`  },
+			{ {`C:`, `\a`},               `C:\a`              },
+			{ {"a", `\b`},                `a\b`               },
+		}
+		for tc in windows_cases {
+			result, err := os.join_path(tc.elems, context.temp_allocator)
+			testing.expectf(t, result == tc.expected && err == nil, "expected join_path(%v) -> %q; got: %q, %v", tc.elems, tc.expected, result, err)
+		}
+	}
 }
 
 @(test)
@@ -380,7 +429,9 @@ glob_tests := []Glob_Test{
 			ODIN_ROOT + "tests/core/os/long_path_windows.odin",
 			ODIN_ROOT + "tests/core/os/path.odin",
 			ODIN_ROOT + "tests/core/os/process.odin",
+			ODIN_ROOT + "tests/core/os/process_windows.odin",
 			ODIN_ROOT + "tests/core/os/stat_windows.odin",
+			ODIN_ROOT + "tests/core/os/test_core_os_leaks.odin",
 			ODIN_ROOT + "tests/core/os/utf16_windows.odin",
 		},
 		err     = {},
@@ -829,7 +880,59 @@ test_remove_all_symlink_inside :: proc(t: ^testing.T) {
 	testing.expect(t, os.exists(kept))
 }
 
-when ODIN_OS != .Windows {
+@(test)
+test_read_link :: proc(t: ^testing.T) {
+	root := remove_all_temp_root(t)
+	defer os.remove_all(root)
+	target := remove_all_join(root, "target")
+	testing.expect_value(t, os.make_directory(target), nil)
+
+	check :: proc(t: ^testing.T, link, expected: string, loc := #caller_location) {
+		got, err := os.read_link(link, context.allocator)
+		testing.expect_value(t, err, nil, loc)
+		testing.expect_value(t, got, expected, loc)
+		delete(got)
+	}
+
+	link := remove_all_join(root, "link")
+	if err := os.symlink(target, link); err != nil {
+		log.infof("skipping symlinks, os.symlink failed: %v", err)
+	} else {
+		check(t, link, "target" when ODIN_OS == .WASI else target)
+		relative := remove_all_join(root, "relative")
+		testing.expect_value(t, os.symlink("target", relative), nil)
+		check(t, relative, "target")
+	}
+
+	when ODIN_OS == .Windows {
+		junction := remove_all_join(root, "junction")
+		state, stdout, stderr, err := os.process_exec({command = {"cmd.exe", "/c", "mklink", "/J", junction, target}}, context.allocator)
+		delete(stdout)
+		delete(stderr)
+		if err != nil || state.exit_code != 0 {
+			log.infof("skipping junctions, mklink /J failed: %v, exit code %d", err, state.exit_code)
+			return
+		}
+		check(t, junction, target)
+
+		long_target := target
+		for _ in 0..<40 {
+			long_target = remove_all_join(long_target, "dir-with-a-long-name")
+		}
+		testing.expect_value(t, os.make_directory_all(long_target), nil)
+		long_junction := remove_all_join(root, "long-junction")
+		state, stdout, stderr, err = os.process_exec({command = {"cmd.exe", "/c", "mklink", "/J", long_junction, long_target}}, context.allocator)
+		delete(stdout)
+		delete(stderr)
+		if err != nil || state.exit_code != 0 {
+			log.infof("skipping long junction, mklink /J failed: %v, exit code %d", err, state.exit_code)
+			return
+		}
+		check(t, long_junction, long_target)
+	}
+}
+
+when ODIN_OS != .Windows && ODIN_OS != .WASI {
 	@(test)
 	test_remove_all_permission_denied :: proc(t: ^testing.T) {
 		root := remove_all_temp_root(t)

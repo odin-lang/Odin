@@ -1366,7 +1366,7 @@ unmarshal_struct_field :: proc(key: string, ti: ^reflect.Type_Info, fields: #soa
 
 	if use_field_idx < 0 && key != "" {
 		for json_name, field_idx in json_names[:len(fields)] {
-			if json_name == "" && key == fields[field_idx].name && !(fields[field_idx].is_using && key == "_") {
+			if json_name == "" && key == fields[field_idx].name && !(.Using in fields[field_idx].flags && key == "_") {
 				use_field_idx = field_idx
 				break
 			}
@@ -1381,7 +1381,7 @@ unmarshal_struct_field :: proc(key: string, ti: ^reflect.Type_Info, fields: #soa
 		fields := reflect.struct_fields_zipped(parent)
 		count = len(fields)
 		for field in fields {
-			if field.is_using && field.name == "_" {
+			if .Using in field.flags && field.name == "_" {
 				count += count_fields(field.type.id)
 			}
 		}
@@ -1404,7 +1404,7 @@ unmarshal_struct_field :: proc(key: string, ti: ^reflect.Type_Info, fields: #soa
 				continue
 			}
 
-			if field.is_using && field.name == "_" {
+			if .Using in field.flags && field.name == "_" {
 				offset, type, index, found = check_children_using_fields(key, field.type.id, index)
 				if found {
 					offset += field.offset
@@ -1415,7 +1415,7 @@ unmarshal_struct_field :: proc(key: string, ti: ^reflect.Type_Info, fields: #soa
 			if key == "" {
 				found = tagged && tag_value == ""
 			} else {
-				found = (json_name == "" && field.name == key && !(field.is_using && key == "_")) || json_name == key
+				found = (json_name == "" && field.name == key && !(.Using in field.flags && key == "_")) || json_name == key
 			}
 			if found {
 				offset = field.offset

@@ -409,7 +409,7 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 
 		// We did bases 2 and 3  already, skip them
 		for ix := 2; ix < p_max; ix += 1 {
-			internal_set(b, _private_prime_table[ix])
+			internal_set(b, _private_prime_table[ix]) or_return
 			if !(internal_int_prime_miller_rabin(a, b) or_return) { return }
 		}
 	} else if miller_rabin_trials > 0 {
@@ -525,7 +525,7 @@ internal_int_prime_frobenius_underwood :: proc(N: ^Int, allocator := context.all
 			continue frob
 		}
 
-		internal_set(T1z, i32((a * a) - 4))
+		internal_set(T1z, i32((a * a) - 4)) or_return
 		j := internal_int_kronecker(T1z, N) or_return
 
 		switch j {
@@ -538,7 +538,7 @@ internal_int_prime_frobenius_underwood :: proc(N: ^Int, allocator := context.all
 	if a >= _FROBENIUS_UNDERWOOD_A { return false, .Max_Iterations_Reached }
 
 	// Composite if N and (a+4)*(2*a+5) are not coprime.
-	internal_set(T1z, u32((a + 4) * ((2 * a) + 5)))
+	internal_set(T1z, u32((a + 4) * ((2 * a) + 5))) or_return
 	internal_int_gcd(T1z, T1z, N) or_return
 
 	if !(T1z.used == 1 && T1z.digit[0] == 1) {
@@ -583,7 +583,7 @@ internal_int_prime_frobenius_underwood :: proc(N: ^Int, allocator := context.all
 			}
 			internal_add(T1z, T1z, tz) or_return
 			internal_int_shl1(T2z, tz) or_return
-			internal_sub(tz, T2z, sz)
+			internal_sub(tz, T2z, sz) or_return
 			internal_swap(sz, T1z)
 		}
 	}
@@ -858,7 +858,7 @@ internal_prime_fermat :: proc(a, b: ^Int, allocator := context.allocator) -> (fe
 	/*
 		Compute `t` = `b`**`a` mod `a`
 	*/
-	internal_int_exponent_mod(t, b, a, a) or_return
+	internal_int_exponent_mod(t, b, a, a, allocator) or_return
 
 	/*
 		Is it equal to b?
@@ -987,7 +987,7 @@ internal_int_sqrtmod_prime :: proc(res, n, prime: ^Int, allocator := context.all
 		M = S
 	*/
 	M = S
-	internal_set(two, 2)
+	internal_set(two, 2)                                             or_return
 
 	for {
 		internal_copy(t1, T)                                         or_return

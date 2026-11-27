@@ -1,4 +1,5 @@
 #+build wasm32, wasm64p32
+#+build !bedrock
 package runtime
 
 @(private="file")
@@ -94,4 +95,34 @@ __lshrti3 :: proc "c" (a: i128, b: u32) -> i128 {
 	}
 
 	return result.all
+}
+
+@(link_name="__ashrti3", linkage="strong")
+__ashrti3 :: proc "c" (a: i128, b: u32) -> i128 {
+	bits :: 64
+
+	input, result: ti_int
+	input.all = a
+	hi := i64(input.hi)
+	if b & bits != 0 {
+		result.hi = u64(hi >> (bits - 1))
+		result.lo = u64(hi >> (b - bits))
+	} else if b == 0 {
+		return a
+	} else {
+		result.hi = u64(hi >> b)
+		result.lo = (input.hi << (bits - b)) | (input.lo >> b)
+	}
+
+	return result.all
+}
+
+@(link_name="__muloti4", linkage="strong")
+__muloti4 :: proc "c" (a, b: i128, overflow: ^i32) -> i128 {
+	sa, sb := a >> 127, b >> 127
+	ua, ub := u128((a ~ sa) - sa), u128((b ~ sb) - sb)
+	product := ua * ub
+	limit   := u128(max(i128)) + u128(sa != sb)
+	overflow^ = i32(ua != 0 && (product / ua != ub || product > limit))
+	return i128(u128(a) * u128(b))
 }

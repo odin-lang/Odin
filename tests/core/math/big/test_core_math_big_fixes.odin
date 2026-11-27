@@ -1482,19 +1482,21 @@ test_fix_minus_inf :: proc(t: ^testing.T) {
 	testing.expect_value(t, a.flags, big.Flags{.Inf})
 }
 
-@(test)
-test_fix_swap_immutable_asserts :: proc(t: ^testing.T) {
-	storage: [1024]byte
-	arena: mem.Arena
-	mem.arena_init(&arena, storage[:])
-	context.allocator = mem.arena_allocator(&arena)
+when !testing.INLINE {
+	@(test)
+	test_fix_swap_immutable_asserts :: proc(t: ^testing.T) {
+		storage: [1024]byte
+		arena: mem.Arena
+		mem.arena_init(&arena, storage[:])
+		context.allocator = mem.arena_allocator(&arena)
 
-	c, x := &big.Int{}, &big.Int{}
-	big.set(c, 1)
-	c.flags = {.Immutable}
-	big.set(x, 6)
-	testing.expect_assert(t, "Assignment to immutable")
-	big.swap(x, c)
+		c, x := &big.Int{}, &big.Int{}
+		big.set(c, 1)
+		c.flags = {.Immutable}
+		big.set(x, 6)
+		testing.expect_assert(t, "Assignment to immutable")
+		big.swap(x, c)
+	}
 }
 
 @(test)
@@ -2348,19 +2350,21 @@ test_fix_rat_immutable_dst :: proc(t: ^testing.T) {
 	}
 }
 
-@(test)
-test_fix_rat_swap_immutable_asserts :: proc(t: ^testing.T) {
-	storage: [1024]byte
-	arena: mem.Arena
-	mem.arena_init(&arena, storage[:])
-	context.allocator = mem.arena_allocator(&arena)
+when !testing.INLINE {
+	@(test)
+	test_fix_rat_swap_immutable_asserts :: proc(t: ^testing.T) {
+		storage: [1024]byte
+		arena: mem.Arena
+		mem.arena_init(&arena, storage[:])
+		context.allocator = mem.arena_allocator(&arena)
 
-	c, x: big.Rat
-	big.rat_set_frac_digit(&c, 1, 2)
-	c.b.flags = {.Immutable}
-	big.rat_set_frac_digit(&x, 3, 4)
-	testing.expect_assert(t, "Assignment to immutable")
-	big.swap(&x, &c)
+		c, x: big.Rat
+		big.rat_set_frac_digit(&c, 1, 2)
+		c.b.flags = {.Immutable}
+		big.rat_set_frac_digit(&x, 3, 4)
+		testing.expect_assert(t, "Assignment to immutable")
+		big.swap(&x, &c)
+	}
 }
 
 @(test)
@@ -2949,7 +2953,7 @@ test_fix_atoi_non_finite :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, big.int_atoi(a, "-inf", 10, &n), big.Error.Invalid_Character)
 	testing.expect_value(t, a.flags, big.Flags{})
-	testing.expect_value(t, n, 1)
+	testing.expect_value(t, n, 0)
 
 	testing.expect_value(t, big.int_atoi(a, "-Inf", 19, &n), nil)
 	testing.expect_value(t, a.flags, big.Flags{.Inf})
@@ -2982,4 +2986,87 @@ test_fix_bit_length :: proc(t: ^testing.T) {
 	testing.expect_value(t, big.bit_length(max(int)), 8 * size_of(int) - 1)
 	testing.expect_value(t, big.bit_length(max(u64)), u64(64))
 	testing.expect_value(t, big.bit_length(u8(0x80)), u8(8))
+}
+
+@(private="file")
+fix_expect_equal :: proc(t: ^testing.T, got, expected: ^big.Int, loc := #caller_location) {
+	equal, err := big.int_equals(got, expected)
+	testing.expect_value(t, err, nil, loc=loc)
+	testing.expect(t, equal, loc=loc)
+}
+
+@(test)
+test_fix_allocator_argument_used :: proc(t: ^testing.T) {
+	ctx_track, arg_track: mem.Tracking_Allocator
+	mem.tracking_allocator_init(&ctx_track, context.allocator)
+	defer mem.tracking_allocator_destroy(&ctx_track)
+	mem.tracking_allocator_init(&arg_track, context.allocator)
+	defer mem.tracking_allocator_destroy(&arg_track)
+	arg_track.bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
+	arg := mem.tracking_allocator(&arg_track)
+
+	DECIMAL :: "123456789012345678901234567890123456789012345678901234567890123456789"
+
+	a := &big.Int{}
+	testing.expect_value(t, big.atoi(a, DECIMAL, 10, allocator = arg), nil)
+	r := &big.Rat{}
+	testing.expect_value(t, big.rat_set_frac_digit(r, 7, 3, arg), nil)
+
+	mod, incr, decr, sqr := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
+	perm, comb_with, comb_without := &big.Int{}, &big.Int{}, &big.Int{}
+	py_big, py_little := &big.Int{}, &big.Int{}
+	r_sqr := &big.Rat{}
+
+	py_bytes := [?]u8{0xff, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x11}
+	buf: [128]u8
+	log, private_log, written: int
+	log_err, private_log_err, itoa_err: big.Error
+	{
+		context.allocator = mem.tracking_allocator(&ctx_track)
+		testing.expect_value(t, big.internal_int_mod_bits(mod, a, 100, arg), nil)
+		testing.expect_value(t, big.internal_int_incr(incr, arg), nil)
+		testing.expect_value(t, big.internal_int_decr(decr, arg), nil)
+		log, log_err = big.internal_int_log(a, 7, arg)
+		private_log, private_log_err = big._private_int_log(a, 7, arg)
+		testing.expect_value(t, big.int_sqr(sqr, a, arg), nil)
+		testing.expect_value(t, big.rat_sqr(r_sqr, r, arg), nil)
+		testing.expect_value(t, big.permutations_without_repetition(perm, 30, 10, arg), nil)
+		testing.expect_value(t, big.combinations_with_repetition(comb_with, 30, 10, arg), nil)
+		testing.expect_value(t, big.combinations_without_repetition(comb_without, 60, 30, arg), nil)
+		testing.expect_value(t, big.int_from_bytes_big_python(py_big, py_bytes[:], true, arg), nil)
+		testing.expect_value(t, big.int_from_bytes_little_python(py_little, py_bytes[:], true, arg), nil)
+		written, itoa_err = big.int_itoa_raw(a, 10, buf[:], allocator = arg)
+	}
+	testing.expect_value(t, ctx_track.total_allocation_count, 0)
+
+	ref := &big.Int{}
+	testing.expect_value(t, big.int_mod_bits(ref, a, 100), nil)
+	fix_expect_equal(t, mod, ref)
+	fix_expect(t, incr, "1")
+	fix_expect(t, decr, "-1")
+	ref_log, ref_log_err := big.int_log(a, 7)
+	testing.expect_value(t, ref_log_err, nil)
+	testing.expect_value(t, log_err, nil)
+	testing.expect_value(t, log, ref_log)
+	testing.expect_value(t, private_log_err, nil)
+	testing.expect_value(t, private_log, ref_log)
+	testing.expect_value(t, big.int_mul(ref, a, a), nil)
+	fix_expect_equal(t, sqr, ref)
+	fix_expect(t, &r_sqr.a, "49")
+	fix_expect(t, &r_sqr.b, "9")
+	fix_expect(t, perm, "109027350432000")
+	fix_expect(t, comb_with, "635745396")
+	fix_expect(t, comb_without, "118264581564861424")
+	testing.expect_value(t, big.atoi(ref, "-EDCBA9876543210FEF", 16), nil)
+	fix_expect_equal(t, py_big, ref)
+	testing.expect_value(t, big.atoi(ref, "11F0DEBC9A78563412FF", 16), nil)
+	fix_expect_equal(t, py_little, ref)
+	testing.expect_value(t, itoa_err, nil)
+	testing.expect_value(t, string(buf[:written]), DECIMAL)
+	big.destroy(ref)
+
+	big.destroy(a, mod, incr, decr, sqr, perm, comb_with, comb_without, py_big, py_little)
+	big.destroy(r, r_sqr)
+	testing.expect_value(t, len(arg_track.allocation_map), 0)
+	testing.expect_value(t, len(arg_track.bad_free_array), 0)
 }

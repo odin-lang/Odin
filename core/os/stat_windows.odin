@@ -24,7 +24,11 @@ _fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (fi: File_Info, err: E
 		return
 	}
 
-	return _file_info_from_get_file_information_by_handle(path, h, allocator)
+	fi, err = _file_info_from_get_file_information_by_handle(path, h)
+	if err != nil {
+		delete(path, allocator)
+	}
+	return
 }
 
 _stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
@@ -83,7 +87,7 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator: runt
 	}
 	defer win32.CloseHandle(h)
 	fullpath := _full_path_utf8(wide, allocator) or_return
-	fi, e = _file_info_from_get_file_information_by_handle(fullpath, h, allocator)
+	fi, e = _file_info_from_get_file_information_by_handle(fullpath, h)
 	if e != nil {
 		delete(fullpath, allocator)
 	}
@@ -110,7 +114,7 @@ _cleanpath_strip_prefix :: proc(buf: []u16) -> []u16 {
 	return buf
 }
 
-_cleanpath_from_handle :: proc(f: ^File, allocator: runtime.Allocator) -> (string, Error) {
+_cleanpath_from_handle :: proc(f: ^File, allocator: runtime.Allocator) -> (cleaned: string, err: Error) {
 	if f == nil {
 		return "", nil
 	}
@@ -123,27 +127,15 @@ _cleanpath_from_handle :: proc(f: ^File, allocator: runtime.Allocator) -> (strin
 
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
-	buf := make([]u16, max(n, 260)+1, temp_allocator)
+	buf := make([]u16, max(n, 260)+1, temp_allocator) or_return
 	n = win32.GetFinalPathNameByHandleW(h, cstring16(raw_data(buf)), u32(len(buf)), 0)
-	return _cleanpath_from_buf(string16(buf[:n]), allocator)
-}
-
-_cleanpath_from_handle_u16 :: proc(f: ^File) -> ([]u16, Error) {
-	if f  == nil {
-		return nil, nil
-	}
-	h := _handle(f)
-
-	n := win32.GetFinalPathNameByHandleW(h, nil, 0, 0)
 	if n == 0 {
-		return nil, _get_platform_error()
+		return "", _get_platform_error()
 	}
-
-	temp_allocator := TEMP_ALLOCATOR_GUARD({})
-
-	buf := make([]u16, max(n, 260)+1, temp_allocator)
-	n = win32.GetFinalPathNameByHandleW(h, cstring16(raw_data(buf)), u32(len(buf)), 0)
-	return _cleanpath_strip_prefix(buf[:n]), nil
+	if int(n) >= len(buf) {
+		return "", .Buffer_Full
+	}
+	return _cleanpath_from_buf(string16(buf[:n]), allocator)
 }
 
 _cleanpath_from_buf :: proc(buf: string16, allocator: runtime.Allocator) -> (string, runtime.Allocator_Error) {
@@ -262,7 +254,7 @@ _file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, wide: []u16,
 	return
 }
 
-_file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HANDLE, allocator: runtime.Allocator) -> (File_Info, Error) {
+_file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HANDLE) -> (File_Info, Error) {
 	d: win32.BY_HANDLE_FILE_INFORMATION
 	if !win32.GetFileInformationByHandle(h, &d) {
 		return {}, _get_platform_error()

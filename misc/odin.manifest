@@ -3,6 +3,7 @@
 	<application>
 		<windowsSettings xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">
 			<activeCodePage>UTF-8</activeCodePage>
+			<longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
 		</windowsSettings>
 	</application>
 </assembly>

@@ -28,6 +28,9 @@ to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) ->
 
 	b: Builder
 	builder_init(&b, 0, 0, allocator) or_return
+	defer if err != nil {
+		builder_destroy(&b)
+	}
 
 	s := s
 	for c, i in s {
@@ -37,8 +40,8 @@ to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) ->
 
 		_, w := utf8.decode_rune_in_string(s[i:])
 		if w == 1 {
-			builder_grow(&b, len(s) + len(replacement))
-			write_string(&b, s[:i])
+			builder_grow(&b, len(s) + len(replacement)) or_return
+			write_string(&b, s[:i]) or_return
 			s = s[i:]
 			break
 		}
@@ -55,7 +58,7 @@ to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) ->
 		if c < utf8.RUNE_SELF {
 			i += 1
 			invalid = false
-			write_byte(&b, c)
+			write_byte(&b, c) or_return
 			continue
 		}
 
@@ -64,12 +67,12 @@ to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) ->
 			i += 1
 			if !invalid {
 				invalid = true
-				write_string(&b, replacement)
+				write_string(&b, replacement) or_return
 			}
 			continue
 		}
 		invalid = false
-		write_string(&b, s[i:][:w])
+		write_string(&b, s[i:][:w]) or_return
 		i += w
 	}
 	return to_string(b), nil
@@ -104,8 +107,11 @@ Output:
 to_lower :: proc(s: string, allocator := context.allocator) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	b: Builder
 	builder_init(&b, 0, len(s), allocator) or_return
+	defer if err != nil {
+		builder_destroy(&b)
+	}
 	for r in s {
-		write_rune(&b, unicode.to_lower(r))
+		write_rune(&b, unicode.to_lower(r)) or_return
 	}
 	return to_string(b), nil
 }
@@ -139,8 +145,11 @@ Output:
 to_upper :: proc(s: string, allocator := context.allocator) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	b: Builder
 	builder_init(&b, 0, len(s), allocator) or_return
+	defer if err != nil {
+		builder_destroy(&b)
+	}
 	for r in s {
-		write_rune(&b, unicode.to_upper(r))
+		write_rune(&b, unicode.to_upper(r)) or_return
 	}
 	return to_string(b), nil
 }
@@ -265,9 +274,12 @@ to_camel_case :: proc(s: string, allocator := context.allocator) -> (res: string
 	s = trim_space(s)
 	b: Builder
 	builder_init(&b, 0, len(s), allocator) or_return
-	w := to_writer(&b)
+	defer if err != nil {
+		builder_destroy(&b)
+	}
+	cw := Case_Writer{b = &b}
 
-	string_case_iterator(w, s, proc(w: io.Writer, prev, curr, next: rune) {
+	string_case_iterator(_case_writer(&cw), s, proc(w: io.Writer, prev, curr, next: rune) {
 		if !is_delimiter(curr) {
 			if is_delimiter(prev) {
 				io.write_rune(w, unicode.to_upper(curr))
@@ -279,6 +291,10 @@ to_camel_case :: proc(s: string, allocator := context.allocator) -> (res: string
 		}
 	})
 
+	err = cw.err
+	if err != nil {
+		return
+	}
 	return to_string(b), nil
 }
 // Alias to `to_pascal_case`
@@ -301,9 +317,12 @@ to_pascal_case :: proc(s: string, allocator := context.allocator) -> (res: strin
 	s = trim_space(s)
 	b: Builder
 	builder_init(&b, 0, len(s), allocator) or_return
-	w := to_writer(&b)
+	defer if err != nil {
+		builder_destroy(&b)
+	}
+	cw := Case_Writer{b = &b}
 
-	string_case_iterator(w, s, proc(w: io.Writer, prev, curr, next: rune) {
+	string_case_iterator(_case_writer(&cw), s, proc(w: io.Writer, prev, curr, next: rune) {
 		if !is_delimiter(curr) {
 			if is_delimiter(prev) || prev == 0 {
 				io.write_rune(w, unicode.to_upper(curr))
@@ -315,6 +334,10 @@ to_pascal_case :: proc(s: string, allocator := context.allocator) -> (res: strin
 		}
 	})
 
+	err = cw.err
+	if err != nil {
+		return
+	}
 	return to_string(b), nil
 }
 /*
@@ -360,7 +383,9 @@ to_delimiter_case :: proc(
 	s = trim_space(s)
 	b: Builder
 	builder_init(&b, 0, len(s), allocator) or_return
-	w := to_writer(&b)
+	defer if err != nil {
+		builder_destroy(&b)
+	}
 
 	adjust_case := unicode.to_upper if all_upper_case else unicode.to_lower
 
@@ -369,15 +394,15 @@ to_delimiter_case :: proc(
 	for next in s {
 		if is_delimiter(curr) {
 			if !is_delimiter(prev) {
-				io.write_rune(w, delimiter)
+				write_rune(&b, delimiter) or_return
 			}
 		} else if unicode.is_upper(curr) {
 			if unicode.is_lower(prev) || (unicode.is_upper(prev) && unicode.is_lower(next)) {
-				io.write_rune(w, delimiter)
+				write_rune(&b, delimiter) or_return
 			}
-			io.write_rune(w, adjust_case(curr))
+			write_rune(&b, adjust_case(curr)) or_return
 		} else if curr != 0 {
-			io.write_rune(w, adjust_case(curr))
+			write_rune(&b, adjust_case(curr)) or_return
 		}
 
 		prev = curr
@@ -386,9 +411,9 @@ to_delimiter_case :: proc(
 
 	if len(s) > 0 {
 		if unicode.is_upper(curr) && unicode.is_lower(prev) && prev != 0 {
-			io.write_rune(w, delimiter)
+			write_rune(&b, delimiter) or_return
 		}
-		io.write_rune(w, adjust_case(curr))
+		write_rune(&b, adjust_case(curr)) or_return
 	}
 
 	return to_string(b), nil
@@ -549,9 +574,12 @@ to_ada_case :: proc(s: string, allocator := context.allocator) -> (res: string, 
 	s = trim_space(s)
 	b: Builder
 	builder_init(&b, 0, len(s), allocator) or_return
-	w := to_writer(&b)
+	defer if err != nil {
+		builder_destroy(&b)
+	}
+	cw := Case_Writer{b = &b}
 
-	string_case_iterator(w, s, proc(w: io.Writer, prev, curr, next: rune) {
+	string_case_iterator(_case_writer(&cw), s, proc(w: io.Writer, prev, curr, next: rune) {
 		if !is_delimiter(curr) {
 			if is_delimiter(prev) || prev == 0 || (unicode.is_lower(prev) && unicode.is_upper(curr)) {
 				if prev != 0 {
@@ -564,5 +592,40 @@ to_ada_case :: proc(s: string, allocator := context.allocator) -> (res: string, 
 		}
 	})
 
+	err = cw.err
+	if err != nil {
+		return
+	}
 	return to_string(b), nil
+}
+
+@(private="file")
+Case_Writer :: struct {
+	b:   ^Builder,
+	err: runtime.Allocator_Error,
+}
+
+@(private="file")
+_case_writer :: proc(cw: ^Case_Writer) -> io.Writer {
+	return {procedure = _case_writer_proc, data = cw}
+}
+
+@(private="file")
+_case_writer_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	cw := (^Case_Writer)(stream_data)
+	#partial switch mode {
+	case .Write:
+		if cw.err != nil {
+			return 0, .Short_Write
+		}
+		written: int
+		written, cw.err = write_bytes(cw.b, p)
+		if cw.err != nil {
+			err = .Short_Write
+		}
+		return i64(written), err
+	case .Query:
+		return io.query_utility({.Write, .Query})
+	}
+	return 0, .Unsupported
 }

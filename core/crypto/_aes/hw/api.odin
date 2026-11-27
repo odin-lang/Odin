@@ -47,6 +47,23 @@ is_ghash_supported :: proc "contextless" () -> bool {
 	}
 }
 
+// is_vaes_supported returns true if and only if (⟺) hardware accelerated
+// AES on 256-bit vectors (VAES) is supported.
+is_vaes_supported :: proc "contextless" () -> bool {
+	when ODIN_ARCH == .amd64 {
+		if !is_supported() {
+			return false
+		}
+		return info.cpu_features() >= info.CPU_Features{
+			.avx,
+			.avx2,
+			.vaes,
+		}
+	} else {
+		return false
+	}
+}
+
 // Context is a keyed AES (ECB) instance.
 Context :: struct {
 	// Note: The ideal thing to do is for the expanded round keys to be

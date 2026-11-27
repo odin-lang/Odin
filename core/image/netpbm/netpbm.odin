@@ -27,9 +27,20 @@ ASCII   :: Formats{.P1, .P2, .P3}
 BINARY  :: Formats{.P4, .P5, .P6} + PAM + PFM
 
 load_from_bytes :: proc(data: []byte, allocator := context.allocator) -> (img: ^Image, err: Error) {
+	img, err = _load_from_bytes(data, allocator)
+	if err != nil {
+		destroy(img)
+		return nil, err
+	}
+	return img, nil
+}
+
+@(private)
+_load_from_bytes :: proc(data: []byte, allocator: runtime.Allocator) -> (img: ^Image, err: Error) {
 	context.allocator = allocator
 
-	img = new(Image)
+	img = new(Image) or_return
+	img.pixels.allocator = allocator
 	img.which = .NetPBM
 
 	header: Header; defer header_destroy(&header)
@@ -39,11 +50,9 @@ load_from_bytes :: proc(data: []byte, allocator := context.allocator) -> (img: ^
 	img_data := data[header_size:]
 	decode_image(img, header, img_data) or_return
 
-	info := new(Info)
+	info := new(Info) or_return
 	info.header = header
-	if header.format == .P7 && header.tupltype != "" {
-		info.header.tupltype = strings.clone(header.tupltype)
-	}
+	header.tupltype = ""
 	img.metadata = info
 
 	return img, nil
@@ -336,6 +345,10 @@ _parse_header_pnm :: proc(data: []byte) -> (header: Header, length: int, err: Er
 			}
 
 			val := int(d - '0')
+			if current_value^ > (max(int) - val) / 10 {
+				err = .Invalid_Header_Value
+				return
+			}
 			current_value^ = current_value^ * 10 + val
 		}
 	}
@@ -388,8 +401,8 @@ _parse_header_pam :: proc(data: []byte, allocator := context.allocator) -> (head
 
 	// string buffer for the tupltype
 	tupltype: strings.Builder
-	strings.builder_init(&tupltype, context.temp_allocator); defer strings.builder_destroy(&tupltype)
-	fmt.sbprint(&tupltype, "")
+	strings.builder_init(&tupltype, context.temp_allocator) or_return
+	defer strings.builder_destroy(&tupltype)
 
 	// PAM uses actual lines, so we can iterate easily
 	line_iterator := string(data[SIGNATURE_LENGTH : header_end_index])
@@ -418,11 +431,10 @@ _parse_header_pam :: proc(data: []byte, allocator := context.allocator) -> (head
 				return
 			}
 
-			if len(tupltype.buf) == 0 {
-				fmt.sbprint(&tupltype, value)
-			} else {
-				fmt.sbprint(&tupltype, "", value)
+			if len(tupltype.buf) > 0 {
+				strings.write_byte(&tupltype, ' ') or_return
 			}
+			strings.write_string(&tupltype, value) or_return
 
 			continue
 
@@ -453,7 +465,7 @@ _parse_header_pam :: proc(data: []byte, allocator := context.allocator) -> (head
 		return
 	}
 
-	header.tupltype = strings.clone(strings.to_string(tupltype))
+	header.tupltype = strings.clone(strings.to_string(tupltype)) or_return
 	err = Format_Error.None
 	return
 }
@@ -518,6 +530,11 @@ _parse_header_pfm :: proc(data: []byte) -> (header: Header, length: int, err: Er
 	if header.scale < 0.0 {
 		header.little_endian = true
 		header.scale = -header.scale
+	}
+
+	if len(field_iterator) == 0 {
+		err = Format_Error.Incomplete_Header
+		return
 	}
 
 	// pointer math to get header size

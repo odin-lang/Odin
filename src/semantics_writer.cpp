@@ -767,7 +767,7 @@ gb_internal void export_semantics(Checker *c) {
 				sw_map(&w, 1 + (a.value != nullptr));
 				sw_key(&w, "name"); sw_string(&w, a.name);
 				if (a.value != nullptr) {
-					gbString value = expr_to_string(a.value);
+					gbString value = expr_to_string_exact(a.value);
 					sw_key(&w, "value"); sw_string(&w, make_string(cast(u8 *)value, gb_string_length(value)));
 					gb_string_free(value);
 				}

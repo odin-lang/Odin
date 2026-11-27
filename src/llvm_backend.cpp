@@ -76,17 +76,20 @@ gb_internal String get_final_microarchitecture() {
 gb_internal String get_default_features() {
 	BuildContext *bc = &build_context;
 
-	if (bc->microarch == str_lit("native")) {
+	bool is_native = bc->microarch == str_lit("native");
+	if (is_native) {
 		String features = make_string_c(LLVMGetHostCPUFeatures());
 
-		// Update the features string so LLVM uses it later.
-		if (bc->target_features_string.len > 0) {
-			bc->target_features_string = concatenate3_strings(permanent_allocator(), features, str_lit(","), bc->target_features_string);
-		} else {
-			bc->target_features_string = features;
-		}
+		if (features.len > 0) {
+			// Update the features string so LLVM uses it later.
+			if (bc->target_features_string.len > 0) {
+				bc->target_features_string = concatenate3_strings(permanent_allocator(), features, str_lit(","), bc->target_features_string);
+			} else {
+				bc->target_features_string = features;
+			}
 
-		return features;
+			return features;
+		}
 	}
 
 	int off = 0;
@@ -119,6 +122,10 @@ gb_internal String get_default_features() {
 		if (microarch_features_list[i].microarch == microarch) {
 			return microarch_features_list[i].features;
 		}
+	}
+
+	if (is_native) {
+		return {};
 	}
 
 	GB_PANIC("unknown microarch: %.*s", LIT(microarch));
@@ -1193,6 +1200,32 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	}
 
 	return {p->value, p->type};
+}
+
+// A read-only table of the element size of each field of an #soa type, for intrinsics.type_soa_field_sizes
+gb_internal lbValue lb_gen_soa_field_sizes_ptr(lbModule *m, Type *type) {
+	lbAddr *found = map_get(&m->soa_field_sizes_map, type);
+	if (found) {
+		return found->addr;
+	}
+
+	Type *soa = base_type(type);
+	isize count = soa_field_count(soa);
+	Type *table_type = alloc_type_array(t_int, count);
+
+	LLVMValueRef *sizes = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+	for (isize i = 0; i < count; i++) {
+		Type *column = base_type(soa->Struct.fields[i]->type);
+		Type *field_type = column->kind == Type_Array ? column->Array.elem : column->MultiPointer.elem;
+		sizes[i] = lb_const_int(m, t_int, type_size_of(field_type)).value;
+	}
+	lbValue table = {llvm_const_array(m, lb_type(m, t_int), sizes, count), table_type};
+
+	lbAddr addr = lb_add_global_generated_with_name(m, table_type, table, lb_internal_gen_name_from_type("ggv$soa_field_sizes", type));
+	lb_make_global_private_const(addr);
+
+	map_set(&m->soa_field_sizes_map, type, addr);
+	return addr.addr;
 }
 
 gb_internal lbValue lb_gen_map_cell_info_ptr(lbModule *m, Type *type) {
@@ -3192,31 +3225,32 @@ gb_internal String lb_filepath_ll_for_module(lbModule *m) {
 		s = m->info->init_package->name;
 	}
 
-	if (build_context.out_filepath.len > 0) {
-		path = concatenate_strings(permanent_allocator(), path, s);
-		path = concatenate_strings(permanent_allocator(), path, STR_LIT(".ll"));
-	} else {
-		path = concatenate_strings(permanent_allocator(), s, STR_LIT(".ll"));
-	}
+	path = concatenate3_strings(permanent_allocator(), path, s, STR_LIT(".ll"));
 	return path;
+}
+
+gb_internal bool lb_object_is_intermediate(void) {
+	switch (build_context.build_mode) {
+	case BuildMode_Executable:
+	case BuildMode_StaticLibrary:
+	case BuildMode_DynamicLibrary:
+		return !build_context.keep_object_files && !build_context.keep_temp_files;
+	}
+	return false;
 }
 
 gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 	String basename = build_context.build_paths[BuildPath_Output].basename;
 	String name = build_context.build_paths[BuildPath_Output].name;
 
-	bool use_temporary_directory = false;
-	if (USE_SEPARATE_MODULES && build_context.build_mode == BuildMode_Executable) {
-		// NOTE(bill): use a temporary directory
-		String dir = temporary_directory(permanent_allocator());
-		if (dir.len != 0) {
-			basename = dir;
-			use_temporary_directory = true;
-		}
-	}
+	// NOTE(bill): use a temporary directory
+	bool use_temporary_directory = lb_object_is_intermediate();
 
-	gbString path = gb_string_make_length(heap_allocator(), basename.text, basename.len);
-	path = gb_string_appendc(path, "/");
+	gbString path = gb_string_make(heap_allocator(), "");
+	if (!use_temporary_directory) {
+		path = gb_string_append_length(path, basename.text, basename.len);
+		path = gb_string_appendc(path, "/");
+	}
 
 	bool output_is_directory = path_is_directory(build_context.build_paths[BuildPath_Output]);
 
@@ -3263,8 +3297,12 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 	path = gb_string_append_length(path, ".", 1);
 	path = gb_string_append_length(path, ext.text, ext.len);
 
-	return make_string(cast(u8 *)path, gb_string_length(path));
-
+	String result = make_string(cast(u8 *)path, gb_string_length(path));
+	if (use_temporary_directory) {
+		result = build_temp_file(result);
+		gb_string_free(path);
+	}
+	return result;
 }
 
 gb_internal void lb_add_foreign_library_paths(lbGenerator *gen) {
@@ -3296,7 +3334,6 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 				continue;
 			}
 			array_add(&gen->output_object_paths, lb_filepath_obj_for_module(m));
-			array_add(&gen->output_temp_paths, lb_filepath_ll_for_module(m));
 		}
 		for (lbModule *m : lb_modules_by_cost(gen)) {
 			if (lb_is_module_empty(m)) {
@@ -3413,6 +3450,10 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 		lb_fill_slice(p, args, argv, argc);
 		lbValue rt_args = lb_find_runtime_value(p->module, str_lit("args__"));
 		lb_emit_store_union_variant(p, rt_args, lb_addr_load(p, args), t_args);
+	}
+
+	if (build_context.metrics.os == TargetOs_wasi) {
+		lb_emit_runtime_call(p, "_wasi_setup_args", {});
 	}
 
 	lbValue startup_runtime_value = {startup_runtime->value, startup_runtime->type};
@@ -3782,12 +3823,12 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				}
 			}
 
-			LLVMMetadataRef init_file_metadata = lb_get_file_metadata(m, init_file);
-			if (init_file_metadata == nullptr) {
-				// every file of the initial package was excluded by its build tags, as can be done for `odin test`
-				String path = m->info->init_package->fullpath;
-				init_file_metadata = LLVMDIBuilderCreateFile(m->debug_builder, cast(char const *)path.text, path.len, "", 0);
+			if (init_file == nullptr && m->info->runtime_package != nullptr && m->info->runtime_package->files.count > 0) {
+				// every file of the initial package was excluded by its build tags, as can be done for `odin test`;
+				// a real file keeps the line table's checksums
+				init_file = m->info->runtime_package->files[0];
 			}
+			LLVMMetadataRef init_file_metadata = lb_get_file_metadata(m, init_file);
 
 			LLVMBool split_debug_inlining = build_context.build_mode == BuildMode_Assembly;
 			LLVMBool debug_info_for_profiling = false;
@@ -3848,9 +3889,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				isize types;
 				isize names;
 				isize offsets;
-				isize usings;
+				isize field_flags;
 				isize tags;
-				isize empty_usings;
+				isize empty_field_flags;
 				isize empty_tags;
 				isize enum_indices;
 			};
@@ -3877,10 +3918,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 					c.types   += n;
 					c.names   += n;
 					c.offsets += n;
-					if (lb_type_info_struct_has_usings(t)) {
-						c.usings += n;
+					if (lb_type_info_struct_has_field_flags(t)) {
+						c.field_flags += n;
 					} else {
-						c.empty_usings = gb_max(c.empty_usings, n);
+						c.empty_field_flags = gb_max(c.empty_field_flags, n);
 					}
 					if (lb_type_info_has_tags(t)) {
 						c.tags += n;
@@ -3926,16 +3967,16 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			for (lbModule *tm : gen->type_info_modules) {
 				MemberCounts const &c = counts[tm->type_info_part];
 				lbTypeInfoMembers *members = permanent_alloc_item<lbTypeInfoMembers>();
-				members->types   = global_type_info_make(tm, LB_TYPE_INFO_TYPES_NAME,   t_type_info_ptr, c.types);
-				members->names   = global_type_info_make(tm, LB_TYPE_INFO_NAMES_NAME,   t_string,        c.names);
-				members->offsets = global_type_info_make(tm, LB_TYPE_INFO_OFFSETS_NAME, t_uintptr,       c.offsets);
-				members->usings  = global_type_info_make(tm, LB_TYPE_INFO_USINGS_NAME,  t_bool,          c.empty_usings + c.usings);
-				members->tags    = global_type_info_make(tm, LB_TYPE_INFO_TAGS_NAME,    t_string,        c.empty_tags   + c.tags);
+				members->types       = global_type_info_make(tm, LB_TYPE_INFO_TYPES_NAME,       t_type_info_ptr, c.types);
+				members->names       = global_type_info_make(tm, LB_TYPE_INFO_NAMES_NAME,       t_string,        c.names);
+				members->offsets     = global_type_info_make(tm, LB_TYPE_INFO_OFFSETS_NAME,     t_uintptr,       c.offsets);
+				members->field_flags = global_type_info_make(tm, LB_TYPE_INFO_FIELD_FLAGS_NAME, t_u8,            c.empty_field_flags + c.field_flags);
+				members->tags        = global_type_info_make(tm, LB_TYPE_INFO_TAGS_NAME,        t_string,        c.empty_tags        + c.tags);
 
-				members->empty_usings_count = c.empty_usings;
-				members->empty_tags_count   = c.empty_tags;
-				members->usings_index       = c.empty_usings;
-				members->tags_index         = c.empty_tags;
+				members->empty_field_flags_count = c.empty_field_flags;
+				members->empty_tags_count        = c.empty_tags;
+				members->field_flags_index       = c.empty_field_flags;
+				members->tags_index              = c.empty_tags;
 
 				if (c.enum_indices > 0) {
 					members->enum_indices       = global_type_info_make(tm, LB_TYPE_INFO_ENUM_INDICES_NAME, t_type_info_enum_value, c.enum_indices);
@@ -4289,8 +4330,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				exit_with_errors();
 				return false;
 			}
-			array_add(&gen->output_temp_paths, filepath_ll);
-
 		}
 		if (build_context.build_mode == BuildMode_LLVM_IR) {
 			return true;

@@ -1,5 +1,6 @@
 package mem_virtual
 
+import "base:intrinsics"
 import "base:runtime"
 _ :: runtime
 
@@ -47,7 +48,12 @@ make_slice :: proc(arena: ^Arena, $T: typeid/[]$E, #any_int len: int, loc := #ca
 @(require_results)
 make_aligned :: proc(arena: ^Arena, $T: typeid/[]$E, #any_int len: int, alignment: uint, loc := #caller_location) -> (T, Allocator_Error) {
 	runtime.make_slice_error_loc(loc, len)
-	data, err := arena_alloc(arena, size_of(E)*uint(len), alignment, loc)
+	elem_size: uint = size_of(E)
+	size, did_overflow := intrinsics.overflow_mul(elem_size, uint(len))
+	if did_overflow {
+		return nil, .Out_Of_Memory
+	}
+	data, err := arena_alloc(arena, size, alignment, loc)
 	if data == nil && size_of(E) != 0 {
 		return nil, err
 	}
@@ -65,7 +71,12 @@ make_aligned :: proc(arena: ^Arena, $T: typeid/[]$E, #any_int len: int, alignmen
 @(require_results)
 make_multi_pointer :: proc(arena: ^Arena, $T: typeid/[^]$E, #any_int len: int, loc := #caller_location) -> (T, Allocator_Error) {
 	runtime.make_slice_error_loc(loc, len)
-	data, err := arena_alloc(arena, size_of(E)*uint(len), align_of(E), loc)
+	elem_size: uint = size_of(E)
+	size, did_overflow := intrinsics.overflow_mul(elem_size, uint(len))
+	if did_overflow {
+		return nil, .Out_Of_Memory
+	}
+	data, err := arena_alloc(arena, size, align_of(E), loc)
 	if data == nil && size_of(E) != 0 {
 		return nil, err
 	}

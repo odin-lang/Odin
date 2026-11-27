@@ -223,7 +223,7 @@ Bcj2_Step :: enum u8 {
 }
 
 @(private) BCJ2_TOP        :: u32(1) << 24
-@(private) READ_STALLS_MAX :: 64
+@(private) READ_STALLS_MAX :: 100
 @(private) BCJ2_PROB_BITS  :: 11
 @(private) BCJ2_PROB_INIT  :: u16(1 << BCJ2_PROB_BITS >> 1)
 @(private) BCJ2_MOVE_BITS  :: 5

@@ -163,32 +163,34 @@ test_zipf :: proc(t: ^testing.T) {
 	testing.expect(t, !underflow_ok)
 }
 
-@(test)
-test_gamma_nan_alpha :: proc(t: ^testing.T) {
-	testing.expect_assert(t, "float64_gamma: alpha must be finite, and alpha and beta must be > 0.0")
-	state := Script_State{sm = 3}
-	_ = rand.float64_gamma(math.nan_f64(), 1, script_generator(&state))
-}
+when !testing.INLINE {
+	@(test)
+	test_gamma_nan_alpha :: proc(t: ^testing.T) {
+		testing.expect_assert(t, "float64_gamma: alpha must be finite, and alpha and beta must be > 0.0")
+		state := Script_State{sm = 3}
+		_ = rand.float64_gamma(math.nan_f64(), 1, script_generator(&state))
+	}
 
-@(test)
-test_gamma_inf_alpha :: proc(t: ^testing.T) {
-	testing.expect_assert(t, "float64_gamma: alpha must be finite, and alpha and beta must be > 0.0")
-	state := Script_State{sm = 3}
-	_ = rand.float64_gamma(math.inf_f64(1), 1, script_generator(&state))
-}
+	@(test)
+	test_gamma_inf_alpha :: proc(t: ^testing.T) {
+		testing.expect_assert(t, "float64_gamma: alpha must be finite, and alpha and beta must be > 0.0")
+		state := Script_State{sm = 3}
+		_ = rand.float64_gamma(math.inf_f64(1), 1, script_generator(&state))
+	}
 
-@(test)
-test_beta_nan_alpha :: proc(t: ^testing.T) {
-	testing.expect_assert(t, "float64_beta: alpha and beta must be finite and > 0.0")
-	state := Script_State{sm = 3}
-	_ = rand.float64_beta(math.nan_f64(), 1, script_generator(&state))
-}
+	@(test)
+	test_beta_nan_alpha :: proc(t: ^testing.T) {
+		testing.expect_assert(t, "float64_beta: alpha and beta must be finite and > 0.0")
+		state := Script_State{sm = 3}
+		_ = rand.float64_beta(math.nan_f64(), 1, script_generator(&state))
+	}
 
-@(test)
-test_von_mises_nan_kappa :: proc(t: ^testing.T) {
-	testing.expect_assert(t, "float64_von_mises: kappa must be >= 0.0")
-	state := Script_State{sm = 3}
-	_ = rand.float64_von_mises(0, math.nan_f64(), script_generator(&state))
+	@(test)
+	test_von_mises_nan_kappa :: proc(t: ^testing.T) {
+		testing.expect_assert(t, "float64_von_mises: kappa must be >= 0.0")
+		state := Script_State{sm = 3}
+		_ = rand.float64_von_mises(0, math.nan_f64(), script_generator(&state))
+	}
 }
 
 @(test)

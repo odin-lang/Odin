@@ -92,13 +92,16 @@ decompress_frame_from_context :: proc(z: ^compress.Context, expected_output_size
 	frame_loop: for {
 		if frames > 0 {
 			next, next_err := compress.peek_data(z, u32le)
+			if next_err != nil && !lz4_input_ended(next_err) {
+				return next_err
+			}
 			if next_err != nil || !lz4_is_magic(u32(next)) {
 				break frame_loop
 			}
 		}
 		magic, magic_err := compress.read_data(z, u32le)
 		if magic_err != nil {
-			return General_Error.Stream_Too_Short
+			return lz4_input_error(magic_err)
 		}
 		progress.consumed += 4
 		switch {
@@ -110,10 +113,10 @@ decompress_frame_from_context :: proc(z: ^compress.Context, expected_output_size
 		case u32(magic) >= SKIPPABLE_MAGIC_MIN && u32(magic) <= SKIPPABLE_MAGIC_MAX:
 			size, size_err := compress.read_data(z, u32le)
 			if size_err != nil {
-				return General_Error.Stream_Too_Short
+				return lz4_input_error(size_err)
 			}
-			if compress.skip(z, i64(size)) != nil {
-				return General_Error.Stream_Too_Short
+			if skip_err := compress.skip(z, i64(size)); skip_err != nil {
+				return lz4_input_error(skip_err)
 			}
 			progress.consumed += 4 + i64(size)
 		case u32(magic) == LEGACY_MAGIC:
@@ -238,12 +241,18 @@ lz4_reader_progress :: proc(r: ^Frame_Reader) -> (err: Error) {
 }
 
 @(private)
-lz4_at_end :: proc(z: ^compress.Context) -> bool {
+lz4_at_end :: proc(z: ^compress.Context) -> (end: bool, err: Error) {
 	if compress.is_memory_context(z) {
-		return len(z.window) == 0
+		return len(z.window) == 0, nil
 	}
-	_, err := compress.peek_data(z, u8)
-	return err != nil
+	_, peek_err := compress.peek_data(z, u8)
+	if peek_err == nil {
+		return false, nil
+	}
+	if lz4_input_ended(peek_err) {
+		return true, nil
+	}
+	return false, peek_err
 }
 
 @(private)
@@ -262,8 +271,8 @@ lz4_read_bytes :: proc(z: ^compress.Context, n: int, scratch: ^[dynamic]u8) -> (
 		return data, nil
 	}
 	non_zero_resize(scratch, n) or_return
-	if compress.read_slice(z, scratch[:n]) != nil {
-		return nil, General_Error.Stream_Too_Short
+	if read_err := compress.read_slice(z, scratch[:n]); read_err != nil {
+		return nil, lz4_input_error(read_err)
 	}
 	return scratch[:n], nil
 }
@@ -300,7 +309,7 @@ lz4_frame_header :: proc(z: ^compress.Context, dictionary: []u8) -> (h: LZ4_Fram
 	descriptor: [FRAME_DESCRIPTOR_MAX]u8
 	flags, flags_err := compress.read_data(z, [2]u8)
 	if flags_err != nil {
-		return h, General_Error.Stream_Too_Short
+		return h, lz4_input_error(flags_err)
 	}
 	copy(descriptor[:], flags[:])
 	descriptor_len := 2
@@ -325,7 +334,7 @@ lz4_frame_header :: proc(z: ^compress.Context, dictionary: []u8) -> (h: LZ4_Fram
 	if .Content_Size in descriptor_flags {
 		v, e := compress.read_data(z, [8]u8)
 		if e != nil {
-			return h, General_Error.Stream_Too_Short
+			return h, lz4_input_error(e)
 		}
 		copy(descriptor[descriptor_len:], v[:])
 		descriptor_len += 8
@@ -335,7 +344,7 @@ lz4_frame_header :: proc(z: ^compress.Context, dictionary: []u8) -> (h: LZ4_Fram
 	if .Dictionary_ID in descriptor_flags {
 		v, e := compress.read_data(z, [4]u8)
 		if e != nil {
-			return h, General_Error.Stream_Too_Short
+			return h, lz4_input_error(e)
 		}
 		copy(descriptor[descriptor_len:], v[:])
 		descriptor_len += 4
@@ -345,7 +354,7 @@ lz4_frame_header :: proc(z: ^compress.Context, dictionary: []u8) -> (h: LZ4_Fram
 	}
 	header_checksum, hc_err := compress.read_data(z, u8)
 	if hc_err != nil {
-		return h, General_Error.Stream_Too_Short
+		return h, lz4_input_error(hc_err)
 	}
 	if u8(xxhash.XXH32(descriptor[:descriptor_len]) >> 8) != header_checksum {
 		return h, LZ4_Error.Header_Checksum_Failed
@@ -393,7 +402,7 @@ lz4_decode_frame :: proc(z: ^compress.Context, start, limit, input_size: int, di
 		}
 		header, header_err := compress.read_data(z, u32le)
 		if header_err != nil {
-			return written, General_Error.Stream_Too_Short
+			return written, lz4_input_error(header_err)
 		}
 		progress.consumed += 4
 		if header == 0 {
@@ -409,7 +418,7 @@ lz4_decode_frame :: proc(z: ^compress.Context, start, limit, input_size: int, di
 		if block_checksum {
 			expected, e := compress.read_data(z, u32le)
 			if e != nil {
-				return written, General_Error.Stream_Too_Short
+				return written, lz4_input_error(e)
 			}
 			progress.consumed += 4
 			if xxhash.XXH32(data) != u32(expected) {
@@ -441,7 +450,7 @@ lz4_decode_frame :: proc(z: ^compress.Context, start, limit, input_size: int, di
 	if content_checksum {
 		expected, e := compress.read_data(z, u32le)
 		if e != nil {
-			return written, General_Error.Stream_Too_Short
+			return written, lz4_input_error(e)
 		}
 		progress.consumed += 4
 		if xxhash.XXH32(z.output[start:written]) != u32(expected) {
@@ -461,12 +470,12 @@ lz4_decode_legacy :: proc(z: ^compress.Context, start, limit: int, scratch: ^[dy
 		if written >= progress.mark && lz4_progress_report(progress, written, progress.consumed, i64(written)) {
 			return written, progress.err
 		}
-		if lz4_at_end(z) {
+		if end := lz4_at_end(z) or_return; end {
 			return written, nil
 		}
 		size_le, size_err := compress.peek_data(z, u32le)
 		if size_err != nil {
-			return written, General_Error.Stream_Too_Short
+			return written, lz4_input_error(size_err)
 		}
 		size := u32(size_le)
 		if lz4_is_magic(size) {
@@ -797,6 +806,9 @@ lz4_stream_fill :: proc(r: ^Frame_Reader) -> (err: Error) {
 		case .Magic:
 			if r.frames > 0 {
 				next, next_err := compress.peek_data(r.z, u32le)
+				if next_err != nil && !lz4_input_ended(next_err) {
+					return next_err
+				}
 				if next_err != nil || !lz4_is_magic(u32(next)) {
 					r.state = .Done
 					continue
@@ -804,7 +816,7 @@ lz4_stream_fill :: proc(r: ^Frame_Reader) -> (err: Error) {
 			}
 			magic, magic_err := compress.read_data(r.z, u32le)
 			if magic_err != nil {
-				return General_Error.Stream_Too_Short
+				return lz4_input_error(magic_err)
 			}
 			r.consumed += 4
 			switch {
@@ -840,10 +852,10 @@ lz4_stream_fill :: proc(r: ^Frame_Reader) -> (err: Error) {
 			case u32(magic) >= SKIPPABLE_MAGIC_MIN && u32(magic) <= SKIPPABLE_MAGIC_MAX:
 				size, size_err := compress.read_data(r.z, u32le)
 				if size_err != nil {
-					return General_Error.Stream_Too_Short
+					return lz4_input_error(size_err)
 				}
-				if compress.skip(r.z, i64(size)) != nil {
-					return General_Error.Stream_Too_Short
+				if skip_err := compress.skip(r.z, i64(size)); skip_err != nil {
+					return lz4_input_error(skip_err)
 				}
 				r.consumed += 4 + i64(size)
 				r.frames   += 1
@@ -870,14 +882,14 @@ lz4_stream_fill :: proc(r: ^Frame_Reader) -> (err: Error) {
 			}
 			header, header_err := compress.read_data(r.z, u32le)
 			if header_err != nil {
-				return General_Error.Stream_Too_Short
+				return lz4_input_error(header_err)
 			}
 			r.consumed += 4
 			if header == 0 {
 				if r.content_hash {
 					expected, e := compress.read_data(r.z, u32le)
 					if e != nil {
-						return General_Error.Stream_Too_Short
+						return lz4_input_error(e)
 					}
 					r.consumed += 4
 					if xxhash.XXH32_digest(&r.digest) != u32(expected) {
@@ -901,7 +913,7 @@ lz4_stream_fill :: proc(r: ^Frame_Reader) -> (err: Error) {
 			if r.checksummed {
 				expected, e := compress.read_data(r.z, u32le)
 				if e != nil {
-					return General_Error.Stream_Too_Short
+					return lz4_input_error(e)
 				}
 				r.consumed += 4
 				if xxhash.XXH32(data) != u32(expected) {
@@ -939,14 +951,14 @@ lz4_stream_fill :: proc(r: ^Frame_Reader) -> (err: Error) {
 			produced = true
 
 		case .Legacy:
-			if lz4_at_end(r.z) {
+			if end := lz4_at_end(r.z) or_return; end {
 				r.frames += 1
 				r.state   = .Magic
 				continue
 			}
 			size_le, size_err := compress.peek_data(r.z, u32le)
 			if size_err != nil {
-				return General_Error.Stream_Too_Short
+				return lz4_input_error(size_err)
 			}
 			size := u32(size_le)
 			if lz4_is_magic(size) {

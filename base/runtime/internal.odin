@@ -272,57 +272,60 @@ conditional_mem_zero :: proc "contextless" (data: rawptr, n_: int) #no_bounds_ch
 }
 
 memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
-	switch {
-	case n == 0: return true
-	case x == y: return true
-	}
 	a, b := cast([^]byte)x, cast([^]byte)y
+
+	switch {
+	case n < 4:
+		for i in 0..<n {
+			if a[i] != b[i] {
+				return false
+			}
+		}
+		return true
+	case n < 8:
+		head := intrinsics.unaligned_load(cast(^u32)a)       ~ intrinsics.unaligned_load(cast(^u32)b)
+		tail := intrinsics.unaligned_load(cast(^u32)&a[n-4]) ~ intrinsics.unaligned_load(cast(^u32)&b[n-4])
+		return (head | tail) == 0
+	case n <= 16:
+		head := intrinsics.unaligned_load(cast(^u64)a)       ~ intrinsics.unaligned_load(cast(^u64)b)
+		tail := intrinsics.unaligned_load(cast(^u64)&a[n-8]) ~ intrinsics.unaligned_load(cast(^u64)&b[n-8])
+		return (head | tail) == 0
+	}
 
 	n := uint(n)
 	i := uint(0)
 	m := uint(0)
 
-	if n >= 8 {
-		when HAS_HARDWARE_SIMD {
-			// Avoid using 256-bit SIMD on platforms where its emulation is
-			// likely to be less than ideal.
-			when ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2") {
-				m = n / 32 * 32
-				for /**/; i < m; i += 32 {
-					load_a := intrinsics.unaligned_load(cast(^#simd[32]u8)&a[i])
-					load_b := intrinsics.unaligned_load(cast(^#simd[32]u8)&b[i])
-					ne := intrinsics.simd_lanes_ne(load_a, load_b)
-					if intrinsics.simd_reduce_or(ne) != 0 {
-						return false
-					}
+	when HAS_HARDWARE_SIMD {
+		// Avoid using 256-bit SIMD on platforms where its emulation is
+		// likely to be less than ideal.
+		when ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2") {
+			m = n / 32 * 32
+			for /**/; i < m; i += 32 {
+				load_a := intrinsics.unaligned_load(cast(^#simd[32]u8)&a[i])
+				load_b := intrinsics.unaligned_load(cast(^#simd[32]u8)&b[i])
+				ne := intrinsics.simd_lanes_ne(load_a, load_b)
+				if intrinsics.simd_reduce_or(ne) != 0 {
+					return false
 				}
 			}
 		}
-
-		m = (n-i) / 16 * 16
-		for /**/; i < m; i += 16 {
-			load_a := intrinsics.unaligned_load(cast(^#simd[16]u8)&a[i])
-			load_b := intrinsics.unaligned_load(cast(^#simd[16]u8)&b[i])
-			ne := intrinsics.simd_lanes_ne(load_a, load_b)
-			if intrinsics.simd_reduce_or(ne) != 0 {
-				return false
-			}
-		}
-
-		m = (n-i) / size_of(uintptr) * size_of(uintptr)
-		for /**/; i < m; i += size_of(uintptr) {
-			if intrinsics.unaligned_load(cast(^uintptr)&a[i]) != intrinsics.unaligned_load(cast(^uintptr)&b[i]) {
-				return false
-			}
-		}
 	}
 
-	for /**/; i < n; i += 1 {
-		if a[i] != b[i] {
+	m = n / 16 * 16
+	for /**/; i < m; i += 16 {
+		load_a := intrinsics.unaligned_load(cast(^#simd[16]u8)&a[i])
+		load_b := intrinsics.unaligned_load(cast(^#simd[16]u8)&b[i])
+		ne := intrinsics.simd_lanes_ne(load_a, load_b)
+		if intrinsics.simd_reduce_or(ne) != 0 {
 			return false
 		}
 	}
-	return true
+
+	load_a := intrinsics.unaligned_load(cast(^#simd[16]u8)&a[n-16])
+	load_b := intrinsics.unaligned_load(cast(^#simd[16]u8)&b[n-16])
+	ne := intrinsics.simd_lanes_ne(load_a, load_b)
+	return intrinsics.simd_reduce_or(ne) == 0
 }
 
 memory_compare :: proc "contextless" (x, y: rawptr, n: int) -> int #no_bounds_check {
@@ -335,61 +338,71 @@ memory_compare :: proc "contextless" (x, y: rawptr, n: int) -> int #no_bounds_ch
 	a, b := cast([^]byte)x, cast([^]byte)y
 
 	n := uint(n)
-	i := uint(0)
-	m := uint(0)
 
+	// Most differences come early: the first 64 bytes go a chunk at a time. Long equal stretches after them
+	// go a vector at a time, and the chunks settle the order inside the first vector that differs.
 	when HAS_HARDWARE_SIMD {
-		when ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2") {
-			m = n / 32 * 32
-			for /**/; i < m; i += 32 {
-				load_a := intrinsics.unaligned_load(cast(^#simd[32]u8)&a[i])
-				load_b := intrinsics.unaligned_load(cast(^#simd[32]u8)&b[i])
-				comparison := intrinsics.simd_lanes_ne(load_a, load_b)
-				if intrinsics.simd_reduce_or(comparison) != 0 {
-					sentinel: #simd[32]u8 = u8(0xFF)
-					indices := intrinsics.simd_indices(#simd[32]u8)
-					index_select := intrinsics.simd_select(comparison, indices, sentinel)
-					index_reduce := cast(uint)intrinsics.simd_reduce_min(index_select)
-					return -1 if a[i+index_reduce] < b[i+index_reduce] else +1
+		if n > 64 {
+			if ret := memory_compare_chunks(a, b, 64); ret != 0 {
+				return ret
+			}
+			i := uint(64)
+			when ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2") {
+				for /**/; n-i >= 32; i += 32 {
+					load_a := intrinsics.unaligned_load(cast(^#simd[32]u8)&a[i])
+					load_b := intrinsics.unaligned_load(cast(^#simd[32]u8)&b[i])
+					if intrinsics.simd_reduce_or(intrinsics.simd_lanes_ne(load_a, load_b)) != 0 {
+						break
+					}
 				}
 			}
+			for /**/; n-i >= 16; i += 16 {
+				load_a := intrinsics.unaligned_load(cast(^#simd[16]u8)&a[i])
+				load_b := intrinsics.unaligned_load(cast(^#simd[16]u8)&b[i])
+				if intrinsics.simd_reduce_or(intrinsics.simd_lanes_ne(load_a, load_b)) != 0 {
+					break
+				}
+			}
+			// Fewer than eight bytes left start their chunk early, over bytes already found equal.
+			i = min(i, n-8)
+			return memory_compare_chunks(a[i:], b[i:], n-i)
 		}
 	}
+	return memory_compare_chunks(a, b, n)
+}
 
-	m = (n-i) / 16 * 16
-	for /**/; i < m; i += 16 {
-		load_a := intrinsics.unaligned_load(cast(^#simd[16]u8)&a[i])
-		load_b := intrinsics.unaligned_load(cast(^#simd[16]u8)&b[i])
-		comparison := intrinsics.simd_lanes_ne(load_a, load_b)
-		if intrinsics.simd_reduce_or(comparison) != 0 {
-			sentinel: #simd[16]u8 = u8(0xFF)
-			indices := intrinsics.simd_indices(#simd[16]u8)
-			index_select := intrinsics.simd_select(comparison, indices, sentinel)
-			index_reduce := cast(uint)intrinsics.simd_reduce_min(index_select)
-			return -1 if a[i+index_reduce] < b[i+index_reduce] else +1
-		}
+// Compares `n` bytes eight at a time. Equal chunks are equal in any byte order. The first pair that differs is
+// compared as big-endian numbers, which orders the two by their first differing byte with no need to find where
+// it is. The last chunk is the eight bytes ending at `n`, overlapping bytes already found equal. Fewer than eight
+// bytes go one at a time.
+@(private)
+memory_compare_chunks :: #force_inline proc "contextless" (a, b: [^]byte, n: uint) -> int #no_bounds_check {
+	chunk :: #force_inline proc "contextless" (p: [^]byte) -> u64 {
+		return intrinsics.unaligned_load(cast(^u64)p)
+	}
+	order :: #force_inline proc "contextless" (x, y: u64) -> int {
+		bx := intrinsics.byte_swap(x) when ODIN_ENDIAN == .Little else x
+		by := intrinsics.byte_swap(y) when ODIN_ENDIAN == .Little else y
+		return -1 if bx < by else +1
 	}
 
-	// 64-bit SIMD is faster than using a `uintptr` to detect a difference then
-	// re-iterating with the byte-by-byte loop, at least on AMD64.
-	m = (n-i) / 8 * 8
-	for /**/; i < m; i += 8 {
-		load_a := intrinsics.unaligned_load(cast(^#simd[8]u8)&a[i])
-		load_b := intrinsics.unaligned_load(cast(^#simd[8]u8)&b[i])
-		comparison := intrinsics.simd_lanes_ne(load_a, load_b)
-		if intrinsics.simd_reduce_or(comparison) != 0 {
-			sentinel: #simd[8]u8 = u8(0xFF)
-			indices := intrinsics.simd_indices(#simd[8]u8)
-			index_select := intrinsics.simd_select(comparison, indices, sentinel)
-			index_reduce := cast(uint)intrinsics.simd_reduce_min(index_select)
-			return -1 if a[i+index_reduce] < b[i+index_reduce] else +1
+	if n < 8 {
+		for i in 0..<n {
+			if a[i] != b[i] {
+				return -1 if a[i] < b[i] else +1
+			}
+		}
+		return 0
+	}
+	for i := uint(0); n-i > 8; i += 8 {
+		ca, cb := chunk(a[i:]), chunk(b[i:])
+		if ca != cb {
+			return order(ca, cb)
 		}
 	}
-
-	for /**/; i < n; i += 1 {
-		if a[i] ~ b[i] != 0 {
-			return -1 if int(a[i]) - int(b[i]) < 0 else +1
-		}
+	ca, cb := chunk(a[n-8:]), chunk(b[n-8:])
+	if ca != cb {
+		return order(ca, cb)
 	}
 	return 0
 }
@@ -422,7 +435,7 @@ memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_
 		}
 
 		scanner16: #simd[16]u8
-		m = (n-i) / 16 * 16
+		m = i + (n-i) / 16 * 16
 		for /**/; i < m; i += 16 {
 			load := intrinsics.unaligned_load(cast(^#simd[16]u8)&bytes[i])
 			ne := intrinsics.simd_lanes_ne(scanner16, load)
@@ -431,7 +444,7 @@ memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_
 			}
 		}
 
-		m = (n-i) / size_of(uintptr) * size_of(uintptr)
+		m = i + (n-i) / size_of(uintptr) * size_of(uintptr)
 		for /**/; i < m; i += size_of(uintptr) {
 			if intrinsics.unaligned_load(cast(^uintptr)&bytes[i]) != 0 {
 				return 1
@@ -477,7 +490,7 @@ memory_prefix_length :: proc "contextless" (x, y: rawptr, n: int) -> (idx: int) 
 		}
 	}
 
-	m = (n-i) / 16 * 16
+	m = i + (n-i) / 16 * 16
 	for /**/; i < m; i += 16 {
 		load_a := intrinsics.unaligned_load(cast(^#simd[16]u8)&a[i])
 		load_b := intrinsics.unaligned_load(cast(^#simd[16]u8)&b[i])
@@ -493,7 +506,7 @@ memory_prefix_length :: proc "contextless" (x, y: rawptr, n: int) -> (idx: int) 
 
 	// 64-bit SIMD is faster than using a `uintptr` to detect a difference then
 	// re-iterating with the byte-by-byte loop, at least on AMD64.
-	m = (n-i) / 8 * 8
+	m = i + (n-i) / 8 * 8
 	for /**/; i < m; i += 8 {
 		load_a := intrinsics.unaligned_load(cast(^#simd[8]u8)&a[i])
 		load_b := intrinsics.unaligned_load(cast(^#simd[8]u8)&b[i])
@@ -528,7 +541,9 @@ string_cmp :: proc "contextless" (a, b: string) -> int {
 	x := transmute(Raw_String)a
 	y := transmute(Raw_String)b
 
-	ret := memory_compare(x.data, y.data, min(x.len, y.len))
+	// Every string goes a chunk at a time, which keeps this small enough to inline into each comparison.
+	// That matters more to sorting than the vectors would on long equal stretches.
+	ret := memory_compare_chunks(x.data, y.data, uint(min(x.len, y.len)))
 	if ret == 0 && x.len != y.len {
 		return -1 if x.len < y.len else +1
 	}
@@ -545,11 +560,29 @@ string16_eq :: proc "contextless" (lhs, rhs: string16) -> bool {
 	return #force_inline memory_equal(x.data, y.data, x.len*size_of(u16))
 }
 
+// Compares `n` UTF-16 code units by value. Their bytes compare in another order on little-endian targets, low byte first.
+// Four units at a time are checked for equality as one 64-bit load. The first that differ are compared as numbers.
+@(private)
+memory_compare_u16 :: #force_inline proc "contextless" (a, b: [^]u16, n: int) -> int #no_bounds_check {
+	i := 0
+	for /**/; n-i >= 4; i += 4 {
+		if intrinsics.unaligned_load(cast(^u64)&a[i]) != intrinsics.unaligned_load(cast(^u64)&b[i]) {
+			break
+		}
+	}
+	for /**/; i < n; i += 1 {
+		if a[i] != b[i] {
+			return -1 if a[i] < b[i] else +1
+		}
+	}
+	return 0
+}
+
 string16_cmp :: proc "contextless" (a, b: string16) -> int {
 	x := transmute(Raw_String16)a
 	y := transmute(Raw_String16)b
 
-	ret := memory_compare(x.data, y.data, min(x.len, y.len)*size_of(u16))
+	ret := memory_compare_u16(x.data, y.data, min(x.len, y.len))
 	if ret == 0 && x.len != y.len {
 		return -1 if x.len < y.len else +1
 	}
@@ -569,20 +602,215 @@ string16_le :: #force_inline proc "contextless" (a, b: string16) -> bool { retur
 string16_ge :: #force_inline proc "contextless" (a, b: string16) -> bool { return string16_cmp(a, b) >= 0 }
 
 
+@(no_sanitize_address)
 cstring_len :: proc "contextless" (s: cstring) -> int {
-	p0 := uintptr((^byte)(s))
-	p := p0
-	for p != 0 && (^byte)(p)^ != 0 {
-		p += 1
+	if s == nil {
+		return 0
 	}
-	return int(p - p0)
+
+	start := uintptr(rawptr(s))
+	when HAS_HARDWARE_SIMD {
+		AVX2  :: ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2")
+		V     :: #simd[32]u8 when AVX2 else #simd[16]u8
+		M     :: u32         when AVX2 else u16
+		SIZE  :: size_of(V)
+		CHUNK :: 4*SIZE
+
+		p := start &~ (SIZE-1)
+		v := intrinsics.volatile_load((^V)(p))
+		m := transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+		when AVX2 {
+			m &= ~M(0) << (start-p)
+			if m != 0 {
+				return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
+			}
+		} else {
+			m >>= (start-p)
+			if m != 0 {
+				return int(intrinsics.count_trailing_zeros(m))
+			}
+		}
+
+		when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
+			for _ in 0..<128/SIZE-1 {
+				p += SIZE
+				v = intrinsics.volatile_load((^V)(p))
+				m = transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+				if m != 0 {
+					return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
+				}
+			}
+
+			p = (p + SIZE) &~ (CHUNK-1)
+			for {
+				a := intrinsics.volatile_load((^V)(p))
+				b := intrinsics.volatile_load((^V)(p+SIZE))
+				c := intrinsics.volatile_load((^V)(p+2*SIZE))
+				d := intrinsics.volatile_load((^V)(p+3*SIZE))
+				lowest := intrinsics.simd_min(intrinsics.simd_min(a, b), intrinsics.simd_min(c, d))
+				if intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(lowest, 0)) != {} {
+					when AVX2 {
+						ma := u64(transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(a, 0)))
+						mb := u64(transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(b, 0)))
+						low := ma | mb<<SIZE
+						if low != 0 {
+							return int(p - start + uintptr(intrinsics.count_trailing_zeros(low)))
+						}
+
+						mc := u64(transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(c, 0)))
+						md := u64(transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(d, 0)))
+						high := mc | md<<SIZE
+						return int(p + 2*SIZE - start + uintptr(intrinsics.count_trailing_zeros(high)))
+					} else {
+						break
+					}
+				}
+				p += CHUNK
+			}
+
+			for {
+				v = intrinsics.volatile_load((^V)(p))
+				m = transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+				if m != 0 {
+					return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
+				}
+				p += SIZE
+			}
+		} else {
+			for m == 0 {
+				p += SIZE
+				v = intrinsics.volatile_load((^V)(p))
+				m = transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+			}
+			return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
+		}
+	} else when ODIN_ENDIAN == .Little {
+		ONES  :: ~uintptr(0) / 0xff
+		HIGHS :: ONES << 7
+
+		p := start &~ (size_of(uintptr)-1)
+		w := intrinsics.volatile_load((^uintptr)(p))
+		w |= (uintptr(1) << ((start-p)*8)) - 1
+		z := (w - ONES) &~ w & HIGHS
+		for z == 0 {
+			p += size_of(uintptr)
+			w = intrinsics.volatile_load((^uintptr)(p))
+			z = (w - ONES) &~ w & HIGHS
+		}
+		return int(p - start + uintptr(intrinsics.count_trailing_zeros(z) >> 3))
+	} else {
+		p := start
+		for p != 0 && (^byte)(p)^ != 0 {
+			p += 1
+		}
+		return int(p - start)
+	}
 }
 
+@(no_sanitize_address)
 cstring16_len :: proc "contextless" (s: cstring16) -> int {
+	if s == nil {
+		return 0
+	}
+
+	start := uintptr(rawptr(s))
+	if start%2 == 0 {
+		when HAS_HARDWARE_SIMD {
+			AVX2  :: ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2")
+			V     :: #simd[16]u16 when AVX2 else #simd[8]u16
+			M     :: u16          when AVX2 else u8
+			SIZE  :: size_of(V)
+			LANES :: SIZE/size_of(u16)
+			CHUNK :: 4*SIZE
+
+			p := start &~ (SIZE-1)
+			v := intrinsics.volatile_load((^V)(p))
+			m := transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+			when AVX2 {
+				m &= ~M(0) << ((start-p)/2)
+				if m != 0 {
+					return int(p - start + 2*uintptr(intrinsics.count_trailing_zeros(m))) / 2
+				}
+			} else {
+				m >>= (start-p)/2
+				if m != 0 {
+					return int(intrinsics.count_trailing_zeros(m))
+				}
+			}
+
+			when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
+				for _ in 0..<128/SIZE-1 {
+					p += SIZE
+					v = intrinsics.volatile_load((^V)(p))
+					m = transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+					if m != 0 {
+						return int(p - start + 2*uintptr(intrinsics.count_trailing_zeros(m))) / 2
+					}
+				}
+
+				p = (p + SIZE) &~ (CHUNK-1)
+				for {
+					a := intrinsics.volatile_load((^V)(p))
+					b := intrinsics.volatile_load((^V)(p+SIZE))
+					c := intrinsics.volatile_load((^V)(p+2*SIZE))
+					d := intrinsics.volatile_load((^V)(p+3*SIZE))
+					lowest := intrinsics.simd_min(intrinsics.simd_min(a, b), intrinsics.simd_min(c, d))
+					if intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(lowest, 0)) != {} {
+						when AVX2 {
+							ma := u64(transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(a, 0)))
+							mb := u64(transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(b, 0)))
+							low := ma | mb<<LANES
+							if low != 0 {
+								return int(p - start + 2*uintptr(intrinsics.count_trailing_zeros(low))) / 2
+							}
+
+							mc := u64(transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(c, 0)))
+							md := u64(transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(d, 0)))
+							high := mc | md<<LANES
+							return int(p + 2*SIZE - start + 2*uintptr(intrinsics.count_trailing_zeros(high))) / 2
+						} else {
+							break
+						}
+					}
+					p += CHUNK
+				}
+
+				for {
+					v = intrinsics.volatile_load((^V)(p))
+					m = transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+					if m != 0 {
+						return int(p - start + 2*uintptr(intrinsics.count_trailing_zeros(m))) / 2
+					}
+					p += SIZE
+				}
+			} else {
+				for m == 0 {
+					p += SIZE
+					v = intrinsics.volatile_load((^V)(p))
+					m = transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+				}
+				return int(p - start + 2*uintptr(intrinsics.count_trailing_zeros(m))) / 2
+			}
+		} else when ODIN_ENDIAN == .Little {
+			ONES  :: ~uintptr(0) / 0xffff
+			HIGHS :: ONES << 15
+
+			p := start &~ (size_of(uintptr)-1)
+			w := intrinsics.volatile_load((^uintptr)(p))
+			w |= (uintptr(1) << ((start-p)*8)) - 1
+			z := (w - ONES) &~ w & HIGHS
+			for z == 0 {
+				p += size_of(uintptr)
+				w = intrinsics.volatile_load((^uintptr)(p))
+				z = (w - ONES) &~ w & HIGHS
+			}
+			return int(p - start + 2*uintptr(intrinsics.count_trailing_zeros(z) >> 4)) / 2
+		}
+	}
+
 	p := ([^]u16)(s)
 	n := 0
-	for p != nil && p[0] != 0 {
-		p = p[1:]
+	for p[n] != 0 {
 		n += 1
 	}
 	return n
@@ -607,23 +835,29 @@ cstring16_to_string16 :: proc "contextless" (s: cstring16) -> string16 {
 }
 
 
+@(no_sanitize_address)
 cstring_eq :: proc "contextless" (lhs, rhs: cstring) -> bool {
-	x := ([^]byte)(lhs)
-	y := ([^]byte)(rhs)
-	if x == y {
-		return true
+	when HAS_HARDWARE_SIMD && (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) {
+		return cstring_cmp(lhs, rhs) == 0
+	} else {
+		x := ([^]byte)(lhs)
+		y := ([^]byte)(rhs)
+		if x == y {
+			return true
+		}
+		if (x == nil) ~ (y == nil) {
+			return false
+		}
+		xn := cstring_len(lhs)
+		yn := cstring_len(rhs)
+		if xn != yn {
+			return false
+		}
+		return #force_inline memory_equal(x, y, xn)
 	}
-	if (x == nil) ~ (y == nil) {
-		return false
-	}
-	xn := cstring_len(lhs)
-	yn := cstring_len(rhs)
-	if xn != yn {
-		return false
-	}
-	return #force_inline memory_equal(x, y, xn)
 }
 
+@(no_sanitize_address)
 cstring_cmp :: proc "contextless" (lhs, rhs: cstring) -> int {
 	x := ([^]byte)(lhs)
 	y := ([^]byte)(rhs)
@@ -633,13 +867,55 @@ cstring_cmp :: proc "contextless" (lhs, rhs: cstring) -> int {
 	if (x == nil) ~ (y == nil) {
 		return -1 if x == nil else +1
 	}
-	xn := cstring_len(lhs)
-	yn := cstring_len(rhs)
-	ret := memory_compare(x, y, min(xn, yn))
-	if ret == 0 && xn != yn {
-		return -1 if xn < yn else +1
+
+	when HAS_HARDWARE_SIMD && (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) {
+		AVX2 :: ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2")
+		V    :: #simd[32]u8 when AVX2 else #simd[16]u8
+		M    :: u32         when AVX2 else u16
+		SIZE :: size_of(V)
+		PAGE :: 4096
+
+		Unaligned :: struct #align(1) {
+			v: V,
+		}
+
+		i := 0
+		scan: for {
+			room := min(PAGE - uintptr(&x[i])%PAGE, PAGE - uintptr(&y[i])%PAGE)
+			for /**/; room >= SIZE; room -= SIZE {
+				a := intrinsics.volatile_load((^Unaligned)(&x[i]))
+				b := intrinsics.volatile_load((^Unaligned)(&y[i]))
+				same := intrinsics.simd_min(a.v, intrinsics.simd_lanes_eq(a.v, b.v))
+				m := transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(same, 0))
+				if m != 0 {
+					i += int(intrinsics.count_trailing_zeros(m))
+					break scan
+				}
+				i += SIZE
+			}
+
+			for _ in 0..<room {
+				if x[i] != y[i] || x[i] == 0 {
+					break scan
+				}
+				i += 1
+			}
+		}
+
+		switch {
+		case x[i] < y[i]: return -1
+		case x[i] > y[i]: return +1
+		}
+		return 0
+	} else {
+		xn := cstring_len(lhs)
+		yn := cstring_len(rhs)
+		ret := memory_compare(x, y, min(xn, yn))
+		if ret == 0 && xn != yn {
+			return -1 if xn < yn else +1
+		}
+		return ret
 	}
-	return ret
 }
 
 cstring_ne :: #force_inline proc "contextless" (a, b: cstring) -> bool { return !cstring_eq(a, b) }
@@ -648,6 +924,7 @@ cstring_gt :: #force_inline proc "contextless" (a, b: cstring) -> bool { return 
 cstring_le :: #force_inline proc "contextless" (a, b: cstring) -> bool { return cstring_cmp(a, b) <= 0 }
 cstring_ge :: #force_inline proc "contextless" (a, b: cstring) -> bool { return cstring_cmp(a, b) >= 0 }
 
+@(no_sanitize_address)
 cstring16_eq :: proc "contextless" (lhs, rhs: cstring16) -> bool {
 	x := ([^]u16)(lhs)
 	y := ([^]u16)(rhs)
@@ -657,14 +934,53 @@ cstring16_eq :: proc "contextless" (lhs, rhs: cstring16) -> bool {
 	if (x == nil) ~ (y == nil) {
 		return false
 	}
-	xn := cstring16_len(lhs)
-	yn := cstring16_len(rhs)
-	if xn != yn {
-		return false
+
+	when HAS_HARDWARE_SIMD && (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) {
+		AVX2  :: ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2")
+		V     :: #simd[16]u16 when AVX2 else #simd[8]u16
+		M     :: u16          when AVX2 else u8
+		SIZE  :: size_of(V)
+		LANES :: SIZE/size_of(u16)
+		PAGE  :: 4096
+
+		Unaligned :: struct #align(1) {
+			v: V,
+		}
+
+		i := 0
+		scan: for {
+			room := min(PAGE - uintptr(&x[i])%PAGE, PAGE - uintptr(&y[i])%PAGE)
+			for /**/; room >= SIZE; room -= SIZE {
+				a := intrinsics.volatile_load((^Unaligned)(&x[i]))
+				b := intrinsics.volatile_load((^Unaligned)(&y[i]))
+				same := intrinsics.simd_min(a.v, intrinsics.simd_lanes_eq(a.v, b.v))
+				m := transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(same, 0))
+				if m != 0 {
+					i += int(intrinsics.count_trailing_zeros(m))
+					break scan
+				}
+				i += LANES
+			}
+
+			for _ in 0..<(room+1)/2 {
+				if x[i] != y[i] || x[i] == 0 {
+					break scan
+				}
+				i += 1
+			}
+		}
+		return x[i] == y[i]
+	} else {
+		xn := cstring16_len(lhs)
+		yn := cstring16_len(rhs)
+		if xn != yn {
+			return false
+		}
+		return #force_inline memory_equal(x, y, xn*size_of(u16))
 	}
-	return #force_inline memory_equal(x, y, xn*size_of(u16))
 }
 
+@(no_sanitize_address)
 cstring16_cmp :: proc "contextless" (lhs, rhs: cstring16) -> int {
 	x := ([^]u16)(lhs)
 	y := ([^]u16)(rhs)
@@ -676,7 +992,7 @@ cstring16_cmp :: proc "contextless" (lhs, rhs: cstring16) -> int {
 	}
 	xn := cstring16_len(lhs)
 	yn := cstring16_len(rhs)
-	ret := memory_compare(x, y, min(xn, yn)*size_of(u16))
+	ret := memory_compare_u16(x, y, min(xn, yn))
 	if ret == 0 && xn != yn {
 		return -1 if xn < yn else +1
 	}

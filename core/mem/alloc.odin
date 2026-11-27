@@ -1,5 +1,6 @@
 package mem
 
+import "base:intrinsics"
 import "base:runtime"
 
 //NOTE(bill, 2019-12-31): These are defined in `package runtime` as they are used in the `context`. This is to prevent an import definition cycle.
@@ -906,7 +907,13 @@ make_over_aligned :: proc(
 	allocator: runtime.Allocator,
 	loc := #caller_location,
 ) -> (slice: T, original_data: []byte, err: Allocator_Error) {
-	size := size_of(E)*len + alignment-1
+	elem_size := size_of(E)
+	elems_size, mul_overflow := intrinsics.overflow_mul(elem_size, len)
+	size, add_overflow := intrinsics.overflow_add(elems_size, alignment-1)
+	if mul_overflow || add_overflow {
+		err = .Out_Of_Memory
+		return
+	}
 	original_data, err = runtime.make([]byte, size, allocator, loc)
 	if err == nil {
 		ptr := align_forward(raw_data(original_data), uintptr(alignment))

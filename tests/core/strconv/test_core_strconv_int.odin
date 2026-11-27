@@ -58,7 +58,6 @@ ref_write_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit
 		switch base {
 		case  2: i -= 1; a[i] = 'b'
 		case  8: i -= 1; a[i] = 'o'
-		case 10: i -= 1; a[i] = 'd'
 		case 12: i -= 1; a[i] = 'z'
 		case 16: i -= 1; a[i] = 'x'
 		case: ok = false
@@ -279,11 +278,13 @@ test_write_bits_short_digits :: proc(t: ^testing.T) {
 	}
 }
 
-@(test)
-test_write_bits_short_digits_panic :: proc(t: ^testing.T) {
-	buf: [140]byte
-	testing.expect_assert(t, "10 is out of range 0..<10")
-	_ = strconv.write_bits(buf[:], 10, 16, false, 64, "0123456789", {})
+when !testing.INLINE {
+	@(test)
+	test_write_bits_short_digits_panic :: proc(t: ^testing.T) {
+		buf: [140]byte
+		testing.expect_assert(t, "10 is out of range 0..<10")
+		_ = strconv.write_bits(buf[:], 10, 16, false, 64, "0123456789", {})
+	}
 }
 
 @(test)

@@ -150,7 +150,7 @@ _get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, er
 
 	cwd: cstring
 	for ; cwd == nil; size *= 2 {
-		resize(&buf, size)
+		resize(&buf, size) or_return
 
 		cwd = posix.getcwd(raw_data(buf), len(buf))
 		if cwd == nil && posix.errno() != .ERANGE {

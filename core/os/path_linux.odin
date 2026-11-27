@@ -59,7 +59,7 @@ _mkdir_all :: proc(path: string, perm: Permissions) -> Error {
 	}
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	// need something we can edit, and use to generate cstrings
-	path_bytes := make([]u8, len(path) + 1, temp_allocator)
+	path_bytes := make([]u8, len(path) + 1, temp_allocator) or_return
 
 	// zero terminate the byte slice to make it a valid cstring
 	copy(path_bytes, path)
@@ -176,9 +176,13 @@ _get_working_directory :: proc(allocator: runtime.Allocator) -> (path: string, e
 			return string(buf[:n-1]), nil
 		}
 		if errno != .ERANGE {
+			delete(buf)
 			return "", _get_platform_error(errno)
 		}
-		resize(&buf, len(buf)+PATH_MAX) or_return
+		if resize_err := resize(&buf, len(buf)+PATH_MAX); resize_err != nil {
+			delete(buf)
+			return "", resize_err
+		}
 	}
 	unreachable()
 }
@@ -217,7 +221,7 @@ _get_full_path :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (fullpath:
 
 	strconv.write_int(buf[len(PROC_FD_PATH):], i64(fd), 10)
 
-	if fullpath, err = _read_link_cstr(cstring(&buf[0]), allocator); err != nil || fullpath[0] != '/' {
+	if fullpath, err = _read_link_cstr(cstring(&buf[0]), allocator); err != nil || len(fullpath) == 0 || fullpath[0] != '/' {
 		delete(fullpath, allocator)
 		fullpath = ""
 	}
@@ -232,7 +236,7 @@ _get_absolute_path :: proc(path: string, allocator: runtime.Allocator) -> (absol
 
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
-	fd, errno := linux.open(clone_to_cstring(path, temp_allocator) or_return, {})
+	fd, errno := linux.open(clone_to_cstring(rel, temp_allocator) or_return, {.PATH, .CLOEXEC})
 	if errno != nil {
 		err = _get_platform_error(errno)
 		return

@@ -25,6 +25,7 @@ gb_internal GB_COMPARE_PROC(lb_polymorphic_instance_cmp) {
 }
 
 gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgType const *arg);
+gb_internal LLVMValueRef lb_split_vector(lbProcedure *p, LLVMValueRef value, LLVMTypeRef type);
 
 // NOTE(bill): @RVO Check if a call expression returns by sret with a return type matching dst_type.
 // Returns the callee's function type if eligible for copy elision, nullptr otherwise.
@@ -441,9 +442,7 @@ gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_
 	lbValue count = {};
 	Type *expr_type = nullptr;
 	if (is_soa_elem) {
-		Type *soa = base_type(type_deref(soa_elem->addr.type));
-		GB_ASSERT(soa->kind == Type_Struct && soa->Struct.soa_kind != StructSoa_None);
-		expr_type = base_type(soa->Struct.soa_elem);
+		expr_type = base_type(lb_soa_variable_elem_type(*soa_elem));
 	} else {
 		expr_type = base_type(type_deref(expr.type));
 	}
@@ -538,7 +537,7 @@ gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_
 	case Type_Array: {
 		if (val_type != nullptr) {
 			if (is_soa_elem) {
-				lbValue ptr = lb_soa_array_component_elem_ptr(p, soa_elem->addr, idx, soa_elem->soa.index, expr_type->Array.count);
+				lbValue ptr = lb_soa_array_component_elem_ptr(p, *soa_elem, idx, expr_type->Array.count);
 				lbAddr component = lb_addr_soa_field_elem(ptr);
 				val = lb_emit_load(p, component.addr);
 			} else {
@@ -1208,6 +1207,21 @@ gb_internal void lb_build_range_enum(lbProcedure *p, Type *enum_type, Type *val_
 	if (done_) *done_ = done;
 }
 
+// The body of a range statement whose values are stored, and its jump back to `loop`, ending in its `done` block
+gb_internal void lb_build_range_stmt_body(lbProcedure *p, AstRangeStmt *rs, lbBlock *loop, lbBlock *done) {
+	lb_push_target_list(p, rs->label, done, loop, nullptr);
+
+	lb_build_stmt(p, rs->body);
+
+	lb_close_scope(p, lbDeferExit_Default, nullptr, rs->body);
+	lb_pop_target_list(p);
+	if (p->debug_info != nullptr) {
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, rs->body));
+	}
+	lb_emit_jump(p, loop);
+	lb_start_block(p, done);
+}
+
 gb_internal void lb_build_range_tuple(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
 	Ast *expr = unparen_expr(rs->expr);
 
@@ -1254,65 +1268,113 @@ gb_internal void lb_build_range_tuple(lbProcedure *p, AstRangeStmt *rs, Scope *s
 		}
 	}
 
-	lb_push_target_list(p, rs->label, done, loop, nullptr);
-
-	lb_build_stmt(p, rs->body);
-
-	lb_close_scope(p, lbDeferExit_Default, nullptr, rs->body);
-	lb_pop_target_list(p);
-	if (p->debug_info != nullptr) {
-		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, rs->body));
-	}
-	lb_emit_jump(p, loop);
-	lb_start_block(p, done);
+	lb_build_range_stmt_body(p, rs, loop, done);
 }
 
-gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
-	Ast *expr = unparen_expr(rs->expr);
-	TypeAndValue tav = type_and_value_of_expr(expr);
+// The check that all the memory a range loop's body writes is apart from the bytes of the array's header it reads,
+// and the blocks of the loop over a snapshot of the header and of the usual loop it chooses between, see `escape_range_snapshots`
+struct lbRangeSnapshot {
+	lbValue  lo;
+	lbValue  hi;
+	lbValue  apart;  // nullptr while nothing is checked
+	lbBlock *reload; // the usual loop's, when something is checked
+	lbBlock *after;
+};
 
+// Checks the `size` bytes at `ptr` are apart from the header
+gb_internal void lb_range_snapshot_check(lbProcedure *p, lbRangeSnapshot *s, lbValue ptr, lbValue size) {
+	lbValue lo = lb_emit_conv(p, ptr, t_uintptr);
+	lbValue hi = lb_emit_arith(p, Token_Add, lo, size, t_uintptr);
+	LLVMValueRef apart = LLVMBuildOr(p->builder, lb_emit_comp(p, Token_LtEq, hi, s->lo).value, lb_emit_comp(p, Token_LtEq, s->hi, lo).value, "");
+	if (s->apart.value != nullptr) {
+		apart = LLVMBuildAnd(p->builder, s->apart.value, apart, "");
+	}
+	s->apart = {apart, t_llvm_bool};
+}
+
+// Checks the outer locals and globals the body writes too, then starts the loop over the snapshot when all is apart from the header,
+// branching to the usual loop otherwise
+gb_internal void lb_range_snapshot_begin(lbProcedure *p, lbRangeSnapshot *s, AstRangeSnapshot *snapshot) {
+	for (Entity *e : snapshot->outer) {
+		lbValue ptr = lb_addr_get_ptr(p, lb_build_addr_from_entity(p, e, nullptr));
+		lb_range_snapshot_check(p, s, ptr, lb_const_int(p->module, t_uintptr, type_size_of(e->type)));
+	}
+	if (s->apart.value == nullptr) {
+		return;
+	}
+	lbBlock *fast = lb_create_block(p, "for.snapshot");
+	s->reload = lb_create_block(p, "for.reload");
+	s->after  = lb_create_block(p, "for.after");
+	lb_emit_if(p, s->apart, fast, s->reload);
+	lb_start_block(p, fast);
+}
+
+// Ends the loop over the snapshot, and starts the usual loop with the body built again in the range statement's scope,
+// unless nothing was checked
+gb_internal bool lb_range_snapshot_reload(lbProcedure *p, lbRangeSnapshot *s, Scope *scope) {
+	if (s->reload == nullptr) {
+		return false;
+	}
+	lb_emit_jump(p, s->after);
+	lb_open_scope(p, scope);
+	lb_start_block(p, s->reload);
+	return true;
+}
+
+// A range loop over `array`, a `[dynamic]T` or `[dynamic; N]T`, over a slice of its elements made before the loop,
+// see `escape_range_snapshots`. It falls back to the usual loop when what the body writes may hold the header.
+gb_internal void lb_build_range_stmt_snapshot(lbProcedure *p, AstRangeStmt *rs, Scope *scope, lbValue array,
+                                              Ast *val0, Ast *val1, Type *val0_type, Type *val1_type) {
+	lbModule *m = p->module;
+	Type *et = base_type(type_deref(array.type));
+	bool inline_elems = et->kind == Type_FixedCapacityDynamicArray;
+	Type *elem_type   = inline_elems ? et->FixedCapacityDynamicArray.elem : et->DynamicArray.elem;
+
+	lbValue len_ptr = lb_emit_struct_ep(p, array, 1);
+	lbValue data    = lb_emit_struct_ep(p, array, 0);
+	data = inline_elems ? lb_emit_array_epi(p, data, 0) : lb_emit_load(p, data);
+	lbValue len = lb_emit_load(p, len_ptr);
+	lbAddr slice = lb_add_local_generated(p, alloc_type_slice(elem_type), false);
+	lb_fill_slice(p, slice, data, len);
+
+	// NOTE(bill): the loop reads the data and the length, or only the length of inline elements, which they never hold
+	lbRangeSnapshot s = {};
+	s.lo = lb_emit_conv(p, inline_elems ? len_ptr : array, t_uintptr);
+	s.hi = lb_emit_arith(p, Token_Add, lb_emit_conv(p, len_ptr, t_uintptr), lb_const_int(m, t_uintptr, type_size_of(t_int)), t_uintptr);
+	if (rs->snapshot->writes_elems && !inline_elems) {
+		lbValue size = lb_emit_arith(p, Token_Mul, lb_emit_conv(p, len, t_uintptr), lb_const_int(m, t_uintptr, type_size_of(elem_type)), t_uintptr);
+		lb_range_snapshot_check(p, &s, data, size);
+	}
+	lb_range_snapshot_begin(p, &s, rs->snapshot);
+
+	lbValue val = {};
+	lbValue key = {};
+	lbBlock *loop = nullptr;
+	lbBlock *done = nullptr;
+	lb_build_range_indexed(p, lb_addr_load(p, slice), val0_type, lb_emit_struct_ep(p, slice.addr, 1), &val, &key, &loop, &done, rs->reverse);
+	if (val0_type) lb_store_range_stmt_val(p, val0, val);
+	if (val1_type) lb_store_range_stmt_val(p, val1, key);
+	lb_build_range_stmt_body(p, rs, loop, done);
+	if (lb_range_snapshot_reload(p, &s, scope)) {
+		lb_build_range_indexed(p, array, val0_type, len_ptr, &val, &key, &loop, &done, rs->reverse);
+		if (val0_type) lb_store_range_stmt_val(p, val0, val);
+		if (val1_type) lb_store_range_stmt_val(p, val1, key);
+		lb_build_range_stmt_body(p, rs, loop, done);
+		lb_emit_jump(p, s.after);
+		lb_start_block(p, s.after);
+	}
+}
+
+// The loop of a range statement over the `count` elements of an #soa array, reached through the columns of the header at `container`
+gb_internal void lb_build_range_soa_loop(lbProcedure *p, AstRangeStmt *rs, lbValue container, lbValue count,
+                                         Ast *val0, Ast *val1, Type *val0_type, Type *val1_type) {
 	lbBlock *loop = nullptr;
 	lbBlock *body = nullptr;
 	lbBlock *done = nullptr;
 
-	bool is_reverse = rs->reverse;
-
-	lb_open_scope(p, scope);
-
-	if (rs->init != nullptr) {
-		lb_build_stmt(p, rs->init);
-	}
-
-	Ast *val0 = rs->vals.count > 0 ? lb_strip_and_prefix(rs->vals[0]) : nullptr;
-	Ast *val1 = rs->vals.count > 1 ? lb_strip_and_prefix(rs->vals[1]) : nullptr;
-	Type *val_types[2] = {};
-	if (val0 != nullptr && !is_blank_ident(val0)) {
-		val_types[0] = type_of_expr(val0);
-	}
-	if (val1 != nullptr && !is_blank_ident(val1)) {
-		val_types[1] = type_of_expr(val1);
-	}
-
-
-
-	lbAddr array = lb_build_addr(p, expr);
-	if (is_type_pointer(lb_addr_type(array))) {
-		array = lb_addr(lb_addr_load(p, array));
-	}
-	lbValue count = lb_soa_struct_len(p, lb_addr_load(p, array));
-
-
 	lbAddr index = lb_add_local_generated(p, t_int, false);
 
-	if (rs->label != nullptr && p->debug_info != nullptr) {
-		lbBlock *label = lb_create_block(p, "for.soa.label");
-		lb_emit_jump(p, label);
-		lb_start_block(p, label);
-
-		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, rs->label));
-		lb_add_debug_label(p, rs->label, label);
-	}
-	if (!is_reverse) {
+	if (!rs->reverse) {
 		/*
 			for x, i in array {
 				...
@@ -1378,35 +1440,88 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 	lb_start_block(p, body);
 
 
-	if (val_types[0]) {
+	if (val0_type) {
 		Entity *e = entity_of_node(val0);
 		if (e != nullptr) {
-			lbAddr soa_val = lb_addr_soa_variable(array.addr, lb_addr_load(p, index), nullptr);
+			lbAddr soa_val = lb_addr_soa_variable(container, lb_addr_load(p, index), nullptr);
 			map_set(&p->module->soa_values, e, soa_val);
 			if (p->debug_info != nullptr && rs->vals[0]->kind == Ast_Ident) {
 				// NOTE(bill): the element has no memory of its own meaning a debugger is given a copy made each iteration
-				lbAddr copy = lb_add_local_generated(p, val_types[0], false);
+				lbAddr copy = lb_add_local_generated(p, val0_type, false);
 				lb_addr_store(p, copy, lb_addr_load(p, soa_val));
-				lb_add_debug_local_variable(p, copy.addr.value, val_types[0], e->token);
+				lb_add_debug_local_variable(p, copy.addr.value, val0_type, e->token);
 			}
 		}
 	}
-	if (val_types[1]) {
+	if (val1_type) {
 		lb_store_range_stmt_val(p, val1, lb_addr_load(p, index));
 	}
 
-	lb_push_target_list(p, rs->label, done, loop, nullptr);
+	lb_build_range_stmt_body(p, rs, loop, done);
+}
 
-	lb_build_stmt(p, rs->body);
+gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
+	Ast *expr = unparen_expr(rs->expr);
 
-	lb_close_scope(p, lbDeferExit_Default, nullptr, rs->body);
-	lb_pop_target_list(p);
-	if (p->debug_info != nullptr) {
-		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, rs->body));
+	lb_open_scope(p, scope);
+
+	if (rs->init != nullptr) {
+		lb_build_stmt(p, rs->init);
 	}
-	lb_emit_jump(p, loop);
-	lb_start_block(p, done);
 
+	Ast *val0 = rs->vals.count > 0 ? lb_strip_and_prefix(rs->vals[0]) : nullptr;
+	Ast *val1 = rs->vals.count > 1 ? lb_strip_and_prefix(rs->vals[1]) : nullptr;
+	Type *val0_type = nullptr;
+	Type *val1_type = nullptr;
+	if (val0 != nullptr && !is_blank_ident(val0)) {
+		val0_type = type_of_expr(val0);
+	}
+	if (val1 != nullptr && !is_blank_ident(val1)) {
+		val1_type = type_of_expr(val1);
+	}
+
+	lbAddr array = lb_build_addr(p, expr);
+	if (is_type_pointer(lb_addr_type(array))) {
+		array = lb_addr(lb_addr_load(p, array));
+	}
+	lbValue count = lb_soa_struct_len(p, lb_addr_get_ptr(p, array));
+
+	if (rs->label != nullptr && p->debug_info != nullptr) {
+		lbBlock *label = lb_create_block(p, "for.soa.label");
+		lb_emit_jump(p, label);
+		lb_start_block(p, label);
+
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, rs->label));
+		lb_add_debug_label(p, rs->label, label);
+	}
+	if (rs->snapshot == nullptr) {
+		lb_build_range_soa_loop(p, rs, array.addr, count, val0, val1, val0_type, val1_type);
+		return;
+	}
+
+	// NOTE(bill): the loop reads the columns of the header for each field of an element, and the length once before it
+	lbModule *m = p->module;
+	i32 columns = cast(i32)soa_field_count(lb_addr_type(array));
+	lbAddr copy = lb_add_local_generated(p, lb_addr_type(array), false);
+	lb_addr_store(p, copy, lb_addr_load(p, array));
+
+	lbRangeSnapshot s = {};
+	s.lo = lb_emit_conv(p, array.addr, t_uintptr);
+	s.hi = lb_emit_conv(p, lb_emit_struct_ep(p, array.addr, columns), t_uintptr);
+	lbValue len = lb_emit_conv(p, count, t_uintptr);
+	for (i32 i : rs->snapshot->columns) {
+		lbValue column = lb_emit_load(p, lb_emit_struct_ep(p, copy.addr, i));
+		lbValue size   = lb_emit_arith(p, Token_Mul, len, lb_const_int(m, t_uintptr, type_size_of(type_deref(column.type, true))), t_uintptr);
+		lb_range_snapshot_check(p, &s, column, size);
+	}
+	lb_range_snapshot_begin(p, &s, rs->snapshot);
+
+	lb_build_range_soa_loop(p, rs, copy.addr, count, val0, val1, val0_type, val1_type);
+	if (lb_range_snapshot_reload(p, &s, scope)) {
+		lb_build_range_soa_loop(p, rs, array.addr, count, val0, val1, val0_type, val1_type);
+		lb_emit_jump(p, s.after);
+		lb_start_block(p, s.after);
+	}
 }
 
 gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
@@ -1537,23 +1652,17 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			lb_build_range_indexed(p, array, val0_type, count_ptr.addr, &val, &key, &loop, &done, rs->reverse);
 			break;
 		}
-		case Type_FixedCapacityDynamicArray: {
-			lbValue array = lb_range_addr_get_ptr(p, lb_build_addr(p, expr));
-			if (is_type_pointer(type_deref(array.type))) {
-				array = lb_emit_load(p, array);
-			}
-			lbValue count_ptr = lb_emit_struct_ep(p, array, 1);
-			lb_build_range_indexed(p, array, val0_type, count_ptr, &val, &key, &loop, &done, rs->reverse);
-			break;
-		}
+		case Type_FixedCapacityDynamicArray:
 		case Type_DynamicArray: {
-			lbValue count_ptr = {};
 			lbValue array = lb_range_addr_get_ptr(p, lb_build_addr(p, expr));
 			if (is_type_pointer(type_deref(array.type))) {
 				array = lb_emit_load(p, array);
 			}
-			count_ptr = lb_emit_struct_ep(p, array, 1);
-			lb_build_range_indexed(p, array, val0_type, count_ptr, &val, &key, &loop, &done, rs->reverse);
+			if (rs->snapshot != nullptr) {
+				lb_build_range_stmt_snapshot(p, rs, scope, array, val0, val1, val0_type, val1_type);
+				return;
+			}
+			lb_build_range_indexed(p, array, val0_type, lb_emit_struct_ep(p, array, 1), &val, &key, &loop, &done, rs->reverse);
 			break;
 		}
 		case Type_Slice: {
@@ -1646,25 +1755,9 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 	}
 
 
-	if (is_map) {
-		if (val0_type) lb_store_range_stmt_val(p, val0, key);
-		if (val1_type) lb_store_range_stmt_val(p, val1, val);
-	} else {
-		if (val0_type) lb_store_range_stmt_val(p, val0, val);
-		if (val1_type) lb_store_range_stmt_val(p, val1, key);
-	}
-
-	lb_push_target_list(p, rs->label, done, loop, nullptr);
-
-	lb_build_stmt(p, rs->body);
-
-	lb_close_scope(p, lbDeferExit_Default, nullptr, rs->body);
-	lb_pop_target_list(p);
-	if (p->debug_info != nullptr) {
-		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, rs->body));
-	}
-	lb_emit_jump(p, loop);
-	lb_start_block(p, done);
+	if (val0_type) lb_store_range_stmt_val(p, val0, is_map ? key : val);
+	if (val1_type) lb_store_range_stmt_val(p, val1, is_map ? val : key);
+	lb_build_range_stmt_body(p, rs, loop, done);
 }
 
 gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *scope) {
@@ -2684,18 +2777,15 @@ gb_internal isize lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_val
 }
 
 
-gb_internal bool lb_is_large_plain_load(LLVMValueRef value) {
-	if (!LLVMIsALoadInst(value) || LLVMGetVolatile(value) || LLVMGetOrdering(value) != LLVMAtomicOrderingNotAtomic) {
+gb_internal bool lb_is_large_plain_load(lbModule *m, LLVMValueRef value) {
+	if (!lb_is_plain_load(m, value)) {
 		return false;
 	}
 	return lb_sizeof(LLVMTypeOf(value)) > LB_MAX_STORE_SIZE;
 }
 
 gb_internal bool lb_load_reads_alloca_after(lbProcedure *p, LLVMValueRef load, LLVMValueRef decl_marker) {
-	LLVMValueRef base = LLVMGetOperand(load, 0);
-	while (LLVMIsAGetElementPtrInst(base) || LLVMIsABitCastInst(base) || LLVMIsAAddrSpaceCastInst(base)) {
-		base = LLVMGetOperand(base, 0);
-	}
+	LLVMValueRef base = lb_pointer_base(LLVMGetOperand(load, 0));
 	if (!LLVMIsAAllocaInst(base)) {
 		return false;
 	}
@@ -2825,7 +2915,7 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 		auto large = slice_make<bool>(temporary_allocator(), inits.count);
 		auto plain = slice_make<bool>(temporary_allocator(), inits.count);
 		for_array(i, inits) {
-			if (lvals[i].addr.value == nullptr || !lb_is_large_plain_load(inits[i].value)) {
+			if (lvals[i].addr.value == nullptr || !lb_is_large_plain_load(p->module, inits[i].value)) {
 				continue;
 			}
 			large[i] = true;
@@ -2876,7 +2966,7 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, Toke
 		if (res.value != nullptr) {
 			LLVMValueRef res_val = res.value;
 			i64 sz = type_size_of(res.type);
-			if (LLVMIsALoadInst(res_val) && sz > build_context.int_size) {
+			if (lb_is_plain_load(p->module, res_val) && sz > build_context.int_size) {
 				lbValue ptr = lb_address_from_load_or_generate_local(p, res);
 				lb_mem_copy_non_overlapping(p, p->return_ptr.addr, ptr, lb_const_int(p->module, t_int, sz));
 			} else {
@@ -2902,6 +2992,9 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, Toke
 
 		if (ft->ret.coerce_offsets.count > 0) {
 			ret_val = lb_coerce_fields_load(p, res, &ft->ret);
+		} else if (ft->ret.split_vector) {
+			ret_val = OdinLLVMBuildTransmute(p, ret_val, ft->ret.type);
+			ret_val = lb_split_vector(p, ret_val, ret_type);
 		} else if (LLVMGetTypeKind(ret_type) == LLVMStructTypeKind) {
 			LLVMTypeRef src_type = LLVMTypeOf(ret_val);
 
@@ -3311,131 +3404,52 @@ gb_internal void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr
 	bool inline_array_arith = lb_can_try_to_inline_array_arith(array_type);
 
 
-	if (lhs.kind == lbAddr_Swizzle) {
+	if (lhs.kind == lbAddr_Swizzle || lhs.kind == lbAddr_SwizzleLarge || lhs.kind == lbAddr_SwizzleSoa) {
+		// NOTE(bill): `x.s op= y` behaves like `x.s = x.s op y`. Every element is loaded before
+		// any store, and a component repeated in the swizzle keeps its last occurrence.
 		GB_ASSERT(is_type_array(lhs_type));
 
-		struct ValueAndIndex {
-			lbValue value;
-			u8      index;
-		};
+		TEMPORARY_ALLOCATOR_GUARD();
 
-		bool indices_handled[4] = {};
-		i32 indices[4] = {};
-		i32 index_count = 0;
-		for (u8 i = 0; i < lhs.swizzle.count; i++) {
-			u8 index = lhs.swizzle.indices[i];
-			if (indices_handled[index]) {
-				continue;
+		isize n = cast(isize)count;
+		auto lhs_ptrs = slice_make<lbValue>(temporary_allocator(), n);
+		auto x_loads  = slice_make<lbValue>(temporary_allocator(), n);
+		auto y_loads  = slice_make<lbValue>(temporary_allocator(), n);
+		auto ops      = slice_make<lbValue>(temporary_allocator(), n);
+
+		switch (lhs.kind) {
+		case lbAddr_Swizzle:
+			GB_ASSERT(lhs.swizzle.count == n);
+			for (isize i = 0; i < n; i++) {
+				lhs_ptrs[i] = lb_emit_array_epi(p, lhs.addr, lhs.swizzle.indices[i]);
 			}
-			indices[index_count++] = index;
+			break;
+		case lbAddr_SwizzleLarge:
+			GB_ASSERT(lhs.swizzle_large.indices.count == n);
+			for (isize i = 0; i < n; i++) {
+				lhs_ptrs[i] = lb_emit_array_epi(p, lhs.addr, lhs.swizzle_large.indices[i]);
+			}
+			break;
+		case lbAddr_SwizzleSoa:
+			GB_ASSERT(lhs.swizzle_soa.indices.count == n);
+			lb_emit_soa_index_bounds_check(p, lhs.addr, lhs.swizzle_soa.index, lhs.swizzle_soa.index_expr);
+			for (isize i = 0; i < n; i++) {
+				lhs_ptrs[i] = lb_soa_field_elem_ptr(p, lhs.addr, lhs.swizzle_soa.indices[i], lhs.swizzle_soa.index);
+			}
+			break;
 		}
 
-		lbValue lhs_ptrs[4] = {};
-		lbValue x_loads[4]  = {};
-		lbValue y_loads[4]  = {};
-		lbValue ops[4]      = {};
-
-		for (i32 i = 0; i < index_count; i++) {
-			lhs_ptrs[i] = lb_emit_array_epi(p, lhs.addr, indices[i]);
-		}
-		for (i32 i = 0; i < index_count; i++) {
+		for (isize i = 0; i < n; i++) {
 			x_loads[i] = lb_emit_load(p, lhs_ptrs[i]);
 		}
-		for (i32 i = 0; i < index_count; i++) {
-			y_loads[i].value = LLVMBuildExtractValue(p->builder, rhs.value, i, "");
+		for (isize i = 0; i < n; i++) {
+			y_loads[i].value = LLVMBuildExtractValue(p->builder, rhs.value, cast(unsigned)i, "");
 			y_loads[i].type = elem_type;
 		}
-		for (i32 i = 0; i < index_count; i++) {
+		for (isize i = 0; i < n; i++) {
 			ops[i] = lb_emit_arith(p, op, x_loads[i], y_loads[i], elem_type);
 		}
-		for (i32 i = 0; i < index_count; i++) {
-			lb_emit_store(p, lhs_ptrs[i], ops[i]);
-		}
-		return;
-	} else if (lhs.kind == lbAddr_SwizzleLarge) {
-		GB_ASSERT(is_type_array(lhs_type));
-
-		struct ValueAndIndex {
-			lbValue value;
-			u32     index;
-		};
-
-		Type *bt = base_type(lhs_type);
-		GB_ASSERT(bt->kind == Type_Array);
-
-		auto indices_handled = slice_make<bool>(temporary_allocator(), bt->Array.count);
-		auto indices = slice_make<i32>(temporary_allocator(), bt->Array.count);
-		i32 index_count = 0;
-		for (i32 index : lhs.swizzle_large.indices) {
-			if (indices_handled[index]) {
-				continue;
-			}
-			indices[index_count++] = index;
-		}
-
-		lbValue lhs_ptrs[4] = {};
-		lbValue x_loads[4]  = {};
-		lbValue y_loads[4]  = {};
-		lbValue ops[4]      = {};
-
-		for (i32 i = 0; i < index_count; i++) {
-			lhs_ptrs[i] = lb_emit_array_epi(p, lhs.addr, indices[i]);
-		}
-		for (i32 i = 0; i < index_count; i++) {
-			x_loads[i] = lb_emit_load(p, lhs_ptrs[i]);
-		}
-		for (i32 i = 0; i < index_count; i++) {
-			y_loads[i].value = LLVMBuildExtractValue(p->builder, rhs.value, i, "");
-			y_loads[i].type = elem_type;
-		}
-		for (i32 i = 0; i < index_count; i++) {
-			ops[i] = lb_emit_arith(p, op, x_loads[i], y_loads[i], elem_type);
-		}
-		for (i32 i = 0; i < index_count; i++) {
-			lb_emit_store(p, lhs_ptrs[i], ops[i]);
-		}
-		return;
-	} else if (lhs.kind == lbAddr_SwizzleSoa) {
-		// the three cases largely mirror each other,
-		// perhaps unify them?
-		GB_ASSERT(is_type_array(lhs_type));
-
-		// the index list may repeat components (and so be longer than 4), but the
-		// element array itself has at most 4, so distinct destinations do fit in [4];
-		// each dest is done on the first occurrence
-		bool indices_handled[4] = {};
-		i32 indices[4] = {};
-		i32 index_count = 0;
-		for (i32 index : lhs.swizzle_soa.indices) {
-			GB_ASSERT(index < 4);
-			if (indices_handled[index]) {
-				continue;
-			}
-			indices_handled[index] = true;
-			indices[index_count++] = index;
-		}
-
-		lb_emit_soa_index_bounds_check(p, lhs.addr, lhs.swizzle_soa.index, lhs.swizzle_soa.index_expr);
-
-		lbValue lhs_ptrs[4] = {};
-		lbValue x_loads[4]  = {};
-		lbValue y_loads[4]  = {};
-		lbValue ops[4]      = {};
-
-		for (i32 i = 0; i < index_count; i++) {
-			lhs_ptrs[i] = lb_soa_field_elem_ptr(p, lhs.addr, indices[i], lhs.swizzle_soa.index);
-		}
-		for (i32 i = 0; i < index_count; i++) {
-			x_loads[i] = lb_emit_load(p, lhs_ptrs[i]);
-		}
-		for (i32 i = 0; i < index_count; i++) {
-			y_loads[i].value = LLVMBuildExtractValue(p->builder, rhs.value, i, "");
-			y_loads[i].type = elem_type;
-		}
-		for (i32 i = 0; i < index_count; i++) {
-			ops[i] = lb_emit_arith(p, op, x_loads[i], y_loads[i], elem_type);
-		}
-		for (i32 i = 0; i < index_count; i++) {
+		for (isize i = 0; i < n; i++) {
 			lb_emit_store(p, lhs_ptrs[i], ops[i]);
 		}
 		return;

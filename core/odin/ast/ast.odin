@@ -590,6 +590,7 @@ Field_Flag :: enum {
 	Const,
 	Any_Int,
 	Subtype,
+	Soa_Split,
 	By_Ptr,
 	No_Broadcast,
 	No_Capture,
@@ -611,6 +612,7 @@ field_flag_strings := [Field_Flag]string{
 	.Const              = "#const",
 	.Any_Int            = "#any_int",
 	.Subtype            = "#subtype",
+	.Soa_Split          = "#soa_split",
 	.By_Ptr             = "#by_ptr",
 	.No_Broadcast       = "#no_broadcast",
 	.No_Capture         = "#no_capture",
@@ -627,6 +629,7 @@ field_hash_flag_strings := []struct{key: string, flag: Field_Flag}{
 	{"const",        .Const},
 	{"any_int",      .Any_Int},
 	{"subtype",      .Subtype},
+	{"soa_split",    .Soa_Split},
 	{"by_ptr",       .By_Ptr},
 	{"no_broadcast", .No_Broadcast},
 	{"no_capture",   .No_Capture},
@@ -637,6 +640,7 @@ Field_Flags_Struct :: Field_Flags{
 	.Using,
 	.Tags,
 	.Subtype,
+	.Soa_Split,
 }
 Field_Flags_Record_Poly_Params :: Field_Flags{
 	.Typeid_Token,

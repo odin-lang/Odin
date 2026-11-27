@@ -49,6 +49,28 @@ test_fixed_capacity_dynamic_array_inject_at :: proc(t: ^testing.T) {
 	testing.expect(t, slice_equal(array[:], []int { 5, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0 }))
 }
 
+// Injecting into a full array fails and leaves it as it was, rather than dropping its last elements
+@(test)
+test_fixed_capacity_dynamic_array_inject_at_full :: proc(t: ^testing.T) {
+	array: [dynamic; 3]int
+	append(&array, 1, 2, 3)
+	testing.expect(t, !inject_at(&array, 0, 9))
+	testing.expect(t, slice_equal(array[:], []int { 1, 2, 3 }))
+
+	pop(&array)
+	testing.expect(t, !inject_at(&array, 1, 7, 8))
+	testing.expect(t, slice_equal(array[:], []int { 1, 2 }))
+	testing.expect(t, !inject_at(&array, 3, 4))
+	testing.expect(t, slice_equal(array[:], []int { 1, 2 }))
+
+	bytes: [dynamic; 4]u8
+	append(&bytes, "ab")
+	testing.expect(t, !inject_at(&bytes, 1, "xyz"))
+	testing.expect(t, string(bytes[:]) == "ab")
+	testing.expect(t, inject_at(&bytes, 1, "xy"))
+	testing.expect(t, string(bytes[:]) == "axyb")
+}
+
 @(test)
 test_fixed_capacity_dynamic_array_push_back_elems :: proc(t: ^testing.T) {
 	array: [dynamic; 2]int
@@ -101,8 +123,9 @@ test_fixed_capacity_dynamic_array_constant_slice :: proc(t: ^testing.T) {
 	testing.expect(t, slice_equal(array[1:2], []int{2}))
 }
 
-// AddressSanitizer on Windows ends the process on the bounds check trap before the test runner can catch it.
-when !(ODIN_OS == .Windows && .Address in ODIN_SANITIZER_FLAGS) {
+// AddressSanitizer on Windows ends the process on the bounds check trap before the test runner can
+// catch it, and tests run inline can't catch a trap at all.
+when !testing.INLINE && !(ODIN_OS == .Windows && .Address in ODIN_SANITIZER_FLAGS) {
 	@(test)
 	test_fixed_capacity_dynamic_array_constant_slice_out_of_range :: proc(t: ^testing.T) {
 		array: [dynamic; 4]int

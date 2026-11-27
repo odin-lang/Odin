@@ -288,6 +288,22 @@ map_total_allocation_size_from_value :: #force_inline proc "contextless" (m: $M/
 	return map_total_allocation_size(uintptr(cap(m)), map_info(M))
 }
 
+@(private, require_results)
+map_total_allocation_size_fits :: proc "contextless" (capacity: uintptr, info: ^Map_Info) -> bool {
+	Wide :: u128 when size_of(uintptr) == 8 else u64
+	cells :: proc "contextless" (count: uintptr, info: ^Map_Cell_Info) -> Wide {
+		n       := info.elements_per_cell
+		stride  := info.size_of_cell if n == 1 else info.size_of_type
+		padding := info.size_of_cell - n*stride
+		return Wide(count)*Wide(stride) + Wide(count/n + 1)*Wide(padding) + MAP_CACHE_LINE_SIZE
+	}
+	INFO_HS := intrinsics.type_map_cell_info(Map_Hash)
+
+	size := cells(capacity, info.ks) + cells(capacity, info.vs) + cells(capacity, INFO_HS)
+	size += cells(2, info.ks) + cells(2, info.vs)
+	return size <= Wide(max(int))
+}
+
 
 // The only procedure which needs access to the context is the one which allocates the map.
 @(require_results)
@@ -297,13 +313,16 @@ map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, alloc
 		return
 	}
 
-	if log2_capacity >= 64 {
-		// Overflowed, would be caused by log2_capacity > 64
+	if log2_capacity >= 8*size_of(uintptr) {
+		// Overflowed: `1 << log2_capacity` doesn't fit in a `uintptr`
 		return {}, .Out_Of_Memory
 	}
 
 	new_log2_capacity := max(log2_capacity, MAP_MIN_LOG2_CAPACITY)
 	capacity := uintptr(1) << new_log2_capacity
+	if !map_total_allocation_size_fits(capacity, info) {
+		return {}, .Out_Of_Memory
+	}
 
 	CACHE_MASK :: MAP_CACHE_LINE_SIZE - 1
 
@@ -1046,28 +1065,16 @@ default_hasher_string :: proc "contextless" (data: rawptr, seed: uintptr) -> uin
 	return default_hasher_fixed(raw_data(str^), seed, len(str))
 }
 default_hasher_cstring :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr {
-	ptr := (^[^]byte)(data)^
-	n := 0
-	if ptr != nil {
-		for ptr[n] != 0 {
-			n += 1
-		}
-	}
-	return default_hasher_fixed(ptr, seed, n)
+	str := (^cstring)(data)^
+	return default_hasher_fixed(rawptr(str), seed, cstring_len(str))
 }
 default_hasher_string16 :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr {
 	str := (^[]u16)(data)
 	return default_hasher_fixed(raw_data(str^), seed, len(str)*size_of(u16))
 }
 default_hasher_cstring16 :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr {
-	ptr := (^[^]u16)(data)^
-	n := 0
-	if ptr != nil {
-		for ptr[n] != 0 {
-			n += 1
-		}
-	}
-	return default_hasher_fixed(ptr, seed, n*size_of(u16))
+	str := (^cstring16)(data)^
+	return default_hasher_fixed(rawptr(str), seed, cstring16_len(str)*size_of(u16))
 }
 
 default_hasher_f64 :: proc "contextless" (f: f64, seed: uintptr) -> uintptr {

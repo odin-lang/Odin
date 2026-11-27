@@ -239,7 +239,7 @@ reader_read_byte :: proc(b: ^Reader) -> (c: byte, err: io.Error) {
 
 // reader_unread_byte unreads the last byte. Only the most recently read byte can be unread
 reader_unread_byte :: proc(b: ^Reader) -> io.Error {
-	if b.last_byte < 0 || b.r == 0 && b.w > 0 {
+	if b.last_byte < 0 || b.r == 0 && b.w > 0 || len(b.buf) == 0 {
 		return .Invalid_Unread
 	}
 	if b.r > 0 {
@@ -267,7 +267,11 @@ reader_read_rune :: proc(b: ^Reader) -> (r: rune, size: int, err: io.Error) {
 
 	b.last_rune_size = -1
 	if b.r == b.w {
-		return 0, 0, _reader_consume_err(b)
+		err = _reader_consume_err(b)
+		if err == nil && len(b.buf) == 0 {
+			err = .Buffer_Full
+		}
+		return 0, 0, err
 	}
 	r, size = rune(b.buf[b.r]), 1
 	if r >= utf8.RUNE_SELF {
@@ -301,6 +305,10 @@ reader_write_to :: proc(b: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
 	}
 
 	n = write_buf(b, w) or_return
+
+	if len(b.buf) == 0 {
+		return n, .Buffer_Full
+	}
 
 	m: i64
 	if b.w-b.r < len(b.buf) {

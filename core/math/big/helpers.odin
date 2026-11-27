@@ -145,16 +145,15 @@ neg :: proc { int_neg, rat_neg }
 /*
 	Helpers to extract values from the `Int`.
 */
-int_bitfield_extract_single :: proc(a: ^Int, offset: int, allocator := context.allocator) -> (bit: _WORD, err: Error) {
-	return #force_inline int_bitfield_extract(a, offset, 1, allocator)
+int_bitfield_extract_single :: proc(a: ^Int, offset: int) -> (bit: _WORD, err: Error) {
+	return #force_inline int_bitfield_extract(a, offset, 1)
 }
 
-int_bitfield_extract :: proc(a: ^Int, offset, count: int, allocator := context.allocator) -> (res: _WORD, err: Error) {
+int_bitfield_extract :: proc(a: ^Int, offset, count: int) -> (res: _WORD, err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a)
-	context.allocator = allocator
 
 	a := a
 	a = _zero_if_uninitialized(a)
@@ -268,57 +267,57 @@ power_of_two :: proc(a: ^Int, power: int, allocator := context.allocator) -> (er
 	return #force_inline internal_int_power_of_two(a, power, allocator)
 }
 
-int_get_u128 :: proc(a: ^Int, allocator := context.allocator) -> (res: u128, err: Error) {
+int_get_u128 :: proc(a: ^Int) -> (res: u128, err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a)
-	return int_get(a, u128, allocator)
+	return int_get(a, u128)
 }
 get_u128 :: proc { int_get_u128, }
 
-int_get_i128 :: proc(a: ^Int, allocator := context.allocator) -> (res: i128, err: Error) {
+int_get_i128 :: proc(a: ^Int) -> (res: i128, err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a)
-	return int_get(a, i128, allocator)
+	return int_get(a, i128)
 }
 get_i128 :: proc { int_get_i128, }
 
-int_get_u64 :: proc(a: ^Int, allocator := context.allocator) -> (res: u64, err: Error) {
+int_get_u64 :: proc(a: ^Int) -> (res: u64, err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a)
-	return int_get(a, u64, allocator)
+	return int_get(a, u64)
 }
 get_u64 :: proc { int_get_u64, }
 
-int_get_i64 :: proc(a: ^Int, allocator := context.allocator) -> (res: i64, err: Error) {
+int_get_i64 :: proc(a: ^Int) -> (res: i64, err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a)
-	return int_get(a, i64, allocator)
+	return int_get(a, i64)
 }
 get_i64 :: proc { int_get_i64, }
 
-int_get_u32 :: proc(a: ^Int, allocator := context.allocator) -> (res: u32, err: Error) {
+int_get_u32 :: proc(a: ^Int) -> (res: u32, err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a)
-	return int_get(a, u32, allocator)
+	return int_get(a, u32)
 }
 get_u32 :: proc { int_get_u32, }
 
-int_get_i32 :: proc(a: ^Int, allocator := context.allocator) -> (res: i32, err: Error) {
+int_get_i32 :: proc(a: ^Int) -> (res: i32, err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a)
-	return int_get(a, i32, allocator)
+	return int_get(a, i32)
 }
 get_i32 :: proc { int_get_i32, }
 
@@ -326,7 +325,7 @@ get_i32 :: proc { int_get_i32, }
 	TODO: Think about using `count_bits` to check if the value could be returned completely,
 	and maybe return max(T), .Integer_Overflow if not?
 */
-int_get :: proc(a: ^Int, $T: typeid, allocator := context.allocator) -> (res: T, err: Error) where intrinsics.type_is_integer(T) {
+int_get :: proc(a: ^Int, $T: typeid) -> (res: T, err: Error) where intrinsics.type_is_integer(T) {
 	/*
 		Check that `a` is usable.
 	*/
@@ -338,7 +337,7 @@ int_get :: proc(a: ^Int, $T: typeid, allocator := context.allocator) -> (res: T,
 }
 get :: proc { int_get, }
 
-int_get_float :: proc(a: ^Int, allocator := context.allocator) -> (res: f64, err: Error) {
+int_get_float :: proc(a: ^Int) -> (res: f64, err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
@@ -353,7 +352,7 @@ int_get_float :: proc(a: ^Int, allocator := context.allocator) -> (res: f64, err
 /*
 	Count bits in an `Int`.
 */
-count_bits :: proc(a: ^Int, allocator := context.allocator) -> (count: int, err: Error) {
+count_bits :: proc(a: ^Int) -> (count: int, err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
@@ -368,7 +367,7 @@ count_bits :: proc(a: ^Int, allocator := context.allocator) -> (count: int, err:
 	Returns the number of trailing zeroes before the first one.
 	Differs from regular `ctz` in that 0 returns 0.
 */
-int_count_lsb :: proc(a: ^Int, allocator := context.allocator) -> (count: int, err: Error) {
+int_count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
 	/*
 		Check that `a` is usable.
 	*/
@@ -501,7 +500,7 @@ clamp :: proc(a: ^Int, allocator := context.allocator) -> (err: Error) {
 /*
 	Size binary representation	
 */
-int_to_bytes_size :: proc(a: ^Int, signed := false, allocator := context.allocator) -> (size_in_bytes: int, err: Error) {
+int_to_bytes_size :: proc(a: ^Int, signed := false) -> (size_in_bytes: int, err: Error) {
 	assert_if_nil(a)
 	a := a
 	a = _zero_if_uninitialized(a)
@@ -519,10 +518,10 @@ int_to_bytes_size :: proc(a: ^Int, signed := false, allocator := context.allocat
 	Return Little Endian binary representation of `a`, either signed or unsigned.
 	If `a` is negative and we ask for the default unsigned representation, we return abs(a).
 */
-int_to_bytes_little :: proc(a: ^Int, buf: []u8, signed := false, allocator := context.allocator) -> (err: Error) {
+int_to_bytes_little :: proc(a: ^Int, buf: []u8, signed := false) -> (err: Error) {
 	assert_if_nil(a)
 
-	size_in_bytes := int_to_bytes_size(a, signed, allocator) or_return
+	size_in_bytes := int_to_bytes_size(a, signed) or_return
 	l := len(buf)
 	if size_in_bytes > l { return .Buffer_Overflow }
 	intrinsics.mem_zero(raw_data(buf), l)
@@ -543,10 +542,10 @@ int_to_bytes_little :: proc(a: ^Int, buf: []u8, signed := false, allocator := co
 	Return Big Endian binary representation of `a`, either signed or unsigned.
 	If `a` is negative and we ask for the default unsigned representation, we return abs(a).
 */
-int_to_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := context.allocator) -> (err: Error) {
+int_to_bytes_big :: proc(a: ^Int, buf: []u8, signed := false) -> (err: Error) {
 	assert_if_nil(a)
 
-	size_in_bytes := int_to_bytes_size(a, signed, allocator) or_return
+	size_in_bytes := int_to_bytes_size(a, signed) or_return
 	l := len(buf)
 	if size_in_bytes > l { return .Buffer_Overflow }
 	intrinsics.mem_zero(raw_data(buf), l)
@@ -574,7 +573,7 @@ int_to_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, allocato
 	if !signed && a.sign == .Negative { return .Invalid_Argument }
 
 	l := len(buf)
-	size_in_bytes := int_to_bytes_size(a, signed, allocator) or_return
+	size_in_bytes := int_to_bytes_size(a, signed) or_return
 	if size_in_bytes > l { return .Buffer_Overflow  }
 
 	if a.sign == .Negative {
@@ -610,10 +609,10 @@ int_to_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator :
 	assert_if_nil(a)
 
 	if !signed && a.sign == .Negative { return .Invalid_Argument }
-	if a.sign == .Zero_or_Positive    { return int_to_bytes_big(a, buf, signed, allocator) }
+	if a.sign == .Zero_or_Positive    { return int_to_bytes_big(a, buf, signed) }
 
 	l := len(buf)
-	size_in_bytes := int_to_bytes_size(a, signed, allocator) or_return
+	size_in_bytes := int_to_bytes_size(a, signed) or_return
 	if size_in_bytes > l { return .Buffer_Overflow  }
 
 	t := &Int{}
@@ -717,7 +716,7 @@ int_from_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator
 	internal_clamp(a) or_return
 
 	if signed && sign == .Negative {
-		return internal_sub(a, a, 1)
+		return internal_sub(a, a, 1, allocator)
 	}
 	return nil
 }
@@ -795,7 +794,7 @@ int_from_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, alloca
 	internal_clamp(a) or_return
 
 	if signed && sign == .Negative {
-		return internal_sub(a, a, 1)
+		return internal_sub(a, a, 1, allocator)
 	}
 	return nil
 }

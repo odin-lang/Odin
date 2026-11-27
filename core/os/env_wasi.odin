@@ -34,10 +34,16 @@ build_env :: proc() -> (err: Error) {
 	}
 
 	g_env = make(map[string]string, num_envs, file_allocator()) or_return
-	defer if err != nil { delete(g_env) }
+	defer if err != nil {
+		delete(g_env)
+		g_env = nil
+	}
 
 	g_env_buf = make([]byte, size_of_envs, file_allocator()) or_return
-	defer if err != nil { delete(g_env_buf, file_allocator()) }
+	defer if err != nil {
+		delete(g_env_buf, file_allocator())
+		g_env_buf = nil
+	}
 
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
@@ -61,7 +67,7 @@ delete_string_if_not_original :: proc(str: string) {
 	start := uintptr(raw_data(g_env_buf))
 	end   := start + uintptr(len(g_env_buf))
 	ptr   := uintptr(raw_data(str))
-	if ptr < start || ptr > end {
+	if ptr < start || ptr >= end {
 		delete(str, file_allocator())
 	}
 }
@@ -81,7 +87,7 @@ _lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: 
 
 _lookup_env_buf :: proc(buf: []u8, key: string) -> (value: string, error: Error) {
 	if key == "" {
-		return
+		return "", .Env_Var_Not_Found
 	}
 
 	if len(key) + 1 > len(buf) {
@@ -90,6 +96,8 @@ _lookup_env_buf :: proc(buf: []u8, key: string) -> (value: string, error: Error)
 		copy(buf, key)
 		buf[len(key)] = 0
 	}
+
+	build_env() or_return
 
 	sync.shared_guard(&g_env_mutex)
 
@@ -114,24 +122,23 @@ _set_env :: proc(key, value: string) -> (err: Error) {
 
 	sync.guard(&g_env_mutex)
 
+	cloned_value := clone_string(value, file_allocator()) or_return
 	defer if err != nil {
-		delete_key(&g_env, key)
+		delete(cloned_value, file_allocator())
 	}
 
 	key_ptr, value_ptr, just_inserted := map_entry(&g_env, key) or_return
-
 	if just_inserted {
-		key_ptr^ = clone_string(key, file_allocator()) or_return
-		defer if err != nil {
-			delete(key_ptr^, file_allocator())
+		cloned_key, key_err := clone_string(key, file_allocator())
+		if key_err != nil {
+			delete_key(&g_env, key)
+			return key_err
 		}
-		value_ptr^ = clone_string(value, file_allocator()) or_return
-		return
+		key_ptr^ = cloned_key
+	} else {
+		delete_string_if_not_original(value_ptr^)
 	}
-
-	delete_string_if_not_original(value_ptr^)
-
-	value_ptr^ = clone_string(value, file_allocator()) or_return
+	value_ptr^ = cloned_value
 	return
 }
 

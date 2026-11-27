@@ -1,4 +1,3 @@
-#+build !wasi
 #+build !js
 package filepath
 

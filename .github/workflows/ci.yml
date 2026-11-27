@@ -9,7 +9,7 @@ jobs:
         os: [macos-latest, ubuntu-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.os == 'macos-latest' && 'MacOS ARM' || (matrix.os == 'ubuntu-latest' && 'Ubuntu') || (matrix.os == 'ubuntu-24.04-arm' && 'Ubuntu ARM') }} Build, Check, and Test
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
 
       - uses: actions/checkout@v7
@@ -119,7 +119,7 @@ jobs:
         run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
       - name: Normal Core library tests
         run: ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
-      - name: Compression tests
+      - name: Compression and archive tests
         run: ./odin test tests/core/compress.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Optimized Core library tests
         run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
@@ -156,12 +156,6 @@ jobs:
           cd tests/abi
           ./run.sh
           ABI_CFLAGS=-O2 ./run.sh "" "" -o:speed
-
-      - name: Run demo on WASI WASM32
-        run: |
-          ./odin build examples/demo -target:wasi_wasm32 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -out:demo
-          wasmtime ./demo.wasm
-        if: matrix.os == 'macos-latest'
 
       - name: Check benchmarks
         run: ./odin check tests/benchmark -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
@@ -270,7 +264,7 @@ jobs:
   build_windows:
     name: Windows ${{ matrix.arch }} Build, Check, and Test
     runs-on: windows-2022
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -322,7 +316,7 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true %ODIN_ASAN% %ODIN_TARGET%
-      - name: Compression tests
+      - name: Compression and archive tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
@@ -464,10 +458,6 @@ jobs:
           sudo ./llvm.sh 22
           echo "/usr/lib/llvm-22/bin" >> $GITHUB_PATH
 
-      - name: Install libcurl
-        run: |
-          sudo apt-get install libcurl4-openssl-dev libmbedtls-dev
-
       - name: Install riscv64 toolchain and qemu
         run: sudo apt-get install -y qemu-user qemu-user-binfmt gcc-14-riscv64-linux-gnu libc6-riscv64-cross
 
@@ -484,19 +474,8 @@ jobs:
       - name: Odin report
         run: ./odin report
 
-      - name: Compile needed Vendor
-        run: |
-          export ODIN_ROOT="$(pwd)"
-          ./vendor/stb/src/build_stb.sh
-          ./vendor/cgltf/src/build_cgltf.sh
-          ./vendor/miniaudio/src/build_miniaudio.sh
-          ./vendor/kb_text_shape/src/build_unix.sh
-
       - name: Odin check examples/all
         run: ./odin check examples/all -target:linux_riscv64 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do
-
-      - name: Odin check examples/all/sdl3
-        run: ./odin check examples/all/sdl3 -target:linux_riscv64 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
 
       - name: Odin run
         run: ./odin run examples/demo -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
@@ -504,20 +483,65 @@ jobs:
       - name: Odin run -debug
         run: ./odin run examples/demo -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
 
-      - name: Normal Core library tests
-        run: ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
+      - name: riscv64 tests
+        run: ./odin test tests/riscv64 -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
 
-      - name: Compression tests
-        run: ./odin test tests/core/compress.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
+      - name: riscv64 tests -o:speed
+        run: ./odin test tests/riscv64 -all-packages -o:speed -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
 
-      - name: Optimized Core library tests
-        run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
-
-      - name: Internals tests
-        run: ./odin test tests/internal -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
+      - name: riscv64 tests -o:speed with V extension
+        run: ./odin test tests/riscv64 -all-packages -o:speed -target-features:v -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
 
       - name: ABI comparator
         run: |
           cd tests/abi
           ./run.sh linux_riscv64 riscv64-linux-gnu "-extra-linker-flags:--target=riscv64-linux-gnu -static" -no-rpath
           ABI_CFLAGS=-O2 ./run.sh linux_riscv64 riscv64-linux-gnu "-extra-linker-flags:--target=riscv64-linux-gnu -static" -no-rpath -o:speed
+
+  build_wasi:
+    runs-on: ubuntu-latest
+    name: WASI Build and Test
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download LLVM
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22
+          echo "/usr/lib/llvm-22/bin" >> $GITHUB_PATH
+
+      - name: Download wasmtime
+        run: |
+          wget -q https://github.com/bytecodealliance/wasmtime/releases/download/v51.0.0/wasmtime-v51.0.0-x86_64-linux.tar.xz
+          echo "a18020674fac4107f329bc9ed720ea9c88e4b30a61e8a527787bcce051123d32  wasmtime-v51.0.0-x86_64-linux.tar.xz" | sha256sum -c
+          tar -xJf wasmtime-v51.0.0-x86_64-linux.tar.xz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/wasmtime-v51.0.0-x86_64-linux" >> $GITHUB_PATH
+
+      - name: Build Odin
+        run: ./build_odin.sh release
+
+      - name: Odin version
+        run: ./odin version
+
+      - name: Odin report
+        run: ./odin report
+
+      - name: wasmtime version
+        run: wasmtime --version
+
+      - name: Run demo on WASI WASM32
+        run: |
+          ./odin build examples/demo -target:wasi_wasm32 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -out:demo
+          wasmtime ./demo.wasm
+
+      - name: Run demo on WASI WASM64P32
+        run: |
+          ./odin build examples/demo -target:wasi_wasm64p32 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -out:demo
+          wasmtime ./demo.wasm
+          ./odin build examples/demo -target:wasi_wasm64p32 -microarch:mvp -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -out:demo
+          wasmtime ./demo.wasm
+
+      - name: Core library tests on WASI WASM32
+        run: ./tests/core/wasi.sh

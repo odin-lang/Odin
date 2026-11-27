@@ -203,13 +203,14 @@ BZip2_Pending :: struct {
 
 @(private)
 BZip2_Bit_Reader :: struct {
-	data:     []u8,
-	pos:      int,
-	bits:     u64,
-	count:    uint,
-	consumed: i64,
-	z:        ^compress.Context,
-	eof:      bool,
+	data:      []u8,
+	pos:       int,
+	bits:      u64,
+	count:     uint,
+	consumed:  i64,
+	z:         ^compress.Context,
+	eof:       bool,
+	input_err: io.Error,
 }
 
 @(private)

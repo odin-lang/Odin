@@ -5,14 +5,16 @@
 #+build !netbsd
 #+build !linux
 #+build !windows
+#+build !wasm32
+#+build !wasm64p32
 package mem_virtual
 
 _reserve :: proc "contextless" (size: uint, address_hint: uintptr) -> (data: []byte, err: Allocator_Error) {
-	return nil, nil
+	return nil, .Out_Of_Memory
 }
 
 _commit :: proc "contextless" (data: rawptr, size: uint) -> Allocator_Error {
-	return nil
+	return .Out_Of_Memory
 }
 
 _decommit :: proc "contextless" (data: rawptr, size: uint) {

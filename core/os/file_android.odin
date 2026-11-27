@@ -138,7 +138,11 @@ _read_asset_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: Fil
 		it.impl.prev_fi = {}
 
 		temp_allocator := TEMP_ALLOCATOR_GUARD({})
-		path, _ := concatenate({dir.name, "/", dir.names[index]}, temp_allocator)
+		path, path_err := concatenate({dir.name, "/", dir.names[index]}, temp_allocator)
+		if path_err != nil {
+			read_directory_iterator_set_error(it, dir.names[index], path_err)
+			continue
+		}
 		err: Error
 		if fi, err = _stat_asset(path, file_allocator()); err != nil {
 			read_directory_iterator_set_error(it, path, err)

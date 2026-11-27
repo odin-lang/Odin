@@ -564,3 +564,28 @@ DNS_Host_Entry :: struct {
 	name: string,
 	addr: Address,
 }
+
+@(private)
+destroy_dns_record :: proc(record: DNS_Record, allocator := context.allocator) {
+	switch r in record {
+	case DNS_Record_IP4:
+		delete(r.record_name, allocator)
+	case DNS_Record_IP6:
+		delete(r.record_name, allocator)
+	case DNS_Record_CNAME:
+		delete(r.record_name, allocator)
+		delete(r.host_name, allocator)
+	case DNS_Record_TXT:
+		delete(r.record_name, allocator)
+		delete(r.value, allocator)
+	case DNS_Record_NS:
+		delete(r.record_name, allocator)
+		delete(r.host_name, allocator)
+	case DNS_Record_MX:
+		delete(r.record_name, allocator)
+		delete(r.host_name, allocator)
+	case DNS_Record_SRV:
+		delete(r.record_name, allocator)
+		delete(r.target, allocator)
+	}
+}

@@ -90,7 +90,7 @@ _process_list :: proc(allocator: runtime.Allocator) -> (list: []int, err: Error)
 		buflen, errno = linux.getdents(dir_fd, buf[:])
 		#partial switch errno {
 		case .EINVAL:
-			resize(&buf, len(buf) * 2)
+			resize(&buf, len(buf) * 2) or_return
 			continue loop
 		case .NONE:
 			if buflen == 0 { break loop }
@@ -103,7 +103,7 @@ _process_list :: proc(allocator: runtime.Allocator) -> (list: []int, err: Error)
 			d_name_str := linux.dirent_name(d)
 
 			if pid, ok := strconv.parse_int(d_name_str); ok {
-				append(&dynamic_list, pid)
+				append(&dynamic_list, pid) or_return
 			}
 		}
 	}
@@ -169,6 +169,9 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 				passwd = passwd[strings.index_byte(passwd, ':') + 1:]
 
 				n = strings.index_byte(passwd, ':')
+				if n < 0 {
+					break
+				}
 				if uid, ok := strconv.parse_int(passwd[:n]); ok && uid == int(s.uid) {
 					info.username = strings.clone(username, allocator) or_return
 					info.fields += {.Username}
@@ -206,8 +209,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			}
 		}
 
-		terminator := strings.index_byte(cmdline, 0)
-		assert(terminator > 0)
+		terminator: int
 
 		// command_line_exec := cmdline[:terminator]
 
@@ -233,40 +235,34 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		if selection & {.Command_Line, .Command_Args} != {} {
 			// skip to first arg
 			//cmdline = cmdline[terminator + 1:]
-			command_line_builder: strings.Builder
-			command_args_list: [dynamic]string
-
-			if .Command_Line in selection {
-				command_line_builder = strings.builder_make(allocator) or_return
-				info.fields += {.Command_Line}
-			}
+			command_line_builder := strings.builder_make(temp_allocator) or_return
+			command_args_list := make([dynamic]string, temp_allocator) or_return
 
 			for i := 0; len(cmdline) > 0; i += 1 {
 				if terminator = strings.index_byte(cmdline, 0); terminator < 0 {
 					break
 				}
 
-				if .Command_Line in selection {
-					if i > 0 {
-						strings.write_byte(&command_line_builder, ' ')
-					}
-					strings.write_string(&command_line_builder, cmdline[:terminator])
+				if i > 0 {
+					strings.write_byte(&command_line_builder, ' ') or_return
+					append(&command_args_list, cmdline[:terminator]) or_return
 				}
-				if .Command_Args in selection {
-					if i == 1 {
-						command_args_list = make([dynamic]string, allocator) or_return
-						info.fields += {.Command_Args}
-					}
-					if i > 0 {
-						arg := strings.clone(cmdline[:terminator], allocator) or_return
-						append(&command_args_list, arg) or_return
-					}
-				}
+				strings.write_string(&command_line_builder, cmdline[:terminator]) or_return
 
 				cmdline = cmdline[terminator + 1:]
 			}
-			info.command_line = strings.to_string(command_line_builder)
-			info.command_args = command_args_list[:]
+
+			if .Command_Line in selection {
+				info.command_line = strings.clone(strings.to_string(command_line_builder), allocator) or_return
+				info.fields += {.Command_Line}
+			}
+			if .Command_Args in selection && len(command_args_list) > 0 {
+				info.command_args = make([]string, len(command_args_list), allocator) or_return
+				for arg, k in command_args_list {
+					info.command_args[k] = strings.clone(arg, allocator) or_return
+				}
+				info.fields += {.Command_Args}
+			}
 		}
 	}
 
@@ -375,17 +371,20 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		if env_bytes, env_err := _read_entire_pseudo_file(strings.to_cstring(&path_builder) or_return, temp_allocator); env_err == nil {
 			env := string(env_bytes)
 
-			env_list := make([dynamic]string, allocator) or_return
+			env_list := make([dynamic]string, temp_allocator) or_return
 			for len(env) > 0 {
 				terminator := strings.index_byte(env, 0)
 				if terminator <= 0 {
 					break
 				}
-				e := strings.clone(env[:terminator], allocator) or_return
-				append(&env_list, e) or_return
+				append(&env_list, env[:terminator]) or_return
 				env = env[terminator + 1:]
 			}
-			info.environment = env_list[:]
+
+			info.environment = make([]string, len(env_list), allocator) or_return
+			for e, k in env_list {
+				info.environment[k] = strings.clone(e, allocator) or_return
+			}
 			info.fields += {.Environment}
 		} else if err == nil {
 			err = env_err
@@ -696,6 +695,10 @@ _reap_terminated :: proc(process: Process) -> (state: Process_State, err: Error)
 		errno = linux.waitid(.PID, linux.Id(process.pid), &info, {.WEXITED}, nil)
 	}
 	err = _get_platform_error(errno)
+	if err != nil {
+		_process_close(process)
+		return
+	}
 
 	switch linux.Sig_Child_Code(info.code) {
 	case .NONE, .CONTINUED, .STOPPED:
@@ -707,6 +710,7 @@ _reap_terminated :: proc(process: Process) -> (state: Process_State, err: Error)
 	case .KILLED, .DUMPED, .TRAPPED:
 		state.exited = true
 		state.exit_code = int(info.status)
+		state.signal = int(info.status)
 		state.success = false
 	}
 
@@ -785,6 +789,10 @@ _timed_wait_on_handle :: proc(process: Process, timeout: time.Duration) -> (proc
 			errno = linux.waitid(.PIDFD, linux.Id(process.handle), &info, {.WEXITED}, nil)
 		}
 		err = _get_platform_error(errno)
+		if err != nil {
+			_process_close(process)
+			return
+		}
 
 		switch linux.Sig_Child_Code(info.code) {
 		case .NONE, .CONTINUED, .STOPPED:
@@ -796,6 +804,7 @@ _timed_wait_on_handle :: proc(process: Process, timeout: time.Duration) -> (proc
 		case .KILLED, .DUMPED, .TRAPPED:
 			process_state.exited = true
 			process_state.exit_code = int(info.status)
+			process_state.signal = int(info.status)
 			process_state.success = false
 		}
 	}

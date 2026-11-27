@@ -1,5 +1,6 @@
 package aead
 
+import "core:crypto"
 import "core:crypto/aegis"
 import "core:crypto/aes"
 import "core:crypto/chacha20"
@@ -124,9 +125,7 @@ _IMPL_IDS := [Algorithm]typeid {
 
 // init initializes a Context with a specific AEAD Algorithm.
 init :: proc(ctx: ^Context, algorithm: Algorithm, key: []byte, impl: Implementation = nil) {
-	if ctx._impl != nil {
-		reset(ctx)
-	}
+	crypto.zero_explicit(ctx, size_of(Context))
 
 	ensure(len(key) == KEY_SIZES[algorithm], "crypto/aead: invalid key size")
 

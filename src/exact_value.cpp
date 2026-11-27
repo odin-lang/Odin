@@ -176,6 +176,19 @@ gb_internal ExactValue exact_value_string16(String16 string) {
 	return result;
 }
 
+gb_internal bool exact_value_to_path_string(ExactValue const &v, String *out) {
+	*out = {};
+	if (v.kind == ExactValue_String) {
+		*out = v.value_string;
+		return true;
+	}
+	if (v.kind == ExactValue_String16) {
+		*out = string16_to_string(permanent_allocator(), v.value_string16);
+		return v.value_string16.len == 0 || out->len > 0;
+	}
+	return false;
+}
+
 gb_internal ExactValue exact_value_i64(i64 i) {
 	ExactValue result = {ExactValue_Integer};
 	result.value_integer = {0};
@@ -1355,7 +1368,7 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 gb_internal Entity *strip_entity_wrapping(Ast *expr);
 gb_internal Entity *strip_entity_wrapping(Entity *e);
 
-gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthand);
+gb_internal gbString write_expr_to_string(gbString str, Ast *node, u32 flags);
 
 gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const &v, isize string_limit);
 

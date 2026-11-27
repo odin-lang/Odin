@@ -81,13 +81,23 @@ sleb_size :: #force_inline proc "contextless" (value: i64) -> u32 {
 }
 
 // Read unsigned LEB128 starting at `*offset`; advances it. `ok` is false on
-// truncation. Reads at most `max` bytes (10 covers u64).
+// truncation, or when the encoding is longer or wider than `bits` allows.
 @(require_results)
-read_uleb :: #force_inline proc "contextless" (data: []u8, offset: ^u32) -> (value: u64, ok: bool) {
+read_uleb :: #force_inline proc "contextless" (data: []u8, offset: ^u32, bits: uint = 64) -> (value: u64, ok: bool) {
+	max_bytes := (bits + 6) / 7
 	shift := uint(0)
-	for i := 0; i < 10 && offset^ < u32(len(data)); i += 1 {
+	for i in uint(0)..<max_bytes {
+		if offset^ >= u32(len(data)) {
+			return 0, false
+		}
 		b := data[offset^]
 		offset^ += 1
+		if i == max_bytes - 1 {
+			used := bits - 7*i
+			if b & 0x80 != 0 || (used < 7 && b >> used != 0) {
+				return 0, false
+			}
+		}
 		value |= u64(b & 0x7F) << shift
 		if b & 0x80 == 0 {
 			return value, true
@@ -99,23 +109,37 @@ read_uleb :: #force_inline proc "contextless" (data: []u8, offset: ^u32) -> (val
 
 // Read signed LEB128 starting at `*offset`; advances it.
 @(require_results)
-read_sleb :: #force_inline proc "contextless" (data: []u8, offset: ^u32) -> (value: i64, ok: bool) {
+read_sleb :: #force_inline proc "contextless" (data: []u8, offset: ^u32, bits: uint = 64) -> (value: i64, ok: bool) {
+	max_bytes := (bits + 6) / 7
 	shift := uint(0)
-	b     := u8(0)
-	for i := 0; i < 10 && offset^ < u32(len(data)); i += 1 {
-		b = data[offset^]
+	for i in uint(0)..<max_bytes {
+		if offset^ >= u32(len(data)) {
+			return 0, false
+		}
+		b := data[offset^]
 		offset^ += 1
+		if i == max_bytes - 1 {
+			used := bits - 7*i
+			if b & 0x80 != 0 {
+				return 0, false
+			}
+			if used < 7 {
+				rest := b >> (used - 1)
+				if rest != 0 && rest != 0x7F >> (used - 1) {
+					return 0, false
+				}
+			}
+		}
 		value |= i64(b & 0x7F) << shift
 		shift += 7
 		if b & 0x80 == 0 {
-			break
+			if shift < 64 && b & 0x40 != 0 {
+				value |= -(i64(1) << shift)
+			}
+			return value, true
 		}
 	}
-	if shift < 64 && (b & 0x40) != 0 {
-		value |= -(i64(1) << shift)
-	}
-	ok = true
-	return
+	return 0, false
 }
 
 write_u32_block :: #force_inline proc(code: []u8, offset: ^u32, v: u32) {

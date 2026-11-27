@@ -9,6 +9,7 @@ import            "core:math"
 @(require) import "core:net"
 import            "core:os"
 import            "core:strings"
+import            "core:terminal/ansi"
 import            "core:testing"
 import            "core:time/datetime"
 
@@ -22,10 +23,15 @@ init_custom_type_setter :: proc "contextless" () {
 	// multi-threaded test runner, to prevent any data races that could be
 	// reported by using `-sanitize:thread`.
 	//
-	// Do mind that this means every test here acknowledges the `Custom_Data` type.
-	flags.register_type_setter(proc (data: rawptr, data_type: typeid, _, _: string) -> (string, bool, runtime.Allocator_Error) {
+	// Do mind that this means every test here acknowledges the `Custom_Data`
+	// and `Leak_Setter_CString` types.
+	flags.register_type_setter(proc (data: rawptr, data_type: typeid, value, _: string) -> (string, bool, runtime.Allocator_Error) {
 		if data_type == Custom_Data {
 			(cast(^Custom_Data)data).a = 32
+			return "", true, nil
+		}
+		if data_type == Leak_Setter_CString && value == "lit" {
+			(cast(^Leak_Setter_CString)data)^ = Leak_Setter_CString(leak_setter_literal)
 			return "", true, nil
 		}
 		return "", false, nil
@@ -1285,7 +1291,8 @@ test_if_map_cstrings_get_freed :: proc(t: ^testing.T) {
 	args := [?]string { "-m:hellope=world", "-m:hellope=bar", "-m:hellope=foo" }
 	result := flags.parse(&s, args[:])
 	defer {
-		for _, v in s.m {
+		for k, v in s.m {
+			delete(k)
 			delete(v)
 		}
 		delete(s.m)
@@ -1558,4 +1565,87 @@ very nicely.
 	writer := strings.to_stream(&builder)
 	flags.write_usage(writer, S, "overflow", .Unix)
 	testing.expect_value(t, strings.to_string(builder), Expected_Output)
+}
+
+@(test)
+test_usage_color_modes :: proc(t: ^testing.T) {
+	S :: struct {
+		count: int `args:"required" usage:"Number of items."`,
+		overflow: [dynamic]string,
+	}
+
+	never_builder := strings.builder_make()
+	defer strings.builder_destroy(&never_builder)
+	never_writer := strings.to_stream(&never_builder)
+	flags.write_usage(never_writer, S, "tool", .Odin, .Never)
+	never_output := strings.to_string(never_builder)
+	testing.expect(t, !strings.contains(never_output, ansi.ESC), "Never mode emitted ANSI codes")
+
+	auto_builder := strings.builder_make()
+	defer strings.builder_destroy(&auto_builder)
+	auto_writer := strings.to_stream(&auto_builder)
+	flags.write_usage(auto_writer, S, "tool", .Odin, .Auto)
+	auto_output := strings.to_string(auto_builder)
+	testing.expect_value(t, auto_output, never_output)
+	testing.expect(t, !strings.contains(auto_output, ansi.ESC), "Auto mode colored a custom writer")
+
+	always_builder := strings.builder_make()
+	defer strings.builder_destroy(&always_builder)
+	always_writer := strings.to_stream(&always_builder)
+	flags.write_usage(always_writer, S, "tool", .Odin, .Always)
+	always_output := strings.to_string(always_builder)
+
+	reset := ansi.sgr_alloc(flags.DEFAULT_COLOR_PALETTE.reset)
+	heading := ansi.sgr_alloc(flags.DEFAULT_COLOR_PALETTE.heading)
+	identifier := ansi.sgr_alloc(flags.DEFAULT_COLOR_PALETTE.identifier)
+	placeholder := ansi.sgr_alloc(flags.DEFAULT_COLOR_PALETTE.placeholder)
+	secondary := ansi.sgr_alloc(flags.DEFAULT_COLOR_PALETTE.secondary)
+	testing.expect(t, strings.contains(always_output, fmt.tprintf("%sUsage:%s", heading, reset)), "Usage heading was not styled")
+	testing.expect(t, strings.contains(always_output, fmt.tprintf("%stool%s", identifier, reset)), "Program name was not styled")
+	testing.expect(t, strings.contains(always_output, fmt.tprintf("%s-%s", identifier, reset)), "Flag prefix was not styled")
+	testing.expect(t, strings.contains(always_output, fmt.tprintf("%scount%s", identifier, reset)), "Flag name was not styled")
+	testing.expect(t, strings.contains(always_output, fmt.tprintf("%s<int>%s", placeholder, reset)), "Type placeholder was not styled")
+	testing.expect(t, strings.contains(always_output, fmt.tprintf("%s<string, ...>%s", placeholder, reset)), "Comma-containing placeholder was not styled")
+	testing.expect(t, strings.contains(always_output, fmt.tprintf("%s, required%s", secondary, reset)), "Metadata was not styled")
+
+	custom_palette := flags.Color_Palette {
+		reset       = ansi.RESET,
+		heading     = flags.color_code(ansi.FG_YELLOW, .Bold),
+		identifier  = flags.color_code(ansi.FG_MAGENTA, .Bold),
+		placeholder = ansi.FG_GREEN,
+		secondary   = ansi.ITALIC,
+		error       = flags.color_code(ansi.FG_BLUE, .Bold),
+	}
+	custom_builder := strings.builder_make()
+	defer strings.builder_destroy(&custom_builder)
+	custom_writer := strings.to_stream(&custom_builder)
+	flags.write_usage(custom_writer, S, "tool", .Odin, .Always, custom_palette)
+	custom_output := strings.to_string(custom_builder)
+	custom_heading := ansi.sgr_alloc(custom_palette.heading)
+	testing.expect(t,
+		strings.contains(custom_output, fmt.tprintf("%sUsage:%s", custom_heading, reset)),
+		"Custom heading palette was not applied")
+	testing.expect_value(t, flags.color_code(ansi.FG_BLUE, .Bold), ansi.BOLD + ";" + ansi.FG_BLUE)
+	testing.expect_value(t, flags.color_code(ansi.FG_BLUE), ansi.FG_BLUE)
+}
+
+@(test)
+test_color_tag_parsing :: proc(t: ^testing.T) {
+	S :: struct {
+		color: flags.Color_Mode `args:"color"`,
+	}
+	s: S
+	args := [?]string { "-color:always" }
+	result := flags.parse(&s, args[:])
+	testing.expect_value(t, result, nil)
+	testing.expect_value(t, s.color, flags.Color_Mode.Always)
+
+	u :: struct {
+		color: flags.Color_Mode `args:"color"`,
+	}
+	unix: u
+	unix_args := [?]string { "--color", "Auto" }
+	result = flags.parse(&unix, unix_args[:], .Unix)
+	testing.expect_value(t, result, nil)
+	testing.expect_value(t, unix.color, flags.Color_Mode.Auto)
 }

@@ -65,11 +65,18 @@ hash_stream :: proc(
 
 	init(&ctx, algorithm)
 
+	stalled := 0
 	loop: for {
 		n, err := io.read(s, buf[:])
 		if n > 0 {
 			// XXX/yawning: Can io.read return n > 0 and EOF?
 			update(&ctx, buf[:n])
+			stalled = 0
+		} else if err == nil {
+			stalled += 1
+			if stalled > 100 {
+				return nil, .No_Progress
+			}
 		}
 		#partial switch err {
 		case .None:

@@ -26,6 +26,9 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		// allocation start, as well as the padding required to align both
 		// the user data and the pointer.
 		a := max(alignment, align_of(rawptr))
+		if size > max(int) - (a-1 + size_of(rawptr)) {
+			return nil, .Out_Of_Memory
+		}
 		space := a-1 + size_of(rawptr) + size
 		allocated_mem: rawptr
 

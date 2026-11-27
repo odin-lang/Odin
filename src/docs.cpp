@@ -221,7 +221,7 @@ gb_internal void print_doc_expr(Ast *expr) {
 	if (build_context.cmd_doc_flags & CmdDocFlag_Short) {
 		s = expr_to_string_shorthand(expr);
 	} else {
-		s = expr_to_string(expr);
+		s = expr_to_string_exact(expr);
 	}
 	gb_file_write(gb_file_get_standard(gbFileStandard_Output), s, gb_string_length(s));
 	gb_string_free(s);
@@ -322,7 +322,7 @@ gb_internal void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 
 			print_doc_line_no_newline(2, e->token.string);
 			if (type_expr != nullptr) {
-				gbString t = expr_to_string(type_expr);
+				gbString t = expr_to_string_exact(type_expr);
 				gb_printf(": %s ", t);
 				gb_string_free(t);
 			} else {
@@ -364,39 +364,10 @@ gb_internal void generate_documentation(Checker *c) {
 	CheckerInfo *info = &c->info;
 
 	if (build_context.cmd_doc_flags & CmdDocFlag_DocFormat) {
-		String init_fullpath = c->parser->init_fullpath;
-		String output_name = {};
-		String output_base = {};
+		String output_file = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
+		defer (gb_free(heap_allocator(), output_file.text));
 
-		if (build_context.out_filepath.len == 0) {
-			output_name = remove_directory_from_path(init_fullpath);
-			output_name = remove_extension_from_path(output_name);
-			output_name = string_trim_whitespace(output_name);
-			if (output_name.len == 0) {
-				output_name = info->init_scope->pkg->name;
-			}
-			output_base = output_name;
-		} else {
-			output_name = build_context.out_filepath;
-			output_name = string_trim_whitespace(output_name);
-			if (output_name.len == 0) {
-				output_name = info->init_scope->pkg->name;
-			}
-			isize pos = string_extension_position(output_name);
-			if (pos < 0) {
-				output_base = output_name;
-			} else {
-				output_base = substring(output_name, 0, pos);
-			}
-		}
-
-		output_base = path_to_full_path(permanent_allocator(), output_base);
-
-		gbString output_file_path = gb_string_make_length(heap_allocator(), output_base.text, output_base.len);
-		output_file_path = gb_string_appendc(output_file_path, ".odin-doc");
-		defer (gb_string_free(output_file_path));
-
-		odin_doc_write(info, output_file_path);
+		odin_doc_write(info, cast(char const *)output_file.text);
 	} else {
 		auto pkgs = array_make<AstPackage *>(permanent_allocator(), 0, info->packages.count);
 		for (auto const &entry : info->packages) {

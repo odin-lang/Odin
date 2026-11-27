@@ -78,7 +78,11 @@ _open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, 
 		return
 	}
 
-	return _new_file(uintptr(fd), name, file_allocator())
+	f, err = _new_file(uintptr(fd), name, file_allocator())
+	if err != nil {
+		posix.close(fd)
+	}
+	return
 }
 
 _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -> (f: ^File, err: Error) {
@@ -91,9 +95,10 @@ _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -
 	}
 
 	crname := _posix_absolute_path(posix.FD(handle), name, allocator) or_return
+	defer if err != nil { delete(crname, allocator) }
 	rname  := string(crname)
 
-	f = __new_file(posix.FD(handle), allocator)
+	f = __new_file(posix.FD(handle), allocator) or_return
 	impl := (^File_Impl)(f.impl)
 	impl.name  = rname
 	impl.cname = crname
@@ -103,14 +108,18 @@ _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -
 
 _posix_absolute_path_from_name :: proc(name: string, allocator: runtime.Allocator) -> (path: cstring, err: Error) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
-	if abs_path, abs_err := _get_absolute_path(name, temp_allocator); abs_err == nil {
+	abs_path, abs_err := _get_absolute_path(name, temp_allocator)
+	if abs_err == nil {
 		return clone_to_cstring(abs_path, allocator)
+	}
+	if _, is_alloc_err := abs_err.(runtime.Allocator_Error); is_alloc_err {
+		return nil, abs_err
 	}
 	return clone_to_cstring(name, allocator)
 }
 
-__new_file :: proc(handle: posix.FD, allocator: runtime.Allocator) -> ^File {
-	impl := new(File_Impl, allocator)
+__new_file :: proc(handle: posix.FD, allocator: runtime.Allocator) -> (f: ^File, err: runtime.Allocator_Error) {
+	impl := new(File_Impl, allocator) or_return
 	impl.file.impl = impl
 	impl.fd = posix.FD(handle)
 	impl.allocator = allocator
@@ -118,7 +127,7 @@ __new_file :: proc(handle: posix.FD, allocator: runtime.Allocator) -> ^File {
 		data = impl,
 		procedure = _file_stream_proc,
 	}
-	return &impl.file
+	return &impl.file, nil
 }
 
 _clone :: proc(f: ^File) -> (clone: ^File, err: Error) {
@@ -130,16 +139,19 @@ _clone :: proc(f: ^File) -> (clone: ^File, err: Error) {
 	impl := (^File_Impl)(f.impl)
 
 	fd := posix.dup(impl.fd)
-	if fd <= 0 {
+	if fd < 0 {
 		err = _get_platform_error()
 		return
 	}
 	defer if err != nil { posix.close(fd) }
 
-	clone = __new_file(fd, file_allocator())	
+	cname := clone_to_cstring(impl.name, file_allocator()) or_return
+	defer if err != nil { delete(cname, file_allocator()) }
+
+	clone = __new_file(fd, file_allocator()) or_return
 	clone_impl := (^File_Impl)(clone.impl)
-	clone_impl.cname = clone_to_cstring(impl.name, file_allocator()) or_return
-	clone_impl.name  = string(clone_impl.cname)
+	clone_impl.cname = cname
+	clone_impl.name  = string(cname)
 
 	return
 }

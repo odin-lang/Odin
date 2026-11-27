@@ -86,6 +86,8 @@ gb_internal void     check_not_tuple                (CheckerContext *c, Operand 
 gb_internal void     convert_to_typed               (CheckerContext *c, Operand *operand, Type *target_type, bool no_final_update=false);
 gb_internal gbString expr_to_string                 (Ast *expression);
 gb_internal gbString expr_to_string                 (Ast *expression, gbAllocator allocator);
+gb_internal gbString expr_to_string_exact           (Ast *expression);
+gb_internal gbString expr_to_string_exact           (Ast *expression, gbAllocator allocator);
 gb_internal void     update_untyped_expr_type       (CheckerContext *c, Ast *e, Type *type, bool final);
 gb_internal bool     check_is_terminating           (Ast *node, String const &label);
 gb_internal bool     check_has_break                (Ast *stmt, String const &label, bool implicit);
@@ -112,6 +114,8 @@ gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key);
 gb_internal Type *make_soa_struct_fixed(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem, i64 count, Type *generic_type);
 gb_internal Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem);
 gb_internal Type *make_soa_struct_dynamic_array(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem);
+gb_internal Type *make_soa_struct_fixed_capacity_dynamic_array(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem, i64 capacity, Type *generic_type);
+gb_internal isize add_soa_columns(CheckerContext *ctx, Type *soa, Scope *scope, isize extra_field_count);
 
 gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint);
 
@@ -724,6 +728,22 @@ gb_internal bool poly_proc_lookup_operands_equal(Slice<PolyProcLookupOperand> co
 
 gb_internal bool check_proc_params_assignable(CheckerContext *c, Type *x, Type *y);
 
+// NOTE(bill): A polymorphic procedure or record that instantiates itself with a new type each time never finishes
+// 	`f :: proc(x: $T) { f([1]T{x}) }`.
+// Instantiations within core, vendor, examples, and tests nest at most 9 deep.
+enum { MAX_POLYMORPHIC_INSTANTIATION_DEPTH = 100 };
+
+gb_internal void check_polymorphic_instantiation_depth(isize depth, Token const &token, String const &name) {
+	if (depth <= MAX_POLYMORPHIC_INSTANTIATION_DEPTH) {
+		return;
+	}
+
+	// NOTE(bill): This stops the compiler and is reported even whilst errors are muted.
+	global_error_context.mute_depth = 0;
+	error(token, "Polymorphic instantiations are nested too deeply: the limit is %d levels. '%.*s' probably instantiates itself with a new type each time", MAX_POLYMORPHIC_INSTANTIATION_DEPTH, LIT(name));
+	exit_with_errors();
+}
+
 gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_entity, Type *type,
                                                         Array<Operand> const *param_operands, Ast *poly_def_node, PolyProcData *poly_proc_data) {
 	///////////////////////////////////////////////////////////////////////////////
@@ -984,6 +1004,15 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	}
 	rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 
+	isize instantiation_depth = 1;
+	for (ProcInfo *pi = global_error_context.instantiations.proc; pi != nullptr; pi = pi->poly_parent) {
+		if (pi->generated_from_polymorphic) {
+			instantiation_depth += 1;
+		}
+	}
+	Token instantiation_token = poly_def_node != nullptr ? ast_token(poly_def_node) : base_entity->token;
+	check_polymorphic_instantiation_depth(instantiation_depth, instantiation_token, name);
+
 	// NOTE(bill): Clone a polymorphic procedure's body before taking `gen_procs`' exclusive lock so lookups of it don't wait on the clone
 	Ast *proc_lit = clone_ast(old_decl->proc_lit);
 	Ast *ident = clone_ast(base_entity->identifier);
@@ -1065,6 +1094,9 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	}
 	if (base_entity->flags & EntityFlag_Disabled) {
 		entity->flags |= EntityFlag_Disabled;
+	}
+	if (base_entity->flags & EntityFlag_NotExported) {
+		entity->flags |= EntityFlag_NotExported;
 	}
 
 	d->entity.store(entity);
@@ -2117,6 +2149,61 @@ gb_internal Type *check_in_progress_type_alias(CheckerContext *c, Entity *e) {
 	return t;
 }
 
+// Whether `e` is a column of `#soa[dynamic; N]T` reached through `using` on a value, which is not addressable
+gb_internal bool is_soa_inline_column_of_value(Entity *e) {
+	if ((e->flags & EntityFlag_Using) == 0 || e->using_parent == nullptr) {
+		return false;
+	}
+	if (!is_type_slice(e->type)) {
+		return false;
+	}
+	Entity *parent = e->using_parent;
+	if ((parent->flags & EntityFlag_Value) == 0 || is_type_pointer(parent->type)) {
+		return false;
+	}
+	Type *soa = base_type(parent->type);
+	return is_type_soa_struct(soa) && soa->Struct.soa_kind == StructSoa_FixedCapacityDynamic;
+}
+
+// Whether the variable `e` is an #soa element: the value of a for-in loop over an #soa array, or an #soa pointer
+gb_internal bool is_soa_element_variable(Entity *e) {
+	if (e == nullptr || e->kind != Entity_Variable) {
+		return false;
+	}
+	if (is_type_soa_pointer(e->type)) {
+		return true;
+	}
+	return (e->flags & EntityFlag_SoaPtrField) != 0 &&
+	       e->Variable.for_loop_parent_type != nullptr &&
+	       is_type_soa_struct(type_deref(e->Variable.for_loop_parent_type));
+}
+
+// Whether the operand `o` of `expr` is an #soa element, or a `#soa_split` field's value in one, spread over columns
+gb_internal bool is_soa_element_operand(Operand const *o, Ast *expr) {
+	expr = unparen_expr(expr);
+	if (o->mode == Addressing_SoaVariable) {
+		// NOTE(bill): a lane, `soa[i][j]`, is in a single column
+		return !(expr->kind == Ast_IndexExpr && is_type_array(type_of_expr(expr->IndexExpr.expr)));
+	}
+	return is_type_soa_pointer(o->type) || is_soa_element_variable(entity_of_node(expr));
+}
+
+// Whether `e`, reached through `using` on an #soa element, is a `#soa_split` field's value
+gb_internal bool is_soa_split_using_variable(Entity *e) {
+	Entity *parent = e->using_parent;
+	return (e->flags & EntityFlag_Using) != 0 &&
+	       is_soa_element_variable(parent) &&
+	       is_soa_split_selection(type_deref(parent->type), lookup_field(parent->type, entity_interned_name(e), false));
+}
+
+gb_internal void error_soa_column_not_addressable(Operand *o, Ast *node) {
+	gbString str = expr_to_string(node);
+	error(node, "Cannot take the column '%s' of an #soa array, value is not addressable", str);
+	gb_string_free(str);
+	o->mode = Addressing_Invalid;
+	o->type = t_invalid;
+}
+
 gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Type *type_hint, bool allow_import_name) {
 	GB_ASSERT(n->kind == Ast_Ident);
 	o->mode = Addressing_Invalid;
@@ -2267,6 +2354,11 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		o->mode = Addressing_Variable;
 		if (e->flags & EntityFlag_Value) {
 			o->mode = Addressing_Value;
+		}
+		if (is_soa_inline_column_of_value(e)) {
+			error_soa_column_not_addressable(o, n);
+		} else if (o->mode == Addressing_Variable && is_soa_split_using_variable(e)) {
+			o->mode = Addressing_SoaVariable;
 		}
 		break;
 
@@ -3140,6 +3232,23 @@ gb_internal void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type
 		}
 	} else if (are_types_identical(src, t_string) && is_type_u8_slice(dst)) {
 		error_line("\tSuggestion: a string may be transmuted to %s\n", b);
+	} else if ((is_type_soa_struct(src) && src->Struct.soa_kind == StructSoa_Fixed && dst->kind == Type_Array) ||
+	           (is_type_soa_struct(dst) && dst->Struct.soa_kind == StructSoa_Fixed && src->kind == Type_Array)) {
+		i64   src_count = src->kind == Type_Array ? src->Array.count : src->Struct.soa_count;
+		i64   dst_count = dst->kind == Type_Array ? dst->Array.count : dst->Struct.soa_count;
+		Type *src_elem  = src->kind == Type_Array ? src->Array.elem  : src->Struct.soa_elem;
+		Type *dst_elem  = dst->kind == Type_Array ? dst->Array.elem  : dst->Struct.soa_elem;
+		if (src_count != dst_count) {
+			error_line("\tNote: an #soa array and an array convert only at the same length, %lld vs %lld\n", cast(long long)src_count, cast(long long)dst_count);
+		} else {
+			gbString se = type_to_string(src_elem);
+			gbString de = type_to_string(dst_elem);
+			error_line("\tNote: an #soa array and an array convert only with the same element type, '%s' vs '%s'\n", se, de);
+			gb_string_free(de);
+			gb_string_free(se);
+		}
+	} else if ((is_type_soa_slice(src) && is_type_slice(dst)) || (is_type_slice(src) && is_type_soa_slice(dst))) {
+		error_line("\tSuggestion: 'copy' copies the elements between a slice and an #soa slice\n");
 	} else if (check_integer_exceed_suggestion(c, o, type)) {
 		return;
 	}
@@ -3373,6 +3482,19 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 			}
 			o->mode = Addressing_Invalid;
 			return;
+		}
+		if (o->mode == Addressing_SoaVariable && node->kind == Ast_UnaryExpr) {
+			// NOTE(bill): `soa[i]`, `p^` and `soa[i][j]` have pointers of their own
+			Ast *expr = unparen_expr(node->UnaryExpr.expr);
+			if (expr->kind == Ast_SelectorExpr || expr->kind == Ast_Ident) {
+				ERROR_BLOCK();
+				gbString str = expr_to_string(expr);
+				error(op, "Cannot take the pointer address of '%s' which is a '#soa_split' field of an #soa element", str);
+				error_line("\tEach of its fields is stored in an #soa column of its own. Take the address of one of its fields instead.\n");
+				gb_string_free(str);
+				o->mode = Addressing_Invalid;
+				return;
+			}
 		}
 		if (analysis_in_use(AnalysisFlag_Atomic)) {
 			if (Entity *e = check_atomic_location(o->expr)) {
@@ -4063,6 +4185,11 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 		return are_types_identical(dst->Slice.elem, src->Slice.elem);
 	}
 
+	// NOTE(bill): `(#soa[N]T)(a)` and `([N]T)(s)` copy the elements into the other layout.
+	if (is_type_soa_of_array(dst, src) || is_type_soa_of_array(src, dst)) {
+		return true;
+	}
+
 	// Cast between booleans and integers
 	if (is_type_boolean(src) || is_type_integer(src)) {
 		if (is_type_boolean(dst) || is_type_integer(dst)) {
@@ -4451,7 +4578,7 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 
 	// In this case, the cast involves array programming
 	// so the operand needs to be a computed value
-	if (!is_type_array_like(x->type) && is_type_array_like(type)) {
+	if (!is_type_array_like(x->type) && is_type_array_like(type) && !is_type_soa_of_array(x->type, type)) {
 		x->mode = Addressing_Value;
 	}
 	x->type = type;
@@ -4877,13 +5004,9 @@ gb_internal void check_binary_expr_dependency(CheckerContext *c, Token op, Type 
 			break;
 		}
 	} else if (op.kind == Token_Shr || op.kind == Token_ShrEq) {
-		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
-		case Basic_u128:
-		case Basic_i128:
-			if (is_arch_wasm()) {
-				add_package_dependency(c, "runtime", "__lshrti3", REQUIRE);
-			}
-			break;
+		if (bt->kind == Type_Basic && is_arch_wasm()) switch (bt->Basic.kind) {
+		case Basic_u128: add_package_dependency(c, "runtime", "__lshrti3", REQUIRE); break;
+		case Basic_i128: add_package_dependency(c, "runtime", "__ashrti3", REQUIRE); break;
 		}
 	}
 }
@@ -6001,7 +6124,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 				if (success_) *success_ = false;
 				if (finish_) *finish_ = true;
 				return empty_exact_value;
-			} else if (is_type_struct(node->tav.type) || is_type_bit_field(node->tav.type)) {
+			} else if ((is_type_struct(node->tav.type) && !is_type_soa_struct(node->tav.type)) || is_type_bit_field(node->tav.type)) {
 				bool found = false;
 				for (Ast *elem : cl->elems) {
 					if (elem->kind != Ast_FieldValue) {
@@ -6021,7 +6144,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 					// Use the zero value if it is not found
 					value = {};
 				}
-			} else if (is_type_array(node->tav.type) || is_type_enumerated_array(node->tav.type)) {
+			} else if (is_type_array(node->tav.type) || is_type_enumerated_array(node->tav.type) || is_type_soa_struct(node->tav.type)) {
 				for (Ast *elem : cl->elems) {
 					if (elem->kind != Ast_FieldValue) {
 						continue;
@@ -6172,6 +6295,15 @@ gb_internal ExactValue get_constant_soa_field(Type *soa, ExactValue value, Selec
 
 	i32 field_index = sel.index[0];
 	Entity *field   = soa->Struct.fields[field_index];
+
+	// NOTE(bill): the element's field for the column, after the columns of any `#soa_split` fields before it
+	if (elem->kind == Type_Struct) {
+		i32 column = field_index;
+		field_index = soa_split_column_field(elem, &column);
+		if (is_soa_split_field(elem->Struct.fields[field_index])) {
+			return empty_exact_value;
+		}
+	}
 
 	Type *field_elem_type = base_type(field->type)->Array.elem;
 
@@ -6498,6 +6630,30 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 	return nullptr;
 }
 
+// `s.f` for a `#soa_split` field `f` of the elements of the #soa array `s`: an `#soa[]` view of the field's columns
+gb_internal Entity *check_soa_split_view(CheckerContext *c, Operand *operand, Ast *node) {
+	ast_node(se, SelectorExpr, node);
+	Type *soa = base_type(type_deref(operand->type));
+	if (operand->mode == Addressing_Type || !is_type_soa_struct(soa) || !is_type_struct(soa->Struct.soa_elem)) {
+		return nullptr;
+	}
+	Selection sel = lookup_field(soa->Struct.soa_elem, se->selector->Ident.interned, false);
+	if (sel.entity == nullptr || sel.index.count != 1 || !is_soa_split_field(sel.entity)) {
+		return nullptr;
+	}
+
+	operand->expr = node;
+	add_entity_use(c, se->selector, sel.entity);
+	if (soa_has_inline_fields(soa) && !is_type_pointer(operand->type) && operand->mode != Addressing_Variable) {
+		error_soa_column_not_addressable(operand, node);
+		return sel.entity;
+	}
+	se->is_soa_split_view = true;
+	operand->type = make_soa_struct_slice(c, nullptr, nullptr, sel.entity->type);
+	operand->mode = Addressing_Value;
+	add_type_and_value(c, node, operand->mode, operand->type, operand->value);
+	return sel.entity;
+}
 
 gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *type_hint) {
 	ast_node(se, SelectorExpr, node);
@@ -6758,6 +6914,12 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 	end_of_array_selector_swizzle:;
 	}
 
+	if (entity == nullptr && selector->kind == Ast_Ident && operand->type != nullptr) {
+		if (Entity *field = check_soa_split_view(c, operand, node)) {
+			return field;
+		}
+	}
+
 	if (entity == nullptr) {
 		gbString op_str   = expr_to_string(op_expr);
 		gbString type_str = type_to_string_shorthand(operand->type);
@@ -6863,6 +7025,12 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 
 	add_entity_use(c, selector, entity);
 
+	// NOTE(bill): an #soa element, whose `#soa_split` fields have no address
+	Type *soa_elem = nullptr;
+	if (is_soa_element_operand(operand, op_expr)) {
+		soa_elem = type_deref(operand->type);
+	}
+
 	operand->type = entity->type;
 	operand->expr = node;
 
@@ -6882,14 +7050,25 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		if (sel.is_bit_field) {
 			se->is_bit_field = true;
 		}
+		if (entity->flags & EntityFlag_SoaPtrField) {
+			// NOTE(bill): A column of an #soa array other than `#soa[N]T` is a slice of its `len` elements.
+			// The columns of `#soa[dynamic; N]T` are stored inline, so it must be addressable, as when it is sliced.
+			Type *column = base_type(entity->type);
+			if (column->kind == Type_Array && !sel.indirect && operand->mode != Addressing_Variable) {
+				error_soa_column_not_addressable(operand, node);
+				break;
+			}
+			se->is_soa_column = true;
+			operand->type = soa_column_slice_type(entity->type);
+			operand->mode = Addressing_Value;
+			break;
+		}
 		if (sel.indirect) {
 			operand->mode = Addressing_Variable;
 		} else if (operand->mode == Addressing_Context) {
 			// Do nothing
 		} else if (operand->mode == Addressing_MapIndex) {
 			operand->mode = Addressing_Value;
-		} else if (entity->flags & EntityFlag_SoaPtrField) {
-			operand->mode = Addressing_SoaVariable;
 		} else if (operand->mode == Addressing_OptionalOk || operand->mode == Addressing_OptionalOkPtr) {
 			operand->mode = Addressing_Value;
 		} else if (operand->mode == Addressing_SoaVariable) {
@@ -6898,6 +7077,9 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			operand->mode = Addressing_Variable;
 		} else {
 			operand->mode = Addressing_Value;
+		}
+		if (operand->mode == Addressing_Variable && soa_elem != nullptr && is_soa_split_selection(soa_elem, sel)) {
+			operand->mode = Addressing_SoaVariable;
 		}
 		break;
 	case Entity_TypeName:
@@ -7342,6 +7524,29 @@ gb_internal void materialize_deferred_untyped_arg(CheckerContext *c, Operand *o,
 	}
 }
 
+// NOTE(bill): The element type that the arguments of a polymorphic variadic parameter determine.
+// The first typed argument decides it.
+// With only untyped arguments, the default type of the first one does.
+// An untyped `nil`, or an argument whose type comes from the parameter, cannot decide it.
+gb_internal Type *polymorphic_variadic_element_hint(Slice<Operand> const &operands) {
+	Type *untyped_default = nullptr;
+	for (Operand const &o : operands) {
+		if (o.deferred_untyped_arg || o.type == nullptr || !is_operand_value(o)) {
+			continue;
+		}
+		if (is_type_typed(o.type)) {
+			return o.type;
+		}
+		if (untyped_default == nullptr) {
+			Type *t = default_type(o.type);
+			if (is_type_typed(t)) {
+				untyped_default = t;
+			}
+		}
+	}
+	return untyped_default;
+}
+
 gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, Ast *call,
 	Entity *entity, Type *proc_type,
 	Array<Operand> positional_operands, Array<Operand> const &named_operands,
@@ -7508,6 +7713,12 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 					Entity *vt = pt->params->Tuple.variables[pt->variadic_index];
 					o.type = vt->type;
+					if (is_type_polymorphic(vt->type)) {
+						// NOTE(bill): The arguments determine a polymorphic element type, e.g. the `E` of `proc(args: ..$E)`.
+						if (Type *elem = polymorphic_variadic_element_hint(variadic_operands)) {
+							o.type = alloc_type_slice(elem);
+						}
+					}
 				} else {
 					dummy_argument_count += 1;
 					o.type = t_untyped_nil;
@@ -7778,14 +7989,35 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		Type *elem = base_type(slice)->Slice.elem;
 		Type *t = elem;
 
-		if (is_type_polymorphic(t)) {
+		// NOTE(bill): The arguments are not checked against an element type that is still polymorphic.
+		bool element_determined = !is_type_polymorphic(t);
+		if (!element_determined) {
 			if (show_error) {
-				error(call, "Ambiguous call to a polymorphic variadic procedure with no variadic input %s", type_to_string(final_proc_type));
+				ERROR_BLOCK();
+				gbString elem_str = type_to_string(elem);
+				String name = var_entity->token.string;
+				if (variadic_operands.count == 0) {
+					error(call, "Cannot infer the polymorphic type '%s' of the variadic parameter '%.*s' without an argument for it", elem_str, LIT(name));
+					error_line("\tSuggestion: Pass a typed argument, or a typed slice with '..', e.g. '..[]T{}'\n");
+				} else {
+					Operand const &first = variadic_operands[0];
+					bool passed_a_type = first.mode == Addressing_Type;
+					set_caret_label(passed_a_type ? "a type, not a value" : "untyped; its type cannot be determined here");
+					error(first.expr, "Cannot infer the polymorphic type '%s' of the variadic parameter '%.*s' from its arguments", elem_str, LIT(name));
+					if (passed_a_type) {
+						gbString type_str = expr_to_string(first.expr);
+						error_line("\tSuggestion: Pass a value of the type, e.g. '%s{}'\n", type_str);
+						gb_string_free(type_str);
+					} else {
+						error_line("\tSuggestion: Give one of the arguments a type, e.g. 'T(x)' or 'T{...}'\n");
+					}
+				}
+				gb_string_free(elem_str);
 			}
 			err = CallArgumentError_AmbiguousPolymorphicVariadic;
 		}
 
-		for_array(operand_index, variadic_operands) {
+		for (isize operand_index = 0; element_determined && operand_index < variadic_operands.count; operand_index++) {
 			Operand *o = &variadic_operands[operand_index];
 			Operand deferred_local;
 			if (o->deferred_untyped_arg) {
@@ -7839,7 +8071,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			score += eval_param_and_score(c, o, t, err, true, var_entity, show_error);
 		}
 
-		if (!vari_expand && variadic_operands.count != 0) {
+		if (element_determined && !vari_expand && variadic_operands.count != 0) {
 			// NOTE(bill, 2024-07-14): minimize the stack usage for variadic parameters with the backing array
 			if (c->decl && c->decl->proc) {
 				poly_dep_capture_unreplayable(c);
@@ -9312,6 +9544,13 @@ gb_internal Type *instantiate_polymorphic_record(CheckerContext *c, Type *origin
 		failed_type = found_entity->type;
 	}
 
+	isize instantiation_depth = 1;
+	for (ErrorRecordInstantiation *r = global_error_context.instantiations.records; r != nullptr; r = r->prev) {
+		instantiation_depth += 1;
+	}
+	Token instantiation_token = call != nullptr ? ast_token(call) : original_type->Named.type_name->token;
+	check_polymorphic_instantiation_depth(instantiation_depth, instantiation_token, original_type->Named.name);
+
 	CheckerContext ctx = *c;
 
 	// NOTE(bill): We need to make sure the lookup scope for the record is the same as where it was created
@@ -9327,7 +9566,7 @@ gb_internal Type *instantiate_polymorphic_record(CheckerContext *c, Type *origin
 	GB_ASSERT(ctx.scope != nullptr);
 
 	Type *bt = base_type(original_type);
-	String generated_name = failed_type ? failed_type->Named.name : make_string_c(expr_to_string(call));
+	String generated_name = failed_type ? failed_type->Named.name : make_string_c(expr_to_string_exact(call));
 
 	Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
 	ErrorRecordInstantiation instantiation = {global_error_context.instantiations.records, call, failed_type ? failed_type : named_type, error_thread_count()};
@@ -9735,6 +9974,7 @@ gb_internal ExprKind check_call_expr_as_type_cast(CheckerContext *c, Operand *op
 			Entity *e = ot->Named.type_name;
 			add_entity_use(c, ident, e);
 			add_type_and_value(c, call, Addressing_Type, ot, empty_exact_value);
+			operand->expr = call;
 		} else {
 			operand->mode = Addressing_Invalid;
 			operand->type = t_invalid;
@@ -10053,6 +10293,12 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		}
 		if (c->curr_proc_decl != nullptr && analysis_in_use(AnalysisFlag_Escape)) {
 			per_thread_array_add(&c->info->checked_calls_queue, CheckedCall{c->curr_proc_decl, callee});
+
+			// NOTE(bill): The deferred procedure is called at the end of the scope, see `escape_defer_call`.
+			Entity *deferred = callee->Procedure.deferred_procedure.entity;
+			if (deferred != nullptr) {
+				per_thread_array_add(&c->info->checked_calls_queue, CheckedCall{c->curr_proc_decl, deferred});
+			}
 		}
 		if (callee->Procedure.futex != ProcedureFutex_None && call->CallExpr.args.count > 0 && analysis_in_use(AnalysisFlag_Atomic)) {
 			per_thread_array_add(&c->info->checked_atomics_queue, CheckedAtomic{call, c->curr_proc_decl, BuiltinProc_Invalid, callee->Procedure.futex});
@@ -10293,7 +10539,7 @@ gb_internal void check_expr_with_type_hint(CheckerContext *c, Operand *o, Ast *e
 	}
 }
 
-gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count, Type *original_type) {
+gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count) {
 	switch (t->kind) {
 	case Type_Basic:
 		if (t->Basic.kind == Basic_string) {
@@ -10408,6 +10654,8 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 			case StructSoa_Dynamic:
 				indirection = o->mode != Addressing_Constant;
 				break;
+			case StructSoa_FixedCapacityDynamic:
+				break;
 			}
 			o->type = t->Struct.soa_elem;
 			if (o->mode == Addressing_SoaVariable || o->mode == Addressing_Variable || indirection) {
@@ -10418,15 +10666,6 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 			return true;
 		}
 		return false;
-	}
-
-	if (is_type_pointer(original_type) && indirection) {
-		Type *ptr = base_type(original_type);
-		if (ptr->kind == Type_MultiPointer && o->mode == Addressing_SoaVariable) {
-			o->type = ptr->MultiPointer.elem;
-			o->mode = Addressing_Value;
-			return true;
-		}
 	}
 
 	return false;
@@ -10951,6 +11190,7 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		String file = get_file_path_string(bd->token.pos.file_id);
 		switch (build_context.source_code_location_info) {
 		case SourceCodeLocationInfo_Normal:
+			file = path_prefix_map_apply(file);
 			break;
 		case SourceCodeLocationInfo_Obfuscated:
 			file = obfuscate_string(file, "F");
@@ -10969,6 +11209,7 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		String path = dir_from_path(file);
 		switch (build_context.source_code_location_info) {
 		case SourceCodeLocationInfo_Normal:
+			path = path_prefix_map_apply(path);
 			break;
 		case SourceCodeLocationInfo_Obfuscated:
 			path = obfuscate_string(path, "D");
@@ -11921,7 +12162,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					}
 					is_to_be_determined_array_count = true;
 				}
-			} else {
+			} else if (type_expr->ArrayType.tag == nullptr) {
 				type = alloc_type_slice(check_type(c, type_expr->ArrayType.elem));
 			}
 			if (cl->elems.count > 0) {
@@ -11931,25 +12172,12 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					String name = tag->BasicDirective.name.string;
 					if (name == "soa") {
 						is_soa = true;
-						if (count == nullptr) {
-							error(node, "#soa slices are not supported for compound literals");
-							return kind;
-						} else if (count->kind == Ast_UnaryExpr &&
-						           count->UnaryExpr.op.kind == Token_Question) {
+						if (count != nullptr &&
+						    count->kind == Ast_UnaryExpr &&
+						    count->UnaryExpr.op.kind == Token_Question) {
 							error(node, "#soa fixed length arrays must specify their length and cannot use ?");
 						}
 					}
-				}
-			}
-		} else if (type_expr->kind == Ast_DynamicArrayType && type_expr->DynamicArrayType.tag != nullptr) {
-			if (cl->elems.count > 0) {
-				Ast *tag = type_expr->DynamicArrayType.tag;
-				GB_ASSERT(tag->kind == Ast_BasicDirective);
-				String name = tag->BasicDirective.name.string;
-				if (name == "soa") {
-					is_soa = true;
-					error(node, "#soa dynamic arrays are not supported for compound literals");
-					return kind;
 				}
 			}
 		}
@@ -12145,8 +12373,16 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			}
 
 			break;
-		} else if (t->Struct.soa_kind != StructSoa_Fixed) {
-			error(node, "#soa slices and dynamic arrays are not supported for compound literals");
+		} else if (t->Struct.soa_kind == StructSoa_Dynamic) {
+			// NOTE(bill): An #soa dynamic array is built up at run time, and a literal is a fixed set of elements.
+			// A fixed set is an #soa slice or #soa array, and `append` adds one to a dynamic array.
+			ERROR_BLOCK();
+			gbString type_str = type_to_string(type);
+			gbString elem_str = type_to_string(t->Struct.soa_elem);
+			error(node, "'%s' cannot be a compound literal: an #soa dynamic array is built up at run time", type_str);
+			error_line("\tSuggestion: Write a fixed set of elements as '#soa[]%s{...}' or '#soa[N]%s{...}', and 'append' it, e.g. 'append(&d, #soa[]%s{...})'\n", elem_str, elem_str, elem_str);
+			gb_string_free(elem_str);
+			gb_string_free(type_str);
 			break;
 		}
 		/*fallthrough*/
@@ -12162,11 +12398,16 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		String context_name = {};
 		i64 max_type_count = -1;
 		if (t->kind == Type_Struct) {
-			GB_ASSERT(t->Struct.soa_kind == StructSoa_Fixed);
 			elem_type = t->Struct.soa_elem;
 			context_name = str_lit("#soa array literal");
-			if (!is_to_be_determined_array_count) {
+			if (t->Struct.soa_kind == StructSoa_Slice) {
+				context_name = str_lit("#soa slice literal");
+			} else if (!is_to_be_determined_array_count) {
 				max_type_count = t->Struct.soa_count;
+			}
+			if (t->Struct.soa_kind == StructSoa_FixedCapacityDynamic) {
+				context_name = str_lit("#soa fixed capacity dynamic array literal");
+				is_constant = false;
 			}
 		} else if (t->kind == Type_Slice) {
 			elem_type = t->Slice.elem;
@@ -12391,6 +12632,17 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				} else if (max > SIMD_ELEMENT_COUNT_MAX) {
 					error(node, "#simd support a maximum element count of %d, got %lld", SIMD_ELEMENT_COUNT_MAX, cast(long long)max);
 				}
+			}
+		} else if (t->kind == Type_Struct && t->Struct.soa_kind == StructSoa_FixedCapacityDynamic) {
+			if (max > t->Struct.soa_count) {
+				error(node, "Expected a maximum of %lld values for this #soa fixed capacity dynamic array, got %lld",
+				      cast(long long)t->Struct.soa_count,
+				      cast(long long)max);
+			}
+		} else if (t->kind == Type_Struct && t->Struct.soa_kind == StructSoa_Slice) {
+			// NOTE(bill): An #soa slice literal is a slice of an #soa array of its elements, as a slice literal is of an array.
+			if (max > 0) {
+				cl->soa_backing = make_soa_struct_fixed(c, nullptr, nullptr, elem_type, max, nullptr);
 			}
 		} else if (t->kind == Type_Struct) {
 			GB_ASSERT(t->Struct.soa_kind == StructSoa_Fixed);
@@ -13330,7 +13582,7 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 	}
 
 	i64 max_count = -1;
-	bool valid = check_set_index_data(o, t, is_ptr, &max_count, o->type);
+	bool valid = check_set_index_data(o, t, is_ptr, &max_count);
 
 	if (is_const) {
 		if (is_type_array(t)) {
@@ -13344,6 +13596,8 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 		} else if (is_type_string(t)) {
 			// Okay
 		} else if (is_type_matrix(t)) {
+			// Okay
+		} else if (is_type_soa_struct(t) && t->Struct.soa_kind != StructSoa_Dynamic) {
 			// Okay
 		} else {
 			valid = false;
@@ -13526,6 +13780,8 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 			valid = true;
 			if (t->Struct.soa_kind == StructSoa_Fixed) {
 				max_count = t->Struct.soa_count;
+			}
+			if (soa_has_inline_fields(t)) {
 				if (o->mode != Addressing_Variable && !is_type_pointer(o->type)) {
 					gbString str = expr_to_string(node);
 					error(node, "Cannot slice #soa array '%s', value is not addressable", str);
@@ -13715,6 +13971,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 			o->mode = Addressing_Type;
 			o->type = type;
 		}
+		o->expr = node;
 		return kind;
 	case_end;
 
@@ -14095,6 +14352,9 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 	case Ast_RelativeType:
 		o->mode = Addressing_Type;
 		o->type = check_type(c, node);
+		if (o->type == t_invalid) {
+			o->mode = Addressing_Invalid;
+		}
 		break;
 	}
 
@@ -14418,14 +14678,19 @@ gb_internal void match_exact_values_variant(ExactValue *x, ExactValue *y) {
 	match_exact_values(x, y);
 }
 
-gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthand);
+enum ExprStringFlag : u32 {
+	ExprString_Shorthand     = 1u<<0,
+	ExprString_ShortLiterals = 1u<<1,
+};
 
-gb_internal gbString write_struct_fields_to_string(gbString str, Slice<Ast *> const &params) {
+gb_internal gbString write_expr_to_string(gbString str, Ast *node, u32 flags);
+
+gb_internal gbString write_struct_fields_to_string(gbString str, Slice<Ast *> const &params, u32 flags) {
 	for_array(i, params) {
 		if (i > 0) {
 			str = gb_string_appendc(str, ", ");
 		}
-		str = write_expr_to_string(str, params[i], false);
+		str = write_expr_to_string(str, params[i], flags & ExprString_ShortLiterals);
 	}
 	return str;
 }
@@ -14443,8 +14708,34 @@ gb_internal gbString string_append_token(gbString str, Token token) {
 	return str;
 }
 
+gb_internal gbString string_append_short_literal(gbString str, String s) {
+	isize const limit = 36;
+	if (s.len <= limit) {
+		return string_append_string(str, s);
+	}
+	isize head = limit/5;
+	isize tail = s.len - limit/5;
+	while (head > 0 && (s[head] & 0xC0) == 0x80) {
+		head -= 1;
+	}
+	while (tail < s.len && (s[tail] & 0xC0) == 0x80) {
+		tail += 1;
+	}
+	isize omitted = 0;
+	for (isize i = head; i < tail; i += 1) {
+		if ((s[i] & 0xC0) != 0x80) {
+			omitted += 1;
+		}
+	}
+	char quote = cast(char)s[0];
+	str = gb_string_append_length(str, s.text, head);
+	str = gb_string_append_fmt(str, "%c..%td chars..%c", quote, omitted, quote);
+	str = gb_string_append_length(str, s.text+tail, s.len-tail);
+	return str;
+}
 
-gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
+
+gb_internal gbString write_expr_to_string(gbString str, Ast *node, u32 flags) {
 	if (node == nullptr)
 		return str;
 
@@ -14466,7 +14757,11 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 	case_end;
 
 	case_ast_node(bl, BasicLit, node);
-		str = string_append_token(str, bl->token);
+		if ((flags & ExprString_ShortLiterals) && bl->token.kind == Token_String) {
+			str = string_append_short_literal(str, bl->token.string);
+		} else {
+			str = string_append_token(str, bl->token);
+		}
 	case_end;
 
 	case_ast_node(bd, BasicDirective, node);
@@ -14482,7 +14777,7 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		str = gb_string_appendc(str, "proc{");
 		for_array(i, pg->args) {
 			if (i > 0) str = gb_string_appendc(str, ", ");
-			str = write_expr_to_string(str, pg->args[i], shorthand);
+			str = write_expr_to_string(str, pg->args[i], flags);
 		}
 		str = gb_string_append_rune(str, '}');
 	case_end;
@@ -14491,14 +14786,14 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		str = gb_string_appendc(str, "asm{");
 		for_array(i, pg->args) {
 			if (i > 0) str = gb_string_appendc(str, ", ");
-			str = write_expr_to_string(str, pg->args[i], shorthand);
+			str = write_expr_to_string(str, pg->args[i], flags);
 		}
 		str = gb_string_append_rune(str, '}');
 	case_end;
 
 
 	case_ast_node(pl, ProcLit, node);
-		str = write_expr_to_string(str, pl->type, shorthand);
+		str = write_expr_to_string(str, pl->type, flags);
 		if (pl->body) {
 			str = gb_string_appendc(str, " {...}");
 		} else {
@@ -14517,14 +14812,14 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 	case_end;
 
 	case_ast_node(cl, CompoundLit, node);
-		str = write_expr_to_string(str, cl->type, shorthand);
+		str = write_expr_to_string(str, cl->type, flags);
 		str = gb_string_append_rune(str, '{');
-		if (shorthand) {
+		if (flags & ExprString_Shorthand) {
 			str = gb_string_appendc(str, "...");
 		} else {
 			for_array(i, cl->elems) {
 				if (i > 0) str = gb_string_appendc(str, ", ");
-				str = write_expr_to_string(str, cl->elems[i], shorthand);
+				str = write_expr_to_string(str, cl->elems[i], flags);
 			}
 		}
 		str = gb_string_append_rune(str, '}');
@@ -14534,93 +14829,93 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 	case_ast_node(te, TagExpr, node);
 		str = gb_string_append_rune(str, '#');
 		str = string_append_token(str, te->name);
-		str = write_expr_to_string(str, te->expr, shorthand);
+		str = write_expr_to_string(str, te->expr, flags);
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, node);
 		str = string_append_token(str, ue->op);
-		str = write_expr_to_string(str, ue->expr, shorthand);
+		str = write_expr_to_string(str, ue->expr, flags);
 	case_end;
 
 	case_ast_node(de, DerefExpr, node);
-		str = write_expr_to_string(str, de->expr, shorthand);
+		str = write_expr_to_string(str, de->expr, flags);
 		str = gb_string_append_rune(str, '^');
 	case_end;
 
 	case_ast_node(be, BinaryExpr, node);
-		str = write_expr_to_string(str, be->left, shorthand);
+		str = write_expr_to_string(str, be->left, flags);
 		str = gb_string_append_rune(str, ' ');
 		str = string_append_token(str, be->op);
 		str = gb_string_append_rune(str, ' ');
-		str = write_expr_to_string(str, be->right, shorthand);
+		str = write_expr_to_string(str, be->right, flags);
 	case_end;
 
 	case_ast_node(te, TernaryIfExpr, node);
 		TokenPos x = ast_token(te->x).pos;
 		TokenPos cond = ast_token(te->cond).pos;
 		if (x < cond) {
-			str = write_expr_to_string(str, te->x, shorthand);
+			str = write_expr_to_string(str, te->x, flags);
 			str = gb_string_appendc(str, " if ");
-			str = write_expr_to_string(str, te->cond, shorthand);
+			str = write_expr_to_string(str, te->cond, flags);
 			str = gb_string_appendc(str, " else ");
-			str = write_expr_to_string(str, te->y, shorthand);
+			str = write_expr_to_string(str, te->y, flags);
 		} else {
-			str = write_expr_to_string(str, te->cond, shorthand);
+			str = write_expr_to_string(str, te->cond, flags);
 			str = gb_string_appendc(str, " ? ");
-			str = write_expr_to_string(str, te->x, shorthand);
+			str = write_expr_to_string(str, te->x, flags);
 			str = gb_string_appendc(str, " : ");
-			str = write_expr_to_string(str, te->y, shorthand);
+			str = write_expr_to_string(str, te->y, flags);
 		}
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, node);
-		str = write_expr_to_string(str, te->x, shorthand);
+		str = write_expr_to_string(str, te->x, flags);
 		str = gb_string_appendc(str, " when ");
-		str = write_expr_to_string(str, te->cond, shorthand);
+		str = write_expr_to_string(str, te->cond, flags);
 		str = gb_string_appendc(str, " else ");
-		str = write_expr_to_string(str, te->y, shorthand);
+		str = write_expr_to_string(str, te->y, flags);
 	case_end;
 
 	case_ast_node(oe, OrElseExpr, node);
-		str = write_expr_to_string(str, oe->x, shorthand);
+		str = write_expr_to_string(str, oe->x, flags);
 		str = gb_string_appendc(str, " or_else ");
-		str = write_expr_to_string(str, oe->y, shorthand);
+		str = write_expr_to_string(str, oe->y, flags);
 	case_end;
 
 	case_ast_node(oe, OrReturnExpr, node);
-		str = write_expr_to_string(str, oe->expr, shorthand);
+		str = write_expr_to_string(str, oe->expr, flags);
 		str = gb_string_appendc(str, " or_return");
 	case_end;
 
 	case_ast_node(oe, OrBranchExpr, node);
-		str = write_expr_to_string(str, oe->expr, shorthand);
+		str = write_expr_to_string(str, oe->expr, flags);
 		str = gb_string_append_rune(str, ' ');
 		str = string_append_token(str, oe->token);
 		if (oe->label) {
 			str = gb_string_append_rune(str, ' ');
-			str = write_expr_to_string(str, oe->label, shorthand);
+			str = write_expr_to_string(str, oe->label, flags);
 		}
 	case_end;
 
 	case_ast_node(pe, ParenExpr, node);
 		str = gb_string_append_rune(str, '(');
-		str = write_expr_to_string(str, pe->expr, shorthand);
+		str = write_expr_to_string(str, pe->expr, flags);
 		str = gb_string_append_rune(str, ')');
 	case_end;
 
 	case_ast_node(se, SelectorExpr, node);
-		str = write_expr_to_string(str, se->expr, shorthand);
+		str = write_expr_to_string(str, se->expr, flags);
 		str = string_append_token(str, se->token);
-		str = write_expr_to_string(str, se->selector, shorthand);
+		str = write_expr_to_string(str, se->selector, flags);
 	case_end;
 
 	case_ast_node(se, ImplicitSelectorExpr, node);
 		str = gb_string_append_rune(str, '.');
-		str = write_expr_to_string(str, se->selector, shorthand);
+		str = write_expr_to_string(str, se->selector, flags);
 	case_end;
 
 	case_ast_node(se, SelectorCallExpr, node);
-		str = write_expr_to_string(str, se->expr, shorthand);
+		str = write_expr_to_string(str, se->expr, flags);
 		str = gb_string_appendc(str, "(");
 		ast_node(ce, CallExpr, se->call);
 		isize start = se->modified_call ? 1 : 0;
@@ -14629,20 +14924,20 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 			if (i > start) {
 				str = gb_string_appendc(str, ", ");
 			}
-			str = write_expr_to_string(str, arg, shorthand);
+			str = write_expr_to_string(str, arg, flags);
 		}
 		str = gb_string_appendc(str, ")");
 	case_end;
 
 	case_ast_node(ta, TypeAssertion, node);
-		str = write_expr_to_string(str, ta->expr, shorthand);
+		str = write_expr_to_string(str, ta->expr, flags);
 		if (ta->type != nullptr &&
 		    ta->type->kind == Ast_UnaryExpr &&
 		    ta->type->UnaryExpr.op.kind == Token_Question) {
 			str = gb_string_appendc(str, ".?");
 		} else {
 			str = gb_string_appendc(str, ".(");
-			str = write_expr_to_string(str, ta->type, shorthand);
+			str = write_expr_to_string(str, ta->type, flags);
 			str = gb_string_append_rune(str, ')');
 		}
 	case_end;
@@ -14650,76 +14945,76 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 	case_ast_node(tc, TypeCast, node);
 		str = string_append_token(str, tc->token);
 		str = gb_string_append_rune(str, '(');
-		str = write_expr_to_string(str, tc->type, shorthand);
+		str = write_expr_to_string(str, tc->type, flags);
 		str = gb_string_append_rune(str, ')');
-		str = write_expr_to_string(str, tc->expr, shorthand);
+		str = write_expr_to_string(str, tc->expr, flags);
 	case_end;
 
 	case_ast_node(ac, AutoCast, node);
 		str = string_append_token(str, ac->token);
 		str = gb_string_append_rune(str, ' ');
-		str = write_expr_to_string(str, ac->expr, shorthand);
+		str = write_expr_to_string(str, ac->expr, flags);
 	case_end;
 
 	case_ast_node(ie, IndexExpr, node);
-		str = write_expr_to_string(str, ie->expr, shorthand);
+		str = write_expr_to_string(str, ie->expr, flags);
 		str = gb_string_append_rune(str, '[');
-		str = write_expr_to_string(str, ie->index, shorthand);
+		str = write_expr_to_string(str, ie->index, flags);
 		str = gb_string_append_rune(str, ']');
 	case_end;
 
 	case_ast_node(se, SliceExpr, node);
-		str = write_expr_to_string(str, se->expr, shorthand);
+		str = write_expr_to_string(str, se->expr, flags);
 		str = gb_string_append_rune(str, '[');
-		str = write_expr_to_string(str, se->low, shorthand);
+		str = write_expr_to_string(str, se->low, flags);
 		str = string_append_token(str, se->interval);
-		str = write_expr_to_string(str, se->high, shorthand);
+		str = write_expr_to_string(str, se->high, flags);
 		str = gb_string_append_rune(str, ']');
 	case_end;
 
 	case_ast_node(mie, MatrixIndexExpr, node);
-		str = write_expr_to_string(str, mie->expr, shorthand);
+		str = write_expr_to_string(str, mie->expr, flags);
 		str = gb_string_append_rune(str, '[');
-		str = write_expr_to_string(str, mie->row_index, shorthand);
+		str = write_expr_to_string(str, mie->row_index, flags);
 		str = gb_string_appendc(str, ", ");
-		str = write_expr_to_string(str, mie->column_index, shorthand);
+		str = write_expr_to_string(str, mie->column_index, flags);
 		str = gb_string_append_rune(str, ']');
 	case_end;
 
 	case_ast_node(e, Ellipsis, node);
 		str = gb_string_appendc(str, "..");
-		str = write_expr_to_string(str, e->expr, shorthand);
+		str = write_expr_to_string(str, e->expr, flags);
 	case_end;
 
 	case_ast_node(fv, FieldValue, node);
-		str = write_expr_to_string(str, fv->field, shorthand);
+		str = write_expr_to_string(str, fv->field, flags);
 		str = gb_string_appendc(str, " = ");
-		str = write_expr_to_string(str, fv->value, shorthand);
+		str = write_expr_to_string(str, fv->value, flags);
 	case_end;
 	case_ast_node(fv, EnumFieldValue, node);
-		str = write_expr_to_string(str, fv->name, shorthand);
+		str = write_expr_to_string(str, fv->name, flags);
 		if (fv->value) {
 			str = gb_string_appendc(str, " = ");
-			str = write_expr_to_string(str, fv->value, shorthand);
+			str = write_expr_to_string(str, fv->value, flags);
 		}
 	case_end;
 
 	case_ast_node(ht, HelperType, node);
 		str = gb_string_appendc(str, "#type ");
-		str = write_expr_to_string(str, ht->type, shorthand);
+		str = write_expr_to_string(str, ht->type, flags);
 	case_end;
 
 	case_ast_node(ht, DistinctType, node);
 		str = gb_string_appendc(str, "distinct ");
-		str = write_expr_to_string(str, ht->type, shorthand);
+		str = write_expr_to_string(str, ht->type, flags);
 	case_end;
 
 	case_ast_node(pt, PolyType, node);
 		str = gb_string_append_rune(str, '$');
-		str = write_expr_to_string(str, pt->type, shorthand);
+		str = write_expr_to_string(str, pt->type, flags);
 		if (pt->specialization != nullptr) {
 			str = gb_string_append_rune(str, '/');
-			str = write_expr_to_string(str, pt->specialization, shorthand);
+			str = write_expr_to_string(str, pt->specialization, flags);
 		}
 	case_end;
 
@@ -14728,12 +15023,12 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 			str = write_expr_to_string(str, pt->tag, false);
 		}
 		str = gb_string_append_rune(str, '^');
-		str = write_expr_to_string(str, pt->type, shorthand);
+		str = write_expr_to_string(str, pt->type, flags);
 	case_end;
 
 	case_ast_node(pt, MultiPointerType, node);
 		str = gb_string_appendc(str, "[^]");
-		str = write_expr_to_string(str, pt->type, shorthand);
+		str = write_expr_to_string(str, pt->type, flags);
 	case_end;
 
 	case_ast_node(at, ArrayType, node);
@@ -14746,10 +15041,10 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		    at->count->UnaryExpr.op.kind == Token_Question) {
 			str = gb_string_appendc(str, "?");
 		} else {
-			str = write_expr_to_string(str, at->count, shorthand);
+			str = write_expr_to_string(str, at->count, flags);
 		}
 		str = gb_string_append_rune(str, ']');
-		str = write_expr_to_string(str, at->elem, shorthand);
+		str = write_expr_to_string(str, at->elem, flags);
 	case_end;
 
 	case_ast_node(at, FixedCapacityDynamicArrayType, node);
@@ -14759,22 +15054,22 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		str = gb_string_appendc(str, "[dynamic; ");
 		str = write_expr_to_string(str, at->capacity, false);
 		str = gb_string_append_rune(str, ']');
-		str = write_expr_to_string(str, at->elem, shorthand);
+		str = write_expr_to_string(str, at->elem, flags);
 	case_end;
 	case_ast_node(at, DynamicArrayType, node);
 		if (at->tag) {
 			str = write_expr_to_string(str, at->tag, false);
 		}
 		str = gb_string_appendc(str, "[dynamic]");
-		str = write_expr_to_string(str, at->elem, shorthand);
+		str = write_expr_to_string(str, at->elem, flags);
 	case_end;
 
 	case_ast_node(bs, BitSetType, node);
 		str = gb_string_appendc(str, "bit_set[");
-		str = write_expr_to_string(str, bs->elem, shorthand);
+		str = write_expr_to_string(str, bs->elem, flags);
 		if (bs->underlying) {
 			str = gb_string_appendc(str, "; ");
-			str = write_expr_to_string(str, bs->underlying, shorthand);
+			str = write_expr_to_string(str, bs->underlying, flags);
 		}
 		str = gb_string_appendc(str, "]");
 	case_end;
@@ -14782,18 +15077,18 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 
 	case_ast_node(mt, MapType, node);
 		str = gb_string_appendc(str, "map[");
-		str = write_expr_to_string(str, mt->key, shorthand);
+		str = write_expr_to_string(str, mt->key, flags);
 		str = gb_string_append_rune(str, ']');
-		str = write_expr_to_string(str, mt->value, shorthand);
+		str = write_expr_to_string(str, mt->value, flags);
 	case_end;
 
 	case_ast_node(mt, MatrixType, node);
 		str = gb_string_appendc(str, "matrix[");
-		str = write_expr_to_string(str, mt->row_count, shorthand);
+		str = write_expr_to_string(str, mt->row_count, flags);
 		str = gb_string_appendc(str, ", ");
-		str = write_expr_to_string(str, mt->column_count, shorthand);
+		str = write_expr_to_string(str, mt->column_count, flags);
 		str = gb_string_append_rune(str, ']');
-		str = write_expr_to_string(str, mt->elem, shorthand);
+		str = write_expr_to_string(str, mt->elem, flags);
 	case_end;
 
 
@@ -14819,11 +15114,14 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		if (f->flags&FieldFlag_subtype) {
 			str = gb_string_appendc(str, "#subtype ");
 		}
+		if (f->flags&FieldFlag_soa_split) {
+			str = gb_string_appendc(str, "#soa_split ");
+		}
 
 		for_array(i, f->names) {
 			Ast *name = f->names[i];
 			if (i > 0) str = gb_string_appendc(str, ", ");
-			str = write_expr_to_string(str, name, shorthand);
+			str = write_expr_to_string(str, name, flags);
 		}
 		if (f->names.count > 0) {
 			if (f->type == nullptr && f->default_value != nullptr) {
@@ -14833,14 +15131,14 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		}
 		if (f->type != nullptr) {
 			str = gb_string_append_rune(str, ' ');
-			str = write_expr_to_string(str, f->type, shorthand);
+			str = write_expr_to_string(str, f->type, flags);
 		}
 		if (f->default_value != nullptr) {
 			if (f->type != nullptr) {
 				str = gb_string_append_rune(str, ' ');
 			}
 			str = gb_string_appendc(str, "= ");
-			str = write_expr_to_string(str, f->default_value, shorthand);
+			str = write_expr_to_string(str, f->default_value, flags);
 		}
 
 	case_end;
@@ -14866,7 +15164,7 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		for_array(i, f->list) {
 			if (i > 0) str = gb_string_appendc(str, ", ");
 			if (has_name) {
-				str = write_expr_to_string(str, f->list[i], shorthand);
+				str = write_expr_to_string(str, f->list[i], flags);
 			} else {
 				ast_node(field, Field, f->list[i]);
 
@@ -14891,8 +15189,11 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 				if (field->flags&FieldFlag_subtype) {
 					str = gb_string_appendc(str, "#subtype ");
 				}
+				if (field->flags&FieldFlag_soa_split) {
+					str = gb_string_appendc(str, "#soa_split ");
+				}
 
-				str = write_expr_to_string(str, field->type, shorthand);
+				str = write_expr_to_string(str, field->type, flags);
 			}
 		}
 	case_end;
@@ -14913,7 +15214,7 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 			break;
 		}
 
-		str = write_expr_to_string(str, ce->proc, shorthand);
+		str = write_expr_to_string(str, ce->proc, flags);
 		str = gb_string_appendc(str, "(");
 
 		isize idx0 = cast(isize)ce->was_selector;
@@ -14922,7 +15223,7 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 			if (i > idx0) {
 				str = gb_string_appendc(str, ", ");
 			}
-			str = write_expr_to_string(str, arg, shorthand);
+			str = write_expr_to_string(str, arg, flags);
 		}
 		str = gb_string_appendc(str, ")");
 	case_end;
@@ -14931,13 +15232,13 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		str = gb_string_appendc(str, "typeid");
 		if (tt->specialization) {
 			str = gb_string_appendc(str, "/");
-			str = write_expr_to_string(str, tt->specialization, shorthand);
+			str = write_expr_to_string(str, tt->specialization, flags);
 		}
 	case_end;
 
 	case_ast_node(pt, ProcType, node);
 		str = gb_string_appendc(str, "proc(");
-		str = write_expr_to_string(str, pt->params, shorthand);
+		str = write_expr_to_string(str, pt->params, flags);
 		str = gb_string_appendc(str, ")");
 		if (pt->results != nullptr) {
 			str = gb_string_appendc(str, " -> ");
@@ -14956,7 +15257,7 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 			if (parens_needed) {
 				str = gb_string_append_rune(str, '(');
 			}
-			str = write_expr_to_string(str, pt->results, shorthand);
+			str = write_expr_to_string(str, pt->results, flags);
 			if (parens_needed) {
 				str = gb_string_append_rune(str, ')');
 			}
@@ -14968,7 +15269,7 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		str = gb_string_appendc(str, "struct ");
 		if (st->polymorphic_params) {
 			str = gb_string_append_rune(str, '(');
-			str = write_expr_to_string(str, st->polymorphic_params, shorthand);
+			str = write_expr_to_string(str, st->polymorphic_params, flags);
 			str = gb_string_appendc(str, ") ");
 		}
 		if (st->is_packed)      str = gb_string_appendc(str, "#packed ");
@@ -14977,14 +15278,14 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		if (st->is_simple)      str = gb_string_appendc(str, "#simple ");
 		if (st->align) {
 			str = gb_string_appendc(str, "#align ");
-			str = write_expr_to_string(str, st->align, shorthand);
+			str = write_expr_to_string(str, st->align, flags);
 			str = gb_string_append_rune(str, ' ');
 		}
 		str = gb_string_append_rune(str, '{');
-		if (shorthand) {
+		if (flags & ExprString_Shorthand) {
 			str = gb_string_appendc(str, "...");
 		} else {
-			str = write_struct_fields_to_string(str, st->fields);
+			str = write_struct_fields_to_string(str, st->fields, flags);
 		}
 		str = gb_string_append_rune(str, '}');
 	case_end;
@@ -14994,7 +15295,7 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		str = gb_string_appendc(str, "union ");
 		if (st->polymorphic_params) {
 			str = gb_string_append_rune(str, '(');
-			str = write_expr_to_string(str, st->polymorphic_params, shorthand);
+			str = write_expr_to_string(str, st->polymorphic_params, flags);
 			str = gb_string_appendc(str, ") ");
 		}
 		switch (st->kind) {
@@ -15003,14 +15304,14 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		}
 		if (st->align) {
 			str = gb_string_appendc(str, "#align ");
-			str = write_expr_to_string(str, st->align, shorthand);
+			str = write_expr_to_string(str, st->align, flags);
 			str = gb_string_append_rune(str, ' ');
 		}
 		str = gb_string_append_rune(str, '{');
-		if (shorthand) {
+		if (flags & ExprString_Shorthand) {
 			str = gb_string_appendc(str, "...");
 		} else {
-			str = write_struct_fields_to_string(str, st->variants);
+			str = write_struct_fields_to_string(str, st->variants, flags);
 		}
 		str = gb_string_append_rune(str, '}');
 	case_end;
@@ -15018,44 +15319,44 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 	case_ast_node(et, EnumType, node);
 		str = gb_string_appendc(str, "enum ");
 		if (et->base_type != nullptr) {
-			str = write_expr_to_string(str, et->base_type, shorthand);
+			str = write_expr_to_string(str, et->base_type, flags);
 			str = gb_string_append_rune(str, ' ');
 		}
 		str = gb_string_append_rune(str, '{');
-		if (shorthand) {
+		if (flags & ExprString_Shorthand) {
 			str = gb_string_appendc(str, "...");
 		} else {
 			for_array(i, et->fields) {
 				if (i > 0) {
 					str = gb_string_appendc(str, ", ");
 				}
-				str = write_expr_to_string(str, et->fields[i], shorthand);
+				str = write_expr_to_string(str, et->fields[i], flags);
 			}
 		}
 		str = gb_string_append_rune(str, '}');
 	case_end;
 
 	case_ast_node(rt, RelativeType, node);
-		str = write_expr_to_string(str, rt->tag, shorthand);
+		str = write_expr_to_string(str, rt->tag, flags);
 		str = gb_string_appendc(str, "" );
-		str = write_expr_to_string(str, rt->type, shorthand);
+		str = write_expr_to_string(str, rt->type, flags);
 	case_end;
 
 
 	case_ast_node(f, BitFieldField, node);
-		str = write_expr_to_string(str, f->name, shorthand);
+		str = write_expr_to_string(str, f->name, flags);
 		str = gb_string_appendc(str, ": ");
-		str = write_expr_to_string(str, f->type, shorthand);
+		str = write_expr_to_string(str, f->type, flags);
 		str = gb_string_appendc(str, " | ");
-		str = write_expr_to_string(str, f->bit_size, shorthand);
+		str = write_expr_to_string(str, f->bit_size, flags);
 	case_end;
 	case_ast_node(bf, BitFieldType, node);
 		str = gb_string_appendc(str, "bit_field ");
-		if (!shorthand) {
-			str = write_expr_to_string(str, bf->backing_type, shorthand);
+		if (!(flags & ExprString_Shorthand)) {
+			str = write_expr_to_string(str, bf->backing_type, flags);
 		}
 		str = gb_string_appendc(str, " {");
-		if (shorthand) {
+		if (flags & ExprString_Shorthand) {
 			str = gb_string_appendc(str, "...");
 		} else {
 			for_array(i, bf->fields) {
@@ -15074,7 +15375,7 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 			ast_node(pt, ProcType, at->signature);
 
 			str = gb_string_appendc(str, "(");
-			str = write_expr_to_string(str, pt->params, shorthand);
+			str = write_expr_to_string(str, pt->params, flags);
 			str = gb_string_appendc(str, ")");
 			if (pt->results != nullptr) {
 				str = gb_string_appendc(str, " -> ");
@@ -15093,7 +15394,7 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 				if (parens_needed) {
 					str = gb_string_append_rune(str, '(');
 				}
-				str = write_expr_to_string(str, pt->results, shorthand);
+				str = write_expr_to_string(str, pt->results, flags);
 				if (parens_needed) {
 					str = gb_string_append_rune(str, ')');
 				}
@@ -15107,7 +15408,7 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 					str = gb_string_appendc(str, ", ");
 				}
 				Ast *spec = at->specs[j];
-				str = write_expr_to_string(str, spec, shorthand);
+				str = write_expr_to_string(str, spec, flags);
 			}
 			str = gb_string_append_rune(str, ']');
 		}
@@ -15117,7 +15418,7 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 				str = gb_string_appendc(str, "; ");
 			}
 			Ast *instr = at->instructions[j];
-			str = write_expr_to_string(str, instr, shorthand);
+			str = write_expr_to_string(str, instr, flags);
 			if (instr->kind == Ast_AsmLabelDecl) {
 				str = gb_string_appendc(str, ":");
 			}
@@ -15132,23 +15433,23 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 
 	case_ast_node(spec, AsmSpec, node);
 		if (spec->name) {
-			str = write_expr_to_string(str, spec->name, shorthand);
+			str = write_expr_to_string(str, spec->name, flags);
 			if (spec->tied_name) {
 				str = gb_string_appendc(str, " -> ");
-				str = write_expr_to_string(str, spec->tied_name, shorthand);
+				str = write_expr_to_string(str, spec->tied_name, flags);
 			}
 		}
 		if (spec->type) {
 			str = gb_string_appendc(str, ": ");
-			str = write_expr_to_string(str, spec->type, shorthand);
+			str = write_expr_to_string(str, spec->type, flags);
 		}
 		if (spec->value) {
 			str = gb_string_appendc(str, " = ");
-			str = write_expr_to_string(str, spec->value, shorthand);
+			str = write_expr_to_string(str, spec->value, flags);
 		}
 		for (Ast *dir : spec->directives) {
 			str = gb_string_appendc(str, " ");
-			str = write_expr_to_string(str, dir, shorthand);
+			str = write_expr_to_string(str, dir, flags);
 		}
 	case_end;
 
@@ -15157,17 +15458,17 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		str = gb_string_append_length(str, clobber->name.string.text, clobber->name.string.len);
 		if (clobber->value) {
 			str = gb_string_appendc(str, " ");
-			str = write_expr_to_string(str, clobber->value, shorthand);
+			str = write_expr_to_string(str, clobber->value, flags);
 		}
 	case_end;
 
 	case_ast_node(label, AsmLabelDecl, node);
 		str = gb_string_appendc(str, ".");
-		str = write_expr_to_string(str, label->name, shorthand);
+		str = write_expr_to_string(str, label->name, flags);
 	case_end;
 
 	case_ast_node(instr, AsmInstruction, node);
-		str = write_expr_to_string(str, instr->name, shorthand);
+		str = write_expr_to_string(str, instr->name, flags);
 		for_array(j, instr->operands) {
 			if (j == 0) {
 				str = gb_string_appendc(str, " ");
@@ -15175,22 +15476,22 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 				str = gb_string_appendc(str, ", ");
 			}
 			Ast *operand = instr->operands[j];
-			str = write_expr_to_string(str, operand, shorthand);
+			str = write_expr_to_string(str, operand, flags);
 		}
 	case_end;
 
 	case_ast_node(term, AsmMemoryTerm, node);
 		GB_ASSERT(term->operand != nullptr);
-		str = write_expr_to_string(str, term->operand, shorthand);
+		str = write_expr_to_string(str, term->operand, flags);
 		if (term->scale != nullptr) {
 			str = gb_string_append_length(str, term->scale_op.string.text, term->scale_op.string.len);
-			str = write_expr_to_string(str, term->scale, shorthand);
+			str = write_expr_to_string(str, term->scale, flags);
 		}
 	case_end;
 	case_ast_node(op, AsmMemoryOperand, node);
 		str = gb_string_appendc(str, "[");
 		if (op->segment_override != nullptr) {
-			str = write_expr_to_string(str, op->segment_override, shorthand);
+			str = write_expr_to_string(str, op->segment_override, flags);
 			str = gb_string_appendc(str, ":");
 		}
 		for_array(i, op->terms) {
@@ -15202,12 +15503,12 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 				str = gb_string_append_length(str, tok.string.text, tok.string.len);
 				str = gb_string_appendc(str, " ");
 			}
-			str = write_expr_to_string(str, term, shorthand);
+			str = write_expr_to_string(str, term, flags);
 		}
 		str = gb_string_appendc(str, "]");
 		if (op->type != nullptr) {
 			str = gb_string_appendc(str, ":");
-			str = write_expr_to_string(str, op->type, shorthand);
+			str = write_expr_to_string(str, op->type, flags);
 		}
 	case_end;
 	}
@@ -15216,10 +15517,16 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 }
 
 gb_internal gbString expr_to_string(Ast *expression) {
-	return write_expr_to_string(gb_string_make(heap_allocator(), ""), expression, false);
+	return write_expr_to_string(gb_string_make(heap_allocator(), ""), expression, ExprString_ShortLiterals);
 }
 gb_internal gbString expr_to_string(Ast *expression, gbAllocator allocator) {
-	return write_expr_to_string(gb_string_make(allocator, ""), expression, false);
+	return write_expr_to_string(gb_string_make(allocator, ""), expression, ExprString_ShortLiterals);
+}
+gb_internal gbString expr_to_string_exact(Ast *expression) {
+	return write_expr_to_string(gb_string_make(heap_allocator(), ""), expression, 0);
+}
+gb_internal gbString expr_to_string_exact(Ast *expression, gbAllocator allocator) {
+	return write_expr_to_string(gb_string_make(allocator, ""), expression, 0);
 }
 gb_internal gbString expr_to_string_shorthand(Ast *expression) {
 	return write_expr_to_string(gb_string_make(heap_allocator(), ""), expression, true);

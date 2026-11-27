@@ -27,7 +27,11 @@ get_args :: proc "contextless" () -> (result: []string) {
 
 	switch rt_args in runtime.args__ {
 	case []cstring:
-		result = make([]string, len(rt_args), heap_allocator())
+		err: runtime.Allocator_Error
+		result, err = make([]string, len(rt_args), heap_allocator())
+		if err != nil {
+			return
+		}
 		for rt_arg, i in rt_args {
 			result[i] = string(rt_arg)
 		}
@@ -182,6 +186,7 @@ get_current_thread_id :: proc "contextless" () -> int {
 
 /*
 Return the number of cores
+On Windows it returns 0 if an allocation fails
 */
 get_processor_core_count :: proc() -> int {
 	return _get_processor_core_count()
@@ -457,7 +462,12 @@ process_exec :: proc(
 
 	stdout_r, stdout_w := pipe() or_return
 	defer close(stdout_r)
-	stderr_r, stderr_w := pipe() or_return
+	stderr_r, stderr_w, pipe_err := pipe()
+	if pipe_err != nil {
+		close(stdout_w)
+		err = pipe_err
+		return
+	}
 	defer close(stderr_r)
 
 	process: Process
@@ -522,8 +532,9 @@ process_exec :: proc(
 	}
 
 	if err != nil {
-		state, _ = process_wait(process, timeout=0)
-		if !state.exited {
+		wait_err: Error
+		state, wait_err = process_wait(process, timeout=0)
+		if wait_err == .Timeout {
 			_ = process_kill(process)
 			state, _ = process_wait(process)
 		}
@@ -546,6 +557,7 @@ Process_State :: struct {
 	// Will also store the number of the exception or signal that has crashed the
 	// process.
 	exit_code: int,
+	signal: int,
 	// Specifies whether the termination of the process was successful or not,
 	// i.e. whether it has crashed or not.
 	// **Note(windows)**: On windows `true` is always returned, as there is no

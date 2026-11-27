@@ -1,6 +1,7 @@
 #+build !js
 package netpbm
 
+import "base:runtime"
 import "core:os"
 
 load :: proc {
@@ -13,6 +14,9 @@ load_from_file :: proc(filename: string, allocator := context.allocator) -> (img
 	context.allocator = allocator
 
 	data, data_err := os.read_entire_file(filename, allocator); defer delete(data)
+	if alloc_err, is_alloc_err := data_err.(runtime.Allocator_Error); is_alloc_err {
+		return nil, alloc_err
+	}
 	if data_err == nil {
 		return load_from_bytes(data)
 	} else {
@@ -33,6 +37,9 @@ save_to_file :: proc(filename: string, img: ^Image, custom_info: Info = {}, allo
 	data = save_to_buffer(img, custom_info) or_return
 
 	if save_err := os.write_entire_file(filename, data); save_err != nil {
+		if alloc_err, is_alloc_err := save_err.(runtime.Allocator_Error); is_alloc_err {
+			return alloc_err
+		}
 		return .Unable_To_Write_File
 	}
 

@@ -112,6 +112,9 @@ decompress_from_context :: proc(z: ^compress.Context, expected_output_size := -1
 			randomised: bool
 			nblock, orig_ptr, randomised, block_err = bzip2_decode_block(&d, &br, tts[np][:nblock_max])
 			if block_err != nil {
+				if overrun_err := bzip2_check_overrun(&br); overrun_err != nil {
+					block_err = overrun_err
+				}
 				break
 			}
 			if randomised {
@@ -246,6 +249,9 @@ bzip2_stream_header :: proc(br: ^BZip2_Bit_Reader, streams: int) -> (nblock_max:
 	if br.z != nil && !br.eof && len(br.data) - br.pos < 4 {
 		bzip2_fill(br, 4)
 	}
+	if br.input_err != nil {
+		return 0, false, br.input_err
+	}
 	header := br.data[br.pos:]
 	if len(header) < 4 || header[0] != 'B' || header[1] != 'Z' || header[2] != 'h' || header[3] < '1' || header[3] > '9' {
 		if streams > 0 {
@@ -325,8 +331,11 @@ bzip2_refill_slow :: proc(br: ^BZip2_Bit_Reader) #no_bounds_check {
 bzip2_fill :: proc(br: ^BZip2_Bit_Reader, need: int) {
 	br.consumed += i64(br.pos)
 	br.z.window  = br.data[br.pos:]
-	if compress.refill_window(br.z, need) != nil {
+	if refill_err := compress.refill_window(br.z, need); refill_err != nil {
 		br.eof = true
+		if refill_err != .EOF && refill_err != .Unexpected_EOF && refill_err != .Short_Buffer {
+			br.input_err = refill_err
+		}
 	}
 	br.data = br.z.window
 	br.pos  = 0
@@ -356,6 +365,9 @@ bzip2_reader_progress :: proc(r: ^Reader) -> (err: Error) {
 @(private)
 bzip2_check_overrun :: proc "contextless" (br: ^BZip2_Bit_Reader) -> Error {
 	if br.pos * 8 - int(br.count) > len(br.data) * 8 {
+		if br.input_err != nil {
+			return br.input_err
+		}
 		return General_Error.Stream_Too_Short
 	}
 	return nil
@@ -842,6 +854,9 @@ bzip2_stream_init :: proc(r: ^Reader, z: ^compress.Context, expected_output_size
 	if !compress.is_memory_context(z) {
 		r.br.z = z
 	}
+	defer if err != nil {
+		reader_destroy(r)
+	}
 
 	if options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
 		return General_Error.Incompatible_Options
@@ -1058,6 +1073,9 @@ bzip2_stream_fill :: proc(r: ^Reader) -> (err: Error) {
 				randomised: bool
 				nblock, orig_ptr, randomised, block_err = bzip2_decode_block(r.decoder, &r.br, r.tts[r.count][:r.nblock_max])
 				if block_err != nil {
+					if overrun_err := bzip2_check_overrun(&r.br); overrun_err != nil {
+						block_err = overrun_err
+					}
 					break block
 				}
 				r.pending[r.count] = {nblock, orig_ptr, stored_crc}

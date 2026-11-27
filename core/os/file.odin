@@ -504,6 +504,7 @@ fchange_times :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 
 /*
 	`exists` returns whether or not a named file exists.
+	It returns false if an allocation fails.
 */
 @(require_results)
 exists :: proc(path: string) -> bool {

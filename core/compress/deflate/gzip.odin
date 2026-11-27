@@ -33,7 +33,7 @@ decompress_gzip_from_context :: proc(z: ^compress.Context, expected_output_size 
 
 		trailer, trailer_err := compress.read_data(z, Gzip_Trailer)
 		if trailer_err != nil {
-			return General_Error.Stream_Too_Short
+			return inflate_input_error(trailer_err)
 		}
 		p.bytes_in += size_of(Gzip_Trailer)
 		if u32le(digest) != trailer.crc32 {
@@ -46,6 +46,9 @@ decompress_gzip_from_context :: proc(z: ^compress.Context, expected_output_size 
 
 		start = len(output)
 		magic, magic_err := compress.peek_data(z, Gzip_Magic)
+		if magic_err != nil && !inflate_input_ended(magic_err) {
+			return magic_err
+		}
 		if magic_err != nil || magic != .GZIP {
 			if expected >= 0 && start != expected {
 				return General_Error.Size_Mismatch
@@ -73,7 +76,7 @@ inflate_gzip_skip_string :: proc(z: ^compress.Context, crc: ^u32, too_long: GZIP
 		}
 		b, read_err := compress.read_u8(z)
 		if read_err != nil {
-			return i, General_Error.Stream_Too_Short
+			return i, inflate_input_error(read_err)
 		}
 		if crc != nil {
 			crc^ = hash.crc32(([^]u8)(&b)[:1], crc^)
@@ -87,8 +90,8 @@ inflate_gzip_skip_string :: proc(z: ^compress.Context, crc: ^u32, too_long: GZIP
 @(private)
 inflate_gzip_skip_bytes :: proc(z: ^compress.Context, crc: ^u32, count: int) -> (err: Error) {
 	if crc == nil {
-		if compress.skip(z, i64(count)) != nil {
-			return General_Error.Stream_Too_Short
+		if skip_err := compress.skip(z, i64(count)); skip_err != nil {
+			return inflate_input_error(skip_err)
 		}
 		return nil
 	}
@@ -96,8 +99,8 @@ inflate_gzip_skip_bytes :: proc(z: ^compress.Context, crc: ^u32, count: int) -> 
 	remaining := count
 	for remaining > 0 {
 		chunk := buffer[:min(remaining, len(buffer))]
-		if compress.read_slice(z, chunk) != nil {
-			return General_Error.Stream_Too_Short
+		if read_err := compress.read_slice(z, chunk); read_err != nil {
+			return inflate_input_error(read_err)
 		}
 		crc^ = hash.crc32(chunk, crc^)
 		remaining -= len(chunk)
@@ -110,7 +113,10 @@ inflate_gzip_header :: proc(z: ^compress.Context) -> (header: Gzip_Header, size:
 	read_err: io.Error
 	header, read_err = compress.read_data(z, Gzip_Header)
 	if read_err != nil {
-		return header, 0, General_Error.File_Too_Short
+		if inflate_input_ended(read_err) {
+			return header, 0, General_Error.File_Too_Short
+		}
+		return header, 0, read_err
 	}
 	size = size_of(Gzip_Header)
 	crc: u32
@@ -135,7 +141,7 @@ inflate_gzip_header :: proc(z: ^compress.Context) -> (header: Gzip_Header, size:
 	if .extra in header.flags {
 		xlen, xlen_err := compress.read_data(z, u16le)
 		if xlen_err != nil {
-			return header, size, General_Error.Stream_Too_Short
+			return header, size, inflate_input_error(xlen_err)
 		}
 		size += size_of(xlen) + int(xlen)
 		if crc_ptr != nil {
@@ -147,7 +153,7 @@ inflate_gzip_header :: proc(z: ^compress.Context) -> (header: Gzip_Header, size:
 			}
 			field, field_err := compress.read_data(z, [2]u16le)
 			if field_err != nil {
-				return header, size, General_Error.Stream_Too_Short
+				return header, size, inflate_input_error(field_err)
 			}
 			if crc_ptr != nil {
 				crc = hash.crc32(([^]u8)(&field)[:size_of(field)], crc)
@@ -170,7 +176,7 @@ inflate_gzip_header :: proc(z: ^compress.Context) -> (header: Gzip_Header, size:
 	if .header_crc in header.flags {
 		header_crc, header_crc_err := compress.read_data(z, u16le)
 		if header_crc_err != nil {
-			return header, size, General_Error.Stream_Too_Short
+			return header, size, inflate_input_error(header_crc_err)
 		}
 		size += size_of(header_crc)
 		if u16(header_crc) != u16(crc) {

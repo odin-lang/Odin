@@ -37,6 +37,8 @@ _get_platform_error :: proc(errno: wasi.errno_t) -> Error {
 		return .Broken_Pipe
 	case .BADF:
 		return .Invalid_File
+	case .ISDIR:
+		return .Is_Dir
 	case .NOMEM:
 		return .Out_Of_Memory
 	case .NOSYS:

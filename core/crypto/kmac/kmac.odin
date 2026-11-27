@@ -40,7 +40,7 @@ verify :: proc(sec_strength: int, tag, msg, key, domain_sep: []byte, allocator :
 	}
 
 	derived_tag := make([]byte, len(tag), allocator)
-	defer(delete(derived_tag))
+	defer delete(derived_tag, allocator)
 
 	sum(sec_strength, derived_tag, msg, key, domain_sep)
 
@@ -99,9 +99,7 @@ reset :: proc(ctx: ^Context) {
 
 @(private)
 _init_kmac :: proc(ctx: ^Context, key, s: []byte, sec_strength: int) {
-	if ctx.is_initialized {
-		reset(ctx)
-	}
+	crypto.zero_explicit(ctx, size_of(Context))
 
 	ensure(len(key) >= sec_strength / 8, "crypto/kmac: invalid KMAC key, too short")
 

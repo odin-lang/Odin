@@ -414,6 +414,10 @@ _clean_path_handle_start :: proc(path: string, buffer: []u8) -> (rooted: bool, s
 				buffer[n] = _Path_Separator
 			}
 		}
+	} else if _is_path_separator(path[0]) {
+		rooted = true
+		buffer[0] = _Path_Separator
+		start = 1
 	}
 	return
 }

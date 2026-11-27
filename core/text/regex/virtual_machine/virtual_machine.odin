@@ -10,10 +10,10 @@ package regex_vm
 
 import "base:intrinsics"
 @require import "core:io"
-import "core:slice"
+@require import "core:slice"
 import "core:text/regex/common"
 import "core:text/regex/parser"
-import "core:unicode/utf8"
+@require import "core:unicode/utf8"
 
 Rune_Class_Range  :: parser.Rune_Class_Range
 

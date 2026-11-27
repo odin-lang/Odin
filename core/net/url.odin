@@ -22,6 +22,11 @@ import "core:strings"
 import "core:unicode/utf8"
 import "core:encoding/hex"
 
+/*
+	Splits `url` into its scheme, host, path, queries and fragment without copying any of them.
+	Only `queries` is allocated, using `allocator`.
+	It is empty if there are none or if allocation fails.
+*/
 split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host, path: string, queries: map[string]string, fragment: string) {
 	s := url
 
@@ -50,7 +55,11 @@ split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host,
 				if strings.index_byte(query, '=') != -1 {
 					continue // additional =, weird x=y=z format
 				}
-				queries[key] = value
+				if _, insert_err := map_insert(&queries, key, value); insert_err != nil {
+					delete(queries)
+					queries = nil
+					break
+				}
 			}
 		}
 	}
@@ -133,9 +142,15 @@ percent_encode :: proc(s: string, allocator := context.allocator) -> string {
 	return strings.to_string(b)
 }
 
+/*
+	Decodes `%XX` escapes and `%%` in `encoded_string` into a string allocated with `allocator`.
+	`ok` is false for a malformed escape or if allocation fails.
+*/
 percent_decode :: proc(encoded_string: string, allocator := context.allocator) -> (decoded_string: string, ok: bool) {
-	b := strings.builder_make(allocator)
-	strings.builder_grow(&b, len(encoded_string))
+	b, b_err := strings.builder_make_len_cap(0, len(encoded_string), allocator)
+	if b_err != nil {
+		return
+	}
 	defer if !ok {
 		strings.builder_destroy(&b)
 	}

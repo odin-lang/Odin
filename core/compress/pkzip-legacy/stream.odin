@@ -190,11 +190,8 @@ _reader_begin :: proc(r: ^Reader, z: ^compress.Context, method: Reader_Method, f
 	}
 
 	if streamed {
-		r.source = compress.init_context_from_stream(io.Stream{data = r, procedure = _source_proc}, nil, nil, allocator)
+		r.source   = compress.init_context_from_stream(io.Stream{data = r, procedure = _source_proc}, nil, nil, allocator) or_return
 		r.streamed = true
-		if r.source.backing == nil {
-			return runtime.Allocator_Error.Out_Of_Memory
-		}
 		r.source.code_buffer = z.code_buffer
 		r.source.num_bits    = z.num_bits
 		z.code_buffer = 0
@@ -227,8 +224,21 @@ _reader_fill :: proc(r: ^Reader) -> (err: Error) {
 	}
 	if err == nil && r.produced == r.size {
 		r.done = true
+		_reader_hand_back(r)
 	}
 	return
+}
+
+@(private)
+_reader_hand_back :: proc(r: ^Reader) {
+	left := int(r.src.num_bits / 8)
+	if r.streamed {
+		left += len(r.src.window)
+	} else {
+		r.src.code_buffer = 0
+		r.src.num_bits    = 0
+	}
+	compress.rewind(r.z, left)
 }
 
 @(private)
@@ -520,13 +530,14 @@ _source_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offse
 	r := (^Reader)(stream_data)
 	#partial switch mode {
 	case .Read:
-		if len(r.z.window) > 0 {
-			k := copy(p, r.z.window)
-			r.z.window = r.z.window[k:]
-			return i64(k), nil
+		if len(r.z.window) == 0 {
+			if refill_err := compress.refill_window(r.z, 1); len(r.z.window) == 0 {
+				return 0, refill_err
+			}
 		}
-		k, read_err := io.read(r.z.input, p)
-		return i64(k), read_err
+		k := copy(p, r.z.window)
+		r.z.window = r.z.window[k:]
+		return i64(k), nil
 	case .Query:
 		return io.query_utility({.Read, .Query})
 	}

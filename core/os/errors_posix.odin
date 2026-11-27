@@ -28,6 +28,8 @@ _get_platform_error_existing :: proc(errno: posix.Errno) -> Error {
 		return .Broken_Pipe
 	case .EBADF:
 		return .Invalid_File
+	case .EISDIR:
+		return .Is_Dir
 	case .ENOMEM:
 		return .Out_Of_Memory
 	case .ENOSYS:

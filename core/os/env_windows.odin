@@ -41,27 +41,33 @@ _lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: 
 // due to the necessary utf-8 <> utf-16 conversion.
 @(require_results)
 _lookup_env_buf :: proc(buf: []u8, key: string) -> (value: string, err: Error) {
+	if key == "" {
+		return "", .Env_Var_Not_Found
+	}
+
 	key_buf: [513]u16
 	wkey := win32.utf8_to_wstring(key_buf[:], key)
 	if wkey == nil {
 		return "", .Buffer_Full
 	}
 
-	n2 := win32.GetEnvironmentVariableW(wkey, nil, 0)
-	if n2 == 0 {
-		return "", .Env_Var_Not_Found
-	}
-
 	val_buf: [513]u16
-	n2 = win32.GetEnvironmentVariableW(wkey, raw_data(val_buf[:]), u32(len(val_buf[:])))
-	if n2 == 0 {
-		return "", .Env_Var_Not_Found
-	} else if int(n2) > len(buf) {
+	win32.SetLastError(0)
+	n := win32.GetEnvironmentVariableW(wkey, raw_data(val_buf[:]), u32(len(val_buf)))
+	if n == 0 {
+		if win32.GetLastError() == win32.ERROR_ENVVAR_NOT_FOUND {
+			return "", .Env_Var_Not_Found
+		}
+		return "", nil
+	}
+	if int(n) >= len(val_buf) {
 		return "", .Buffer_Full
 	}
 
-	value = win32.utf16_to_utf8(buf, val_buf[:n2])
-
+	value = win32.utf16_to_utf8(buf, val_buf[:n])
+	if value == "" {
+		return "", .Buffer_Full
+	}
 	return value, nil
 }
 _lookup_env :: proc{_lookup_env_alloc, _lookup_env_buf}
@@ -71,6 +77,11 @@ _set_env :: proc(key, value: string) -> Error {
 	k := win32_utf8_to_wstring(key,   temp_allocator) or_return
 	v := win32_utf8_to_wstring(value, temp_allocator) or_return
 
+	empty: [1]u16
+	if value == "" {
+		v = cstring16(&empty[0])
+	}
+
 	if !win32.SetEnvironmentVariableW(k, v) {
 		return _get_platform_error()
 	}
@@ -79,7 +90,10 @@ _set_env :: proc(key, value: string) -> Error {
 
 _unset_env :: proc(key: string) -> bool {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
-	k, _ := win32_utf8_to_wstring(key, temp_allocator)
+	k, k_err := win32_utf8_to_wstring(key, temp_allocator)
+	if k_err != nil {
+		return false
+	}
 	return bool(win32.SetEnvironmentVariableW(k, nil))
 }
 

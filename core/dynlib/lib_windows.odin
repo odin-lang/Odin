@@ -24,7 +24,10 @@ _unload_library :: proc(library: Library) -> bool {
 }
 
 _symbol_address :: proc(library: Library, symbol: string, allocator: runtime.Allocator) -> (ptr: rawptr, found: bool) {
-	c_str := strings.clone_to_cstring(symbol, allocator)
+	c_str, c_str_err := strings.clone_to_cstring(symbol, allocator)
+	if c_str_err != nil {
+		return nil, false
+	}
 	defer delete(c_str, allocator)
 	ptr = win32.GetProcAddress(cast(win32.HMODULE)library, c_str)
 	found = ptr != nil
