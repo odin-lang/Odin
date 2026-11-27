@@ -34,8 +34,8 @@ _ :: intrinsics
 		allocator: Allocator,
 	}
 
-	A footer is used rather than a header purely to simplify access to the fields internally
-	i.e. field index of the AOS == SOA
+	A footer is used rather than a header purely to simplify access to the columns internally.
+	The columns come first: one per field of the element, with a '#soa_split' field's own columns in its place.
 
 */
 
@@ -60,7 +60,7 @@ raw_soa_footer_slice :: proc "contextless" (array: ^$T/#soa[]$E) -> (footer: ^Ra
 	if array == nil {
 		return nil
 	}
-	field_count := len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+	field_count := len(intrinsics.type_soa_field_sizes(T)^)
 	offset := (field_count*size_of(rawptr) + align_of(Raw_SOA_Footer_Slice) - 1) &~ (align_of(Raw_SOA_Footer_Slice) - 1)
 	footer = (^Raw_SOA_Footer_Slice)(&([^]byte)(array)[offset])
 	return
@@ -70,7 +70,7 @@ raw_soa_footer_dynamic_array :: proc "contextless" (array: ^$T/#soa[dynamic]$E) 
 	if array == nil {
 		return nil
 	}
-	field_count := len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+	field_count := len(intrinsics.type_soa_field_sizes(T)^)
 	offset := (field_count*size_of(rawptr) + align_of(Raw_SOA_Footer_Dynamic_Array) - 1) &~ (align_of(Raw_SOA_Footer_Dynamic_Array) - 1)
 	footer = (^Raw_SOA_Footer_Dynamic_Array)(&([^]byte)(array)[offset])
 	return
@@ -96,7 +96,7 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, #any_int length, alignment: int, a
 
 	max_align := max(alignment, align_of(E))
 
-	FIELD_COUNT :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+	FIELD_COUNT :: len(intrinsics.type_soa_field_sizes(T)^)
 
 	offsets: [FIELD_COUNT]int
 	total_size := _soa_layout(intrinsics.type_soa_field_sizes(T)[:], length, max_align, offsets[:]) or_return
@@ -243,7 +243,7 @@ shrink_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int new_cap := -1,
 		return true, nil
 	}
 
-	FIELD_COUNT :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+	FIELD_COUNT :: len(intrinsics.type_soa_field_sizes(T)^)
 	max_align   :: align_of(E)
 
 	// NOTE(bill): The layout of the columns depends on the capacity, so the elements are copied to new memory.
@@ -778,7 +778,7 @@ _reserve_soa :: #force_no_inline proc(array: ^$T/#soa[dynamic]$E, capacity: int,
 		return nil
 	}
 
-	FIELD_COUNT :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+	FIELD_COUNT :: len(intrinsics.type_soa_field_sizes(T)^)
 	assert(footer.cap == old_cap)
 
 	max_align :: align_of(E)
@@ -912,7 +912,7 @@ _append_soa_elems :: proc(#no_alias array: ^$T/#soa[dynamic]$E, zero_memory: boo
 
 	footer := raw_soa_footer(array)
 	if size_of(E) > 0 && arg_len > 0 {
-		FIELD_COUNT :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+		FIELD_COUNT :: len(intrinsics.type_soa_field_sizes(T)^)
 		// Advance len before the copy, soa_copy_from_slice needs the final len to be set
 		when FIELD_COUNT != 0 {
 			offset := footer.len
@@ -1108,7 +1108,7 @@ inject_at_soa :: proc{
 
 @builtin
 delete_soa_slice :: proc(array: $T/#soa[]$E, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	field_count :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+	field_count :: len(intrinsics.type_soa_field_sizes(T)^)
 	when field_count != 0 {
 		array := array
 		ptr := (^rawptr)(&array)^
@@ -1119,7 +1119,7 @@ delete_soa_slice :: proc(array: $T/#soa[]$E, allocator := context.allocator, loc
 
 @builtin
 delete_soa_dynamic_array :: proc(array: $T/#soa[dynamic]$E, loc := #caller_location) -> Allocator_Error {
-	field_count :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+	field_count :: len(intrinsics.type_soa_field_sizes(T)^)
 	when field_count != 0 {
 		array := array
 		ptr := (^rawptr)(&array)^
@@ -1138,7 +1138,7 @@ delete_soa :: proc{
 
 @builtin
 clear_soa_dynamic_array :: proc(array: ^$T/#soa[dynamic]$E) {
-	field_count :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
+	field_count :: len(intrinsics.type_soa_field_sizes(T)^)
 	when field_count != 0 {
 		footer := raw_soa_footer(array)
 		footer.len = 0
@@ -1162,7 +1162,7 @@ into_dynamic_soa :: proc(array: $T/#soa[]$E) -> #soa[dynamic]E {
 		allocator = nil_allocator(),
 	}
 
-	field_count := uintptr(len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E))
+	field_count := uintptr(len(intrinsics.type_soa_field_sizes(T)^))
 
 	array := array
 	dynamic_data := ([^]rawptr)(&d)[:field_count]

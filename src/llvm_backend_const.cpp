@@ -1039,6 +1039,23 @@ gb_internal void lb_fill_soa_slice(lbProcedure *p, lbAddr const &slice, lbValue 
 	lb_emit_store(p, lb_emit_struct_ep(p, slice.addr, column_count), lb_const_int(p->module, t_int, count));
 }
 
+// The value of #soa column `column` in the constant element `v` of type `elem`
+gb_internal LLVMValueRef lb_const_soa_column_value(lbModule *m, Type *elem, LLVMValueRef v, i32 column) {
+	for (;;) {
+		Type *t = base_type(elem);
+		// the element constant carries llvm padding members; remap the Odin field index
+		if (t->kind == Type_Array) {
+			return llvm_const_extract_value(m, v, cast(unsigned)lb_convert_struct_index(m, t, column));
+		}
+		i32 i = soa_split_column_field(t, &column);
+		v = llvm_const_extract_value(m, v, cast(unsigned)lb_convert_struct_index(m, t, i));
+		if (!is_soa_split_field(t->Struct.fields[i])) {
+			return v;
+		}
+		elem = t->Struct.fields[i]->type;
+	}
+}
+
 gb_internal lbValue lb_const_soa_slice(lbModule *m, Type *original_type, ExactValue value, lbConstContext cc, bool is_local) {
 	ast_node(cl, CompoundLit, value.value_compound);
 	Type *backing_type = cl->soa_backing;
@@ -1735,12 +1752,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					GB_ASSERT(array_type->kind == Type_Array);
 					Type *field_type = array_type->Array.elem;
 
-					// the element constant carries llvm padding members; remap the Odin field index
-					unsigned src_index = cast(unsigned)lb_convert_struct_index(m, base_type(elem_type), cast(i32)i);
 					for (isize j = 0; j < elem_count; j++) {
 						LLVMValueRef v = aos_values[j];
 						if (v != nullptr) {
-							values[j] = llvm_const_extract_value(m, v, src_index);
+							values[j] = lb_const_soa_column_value(m, elem_type, v, cast(i32)i);
 						} else {
 							values[j] = LLVMConstNull(lb_type(m, field_type));
 						}
@@ -1782,12 +1797,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					GB_ASSERT(array_type->kind == Type_Array);
 					Type *field_type = array_type->Array.elem;
 
-					// the element constant carries llvm padding members; remap the Odin field index
-					unsigned src_index = cast(unsigned)lb_convert_struct_index(m, base_type(elem_type), cast(i32)i);
 					for (isize j = 0; j < elem_count; j++) {
 						LLVMValueRef v = aos_values[j];
 						if (v != nullptr) {
-							values[j] = llvm_const_extract_value(m, v, src_index);
+							values[j] = lb_const_soa_column_value(m, elem_type, v, cast(i32)i);
 						} else {
 							values[j] = LLVMConstNull(lb_type(m, field_type));
 						}

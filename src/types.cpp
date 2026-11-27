@@ -2073,13 +2073,11 @@ gb_internal bool is_type_soa_struct(Type *t) {
 	return t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None;
 }
 
-// The number of data fields of an #soa type: one per field, or element, of its element type
+gb_internal i32 soa_split_column_count(Type *t);
+
+// The number of data fields (columns) of an #soa type: one per field, or element, of its element type, after splitting the fields marked `#soa_split`
 gb_internal isize soa_field_count(Type *t) {
-	Type *elem = base_type(base_type(t)->Struct.soa_elem);
-	if (elem->kind == Type_Array) {
-		return cast(isize)elem->Array.count;
-	}
-	return elem->Struct.fields.count;
+	return soa_split_column_count(base_type(t)->Struct.soa_elem);
 }
 
 // The fields of `#soa[N]T` and `#soa[dynamic; N]T` hold their elements inline, as `[N]T` arrays
@@ -2128,6 +2126,192 @@ gb_internal bool is_type_soa_splittable(Type *t) {
 		return t->Array.count <= 4;
 	}
 	return false;
+}
+
+gb_internal bool is_soa_split_field(Entity *f) {
+	return f->kind == Entity_Variable && (f->flags & EntityFlag_SoaSplit) != 0 && is_type_soa_splittable(f->type);
+}
+
+// The #soa columns the field `f` of a split value takes
+gb_internal i32 soa_field_column_count(Entity *f) {
+	return is_soa_split_field(f) ? soa_split_column_count(f->type) : 1;
+}
+
+// The #soa columns a split value of type `t` takes: one for each of its lanes, or for each of its fields after splitting those marked `#soa_split`
+gb_internal i32 soa_split_column_count(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Array) {
+		return cast(i32)t->Array.count;
+	}
+	i32 count = 0;
+	for (Entity *f : t->Struct.fields) {
+		count += soa_field_column_count(f);
+	}
+	return count;
+}
+
+// The first of the #soa columns of field (or lane) `index` of the split value of type `t`
+gb_internal i32 soa_split_column_offset(Type *t, i32 index) {
+	t = base_type(t);
+	if (t->kind == Type_Array) {
+		return index;
+	}
+	i32 offset = 0;
+	for (i32 i = 0; i < index; i++) {
+		offset += soa_field_column_count(t->Struct.fields[i]);
+	}
+	return offset;
+}
+
+struct SoaColumn {
+	Entity *field; // the element's field, or nullptr for a lane
+	Token   token;
+	Type *  type;
+	String  tag;
+};
+
+gb_internal String soa_column_name(String prefix, String name) {
+	if (prefix.len == 0) {
+		return name;
+	}
+	return concatenate3_strings(permanent_allocator(), prefix, str_lit("."), name);
+}
+
+// The field of the split struct `t` whose columns hold `*column`. `*column` becomes the column within that field's value.
+gb_internal i32 soa_split_column_field(Type *t, i32 *column) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Struct);
+	for_array(i, t->Struct.fields) {
+		i32 count = soa_field_column_count(t->Struct.fields[i]);
+		if (*column < count) {
+			return cast(i32)i;
+		}
+		*column -= count;
+	}
+	GB_PANIC("#soa column out of range for '%s'", type_to_string(t));
+	return -1;
+}
+
+// Walks `sel` from `*depth` through the split value of type `t`, adding the column offset of each step to `*column`.
+// Returns the type of the `#soa_split` field's value `sel` ends at, or nullptr after the first step that is not
+// a `#soa_split` field, with `*depth` just past that step.
+gb_internal Type *soa_split_select(Type *t, Selection const &sel, isize *depth, i32 *column) {
+	for (;;) {
+		Type *bt = base_type(t);
+		i32 index = sel.index[(*depth)++];
+		*column += soa_split_column_offset(bt, index);
+		if (bt->kind != Type_Struct || !is_soa_split_field(bt->Struct.fields[index])) {
+			return nullptr;
+		}
+		t = bt->Struct.fields[index]->type;
+		if (*depth == sel.index.count) {
+			return t;
+		}
+	}
+}
+
+// Whether every field along `sel` from `t` is a `#soa_split` field. The value it selects in an #soa element is then
+// spread over columns.
+gb_internal bool is_soa_split_selection(Type *t, Selection const &sel) {
+	isize depth = 0;
+	i32 column = 0;
+	return sel.index.count > 0 && soa_split_select(t, sel, &depth, &column) != nullptr;
+}
+
+// The columns of the split value of type `t`, named as fields and lanes under `prefix` (e.g. `pos.x`)
+gb_internal void soa_columns_of(Array<SoaColumn> *columns, Type *t, String prefix) {
+	static String const lanes[4] = {str_lit("x"), str_lit("y"), str_lit("z"), str_lit("w")};
+
+	t = base_type(t);
+	if (t->kind == Type_Array) {
+		for (i64 i = 0; i < t->Array.count; i++) {
+			SoaColumn c = {};
+			c.token = make_token_ident(soa_column_name(prefix, lanes[i]));
+			c.type  = t->Array.elem;
+			array_add(columns, c);
+		}
+		return;
+	}
+	for_array(i, t->Struct.fields) {
+		Entity *f = t->Struct.fields[i];
+		Token token = f->token;
+		token.string = soa_column_name(prefix, f->token.string);
+		if (is_soa_split_field(f)) {
+			soa_columns_of(columns, f->type, token.string);
+			continue;
+		}
+		SoaColumn c = {};
+		c.field = f;
+		c.token = token;
+		c.type  = f->type;
+		if (t->Struct.tags != nullptr) {
+			c.tag = t->Struct.tags[i];
+		}
+		array_add(columns, c);
+	}
+}
+
+// Allocates the fields of the #soa struct `soa` and fills in its columns, returning their number.
+// The caller fills in the `extra_field_count` hidden fields after them (e.g. `__$len`) and adds the columns to `scope`.
+gb_internal isize soa_make_columns(Type *soa, Scope *scope, isize extra_field_count) {
+	auto columns = array_make<SoaColumn>(heap_allocator());
+	defer (array_free(&columns));
+	soa_columns_of(&columns, soa->Struct.soa_elem, {});
+
+	isize count = columns.count;
+	soa->Struct.fields = permanent_slice_make<Entity *>(count+extra_field_count);
+	soa->Struct.tags   = permanent_alloc_array<String>(count+extra_field_count);
+	for_array(i, columns) {
+		SoaColumn const &c = columns[i];
+		soa->Struct.tags[i] = c.tag;
+		if (c.field != nullptr && c.field->kind != Entity_Variable) {
+			soa->Struct.fields[i] = c.field;
+			continue;
+		}
+
+		Type *column_type = nullptr;
+		if (soa_has_inline_fields(soa)) {
+			column_type = alloc_type_array(c.type, soa->Struct.soa_count);
+		} else {
+			column_type = alloc_type_multi_pointer(c.type);
+		}
+		Entity *column = alloc_entity_field(scope, c.token, column_type, false, cast(i32)i);
+		if (soa->Struct.soa_kind != StructSoa_Fixed) {
+			column->flags |= EntityFlag_SoaPtrField;
+		}
+		soa->Struct.fields[i] = column;
+	}
+	return count;
+}
+
+// Whether the element `t` and the types of its `#soa_split` fields, at any depth, have all their fields
+gb_internal bool soa_split_types_complete(Type *t) {
+	t = base_type(t);
+	if (t->kind != Type_Struct) {
+		return true;
+	}
+	if (!t->Struct.fields_wait_signal.futex.load()) {
+		return false;
+	}
+	for (Entity *f : t->Struct.fields) {
+		if (is_soa_split_field(f) && !soa_split_types_complete(f->type)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+gb_internal void wait_for_soa_split_types(Type *t) {
+	t = base_type(t);
+	if (t->kind != Type_Struct) {
+		return;
+	}
+	wait_for_record_signal(&t->Struct.fields_wait_signal, &t->Struct.checking_thread);
+	for (Entity *f : t->Struct.fields) {
+		if (is_soa_split_field(f)) {
+			wait_for_soa_split_types(f->type);
+		}
+	}
 }
 
 // `soa` is `#soa[N]T` and `array` is `[N]T`, for the same `N` and `T`
@@ -3632,8 +3816,8 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 				if (x->Struct.tags[i] != y->Struct.tags[i]) {
 					return false;
 				}
-				u64 xf_flags = (xf->flags&EntityFlags_IsSubtype);
-				u64 yf_flags = (yf->flags&EntityFlags_IsSubtype);
+				u64 xf_flags = (xf->flags&(EntityFlags_IsSubtype|EntityFlag_SoaSplit));
+				u64 yf_flags = (yf->flags&(EntityFlags_IsSubtype|EntityFlag_SoaSplit));
 				if (xf_flags != yf_flags) {
 					return false;
 				}

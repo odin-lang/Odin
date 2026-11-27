@@ -1209,13 +1209,14 @@ gb_internal lbValue lb_gen_soa_field_sizes_ptr(lbModule *m, Type *type) {
 		return found->addr;
 	}
 
-	Type *elem = base_type(base_type(type)->Struct.soa_elem);
-	isize count = soa_field_count(type);
+	Type *soa = base_type(type);
+	isize count = soa_field_count(soa);
 	Type *table_type = alloc_type_array(t_int, count);
 
 	LLVMValueRef *sizes = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
 	for (isize i = 0; i < count; i++) {
-		Type *field_type = elem->kind == Type_Array ? elem->Array.elem : elem->Struct.fields[i]->type;
+		Type *column = base_type(soa->Struct.fields[i]->type);
+		Type *field_type = column->kind == Type_Array ? column->Array.elem : column->MultiPointer.elem;
 		sizes[i] = lb_const_int(m, t_int, type_size_of(field_type)).value;
 	}
 	lbValue table = {llvm_const_array(m, lb_type(m, t_int), sizes, count), table_type};

@@ -4774,22 +4774,14 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 	}
 
 	Scope *scope = t->Struct.scope;
-	i64 soa_count = t->Struct.soa_count;
 	Type *elem = t->Struct.soa_elem;
-	Type *old_struct = base_type(elem);
-	GB_ASSERT(old_struct->kind == Type_Struct);
+	GB_ASSERT(base_type(elem)->kind == Type_Struct);
 
 	if (wait_to_finish) {
-		wait_for_record_signal(&old_struct->Struct.fields_wait_signal, &old_struct->Struct.checking_thread);
+		wait_for_soa_split_types(elem);
 	} else {
-		GB_ASSERT(old_struct->Struct.fields_wait_signal.futex.load() != 0);
+		GB_ASSERT(soa_split_types_complete(elem));
 	}
-
-	field_count = old_struct->Struct.fields.count;
-
-	t->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
-	t->Struct.tags = permanent_alloc_array<String>(field_count+extra_field_count);
-
 
 	auto const &add_entity = [](Scope *scope, Entity *entity) {
 		String name = entity->token.string;
@@ -4801,29 +4793,13 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 		}
 	};
 
-
-	for_array(i, old_struct->Struct.fields) {
-		Entity *old_field = old_struct->Struct.fields[i];
-		if (old_field->kind == Entity_Variable) {
-			Type *field_type = nullptr;
-			if (soa_has_inline_fields(t)) {
-				GB_ASSERT(soa_count >= 0);
-				field_type = alloc_type_array(old_field->type, soa_count);
-			} else {
-				field_type = alloc_type_multi_pointer(old_field->type);
-			}
-			Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_index);
-			t->Struct.fields[i] = new_field;
-			add_entity(scope, new_field);
-			new_field->flags |= EntityFlag_Used;
-			if (t->Struct.soa_kind != StructSoa_Fixed) {
-				new_field->flags |= EntityFlag_SoaPtrField;
-			}
-		} else {
-			t->Struct.fields[i] = old_field;
+	field_count = soa_make_columns(t, scope, extra_field_count);
+	for (isize i = 0; i < field_count; i++) {
+		Entity *column = t->Struct.fields[i];
+		if (column->scope == scope) {
+			add_entity(scope, column);
+			column->flags |= EntityFlag_Used;
 		}
-
-		t->Struct.tags[i] = old_struct->Struct.tags[i];
 	}
 
 	if (t->Struct.soa_kind != StructSoa_Fixed) {
@@ -4924,78 +4900,19 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 
 		is_complete = true;
 
-	} else if (is_type_array(elem)) {
-		Type *old_array = base_type(elem);
-		field_count = cast(isize)old_array->Array.count;
+	} else if (soa_split_types_complete(elem)) {
+		GB_ASSERT(is_type_array(elem) || is_type_struct(elem));
+		GB_ASSERT(!soa_has_inline_fields(soa_struct) || count >= 0);
 
-		soa_struct->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
-		soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
-
-		String params_xyzw[4] = {
-			str_lit("x"),
-			str_lit("y"),
-			str_lit("z"),
-			str_lit("w")
-		};
-
-		for (isize i = 0; i < cast(isize)old_array->Array.count; i++) {
-			Type *field_type = nullptr;
-			if (soa_has_inline_fields(soa_struct)) {
-				GB_ASSERT(count >= 0);
-				field_type = alloc_type_array(old_array->Array.elem, count);
-			} else {
-				field_type = alloc_type_multi_pointer(old_array->Array.elem);
-			}
-			Token token = {};
-			token.string = params_xyzw[i];
-
-			Entity *new_field = alloc_entity_field(scope, token, field_type, false, cast(i32)i);
-			soa_struct->Struct.fields[i] = new_field;
-			add_entity(ctx, scope, nullptr, new_field);
-			add_entity_use(ctx, nullptr, new_field);
-			if (soa_struct->Struct.soa_kind != StructSoa_Fixed) {
-				new_field->flags |= EntityFlag_SoaPtrField;
+		field_count = soa_make_columns(soa_struct, scope, extra_field_count);
+		for (isize i = 0; i < field_count; i++) {
+			Entity *column = soa_struct->Struct.fields[i];
+			if (column->scope == scope) {
+				add_entity(ctx, scope, nullptr, column);
+				add_entity_use(ctx, nullptr, column);
 			}
 		}
-
 		is_complete = true;
-
-	} else {
-		GB_ASSERT(is_type_struct(elem));
-
-		Type *old_struct = base_type(elem);
-
-		if (old_struct->Struct.fields_wait_signal.futex.load()) {
-			field_count = old_struct->Struct.fields.count;
-
-			soa_struct->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
-			soa_struct->Struct.tags = permanent_alloc_array<String>(field_count+extra_field_count);
-
-			for_array(i, old_struct->Struct.fields) {
-				Entity *old_field = old_struct->Struct.fields[i];
-				if (old_field->kind == Entity_Variable) {
-					Type *field_type = nullptr;
-					if (soa_has_inline_fields(soa_struct)) {
-						GB_ASSERT(count >= 0);
-						field_type = alloc_type_array(old_field->type, count);
-					} else {
-						field_type = alloc_type_multi_pointer(old_field->type);
-					}
-					Entity *new_field = alloc_entity_field(scope, old_field->token, field_type, false, old_field->Variable.field_index);
-					soa_struct->Struct.fields[i] = new_field;
-					add_entity(ctx, scope, nullptr, new_field);
-					add_entity_use(ctx, nullptr, new_field);
-					if (soa_struct->Struct.soa_kind != StructSoa_Fixed) {
-						new_field->flags |= EntityFlag_SoaPtrField;
-					}
-				} else {
-					soa_struct->Struct.fields[i] = old_field;
-				}
-
-				soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
-			}
-			is_complete = true;
-		}
 	}
 
 	if (is_complete && soa_kind != StructSoa_Fixed) {

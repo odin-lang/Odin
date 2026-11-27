@@ -45,8 +45,11 @@ Info_State :: struct {
 	indent:    int,
 
 	parent_struct: any,
-	// When `parent_struct` is an #soa array, the index of the element whose fields are being formatted
-	parent_soa_index: int,
+	// When `parent_struct` is an #soa array: the element whose fields are being formatted, the struct they belong to
+	// (the element or a '#soa_split' field's value), and the first column of that struct
+	parent_soa_index:  int,
+	parent_soa_fields: ^runtime.Type_Info_Struct,
+	parent_soa_column: int,
 }
 
 
@@ -2528,18 +2531,36 @@ parent_field :: proc(state: ^Info_State, name: string) -> any {
 	if !ok || info.soa_kind == .None {
 		return reflect.struct_field_value_by_name(parent, name, true)
 	}
-	for field_name, i in info.names[:reflect.soa_field_count(parent.id)] {
+	fields := state.parent_soa_fields
+	column := state.parent_soa_column
+	for field_name, i in fields.names[:fields.field_count] {
+		split := .Soa_Split in fields.field_flags[i]
 		if field_name == name {
-			return reflect.soa_field_value(parent, state.parent_soa_index, i)
+			return nil if split else reflect.soa_field_value(parent, state.parent_soa_index, column)
 		}
+		column += soa_split_column_count(fields.types[i]) if split else 1
 	}
 	return nil
 }
 
-// Formats `n` items of an #soa array as an array, each formatted from where its fields are.
-// The items are its elements, or the lanes of its element `lanes_of` when its elements are arrays.
+// The number of #soa columns that hold a '#soa_split' field's value of type `type`
 @(private)
-fmt_soa :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Struct, field_count, n, lanes_of: int) {
+soa_split_column_count :: proc(type: ^runtime.Type_Info) -> (count: int) {
+	#partial switch t in runtime.type_info_base(type).variant {
+	case ^runtime.Type_Info_Array:
+		return t.count
+	case ^runtime.Type_Info_Struct:
+		for field_type, i in t.types[:t.field_count] {
+			count += soa_split_column_count(field_type) if .Soa_Split in t.field_flags[i] else 1
+		}
+	}
+	return
+}
+
+// Formats `n` items of an #soa array as an array, each formatted from where its fields are.
+// The items are its elements, or the lanes from `column` on of its element `lanes_of`.
+@(private)
+fmt_soa :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Struct, n: int, lanes_of := -1, column := 0) {
 	_write_byte(fi, '[' if verb != 'w' else '{')
 	defer _write_byte(fi, ']' if verb != 'w' else '}')
 	if n <= 0 {
@@ -2552,7 +2573,8 @@ fmt_soa :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Struct, f
 	if named, ok := info.soa_base_type.variant.(^runtime.Type_Info_Named); ok {
 		elem_name = named.name
 	}
-	_, elem_is_array := runtime.type_info_base(info.soa_base_type).variant.(^runtime.Type_Info_Array)
+	elem_array, elem_is_array := runtime.type_info_base(info.soa_base_type).variant.(^runtime.Type_Info_Array)
+	elem_struct, _            := runtime.type_info_base(info.soa_base_type).variant.(^runtime.Type_Info_Struct)
 
 	hash   := fi.hash
 	indent := fi.indent
@@ -2573,13 +2595,13 @@ fmt_soa :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Struct, f
 		}
 		switch {
 		case lanes_of >= 0:
-			data, type := struct_field(v, info, lanes_of, i)
+			data, type := struct_field(v, info, lanes_of, column+i)
 			_fmt_arg(fi, data, type.id, type, verb)
 		case elem_is_array:
-			fmt_soa(fi, v, verb, info, field_count, field_count, i)
+			fmt_soa(fi, v, verb, info, elem_array.count, i)
 		case:
 			_write_string(fi, elem_name)
-			fmt_struct_fields(fi, v, i, verb, info, field_count)
+			fmt_struct_fields(fi, v, i, verb, info, elem_struct, 0)
 		}
 		if hash {
 			_write_string(fi, ",\n")
@@ -2616,15 +2638,32 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 
 	_write_string(fi, type_name)
 	if info.soa_kind != .None {
-		fmt_soa(fi, v, the_verb, info, reflect.soa_field_count(v.id), reflect.length(v), -1)
+		fmt_soa(fi, v, the_verb, info, reflect.length(v))
 		return
 	}
-	fmt_struct_fields(fi, v, 0, the_verb, info, int(info.field_count))
+	info := info
+	fmt_struct_fields(fi, v, 0, the_verb, info, &info, 0)
 }
 
-// Formats the first `count` fields of `parent`, a struct, or of its element `index` when it is an #soa array
+// Formats the value of a '#soa_split' field of type `type` of the element `index` of the #soa array `parent`,
+// from its columns starting at `column`
 @(private)
-fmt_struct_fields :: proc(fi: ^Info, parent: any, index: int, the_verb: rune, info: runtime.Type_Info_Struct, count: int) {
+fmt_soa_split :: proc(fi: ^Info, parent: any, index: int, verb: rune, info: runtime.Type_Info_Struct, type: ^runtime.Type_Info, column: int) {
+	#partial switch t in runtime.type_info_base(type).variant {
+	case ^runtime.Type_Info_Array:
+		fmt_soa(fi, parent, verb, info, t.count, index, column)
+	case ^runtime.Type_Info_Struct:
+		if named, ok := type.variant.(^runtime.Type_Info_Named); ok {
+			_write_string(fi, named.name)
+		}
+		fmt_struct_fields(fi, parent, index, verb, info, t, column)
+	}
+}
+
+// Formats the `fields` of `parent`, a struct, or of its element `index` when it is an #soa array.
+// For an #soa array, `fields` is the element or a '#soa_split' field's value, held from `column` on.
+@(private)
+fmt_struct_fields :: proc(fi: ^Info, parent: any, index: int, the_verb: rune, info: runtime.Type_Info_Struct, fields: ^runtime.Type_Info_Struct, column: int) {
 	_write_byte(fi, '{')
 	fi.record_level += 1
 	defer fi.record_level -= 1
@@ -2636,7 +2675,7 @@ fmt_struct_fields :: proc(fi: ^Info, parent: any, index: int, the_verb: rune, in
 	// fi.hash = false;
 	fi.indent += 1
 
-	is_empty := count == 0
+	is_empty := fields.field_count == 0
 
 	if hash && !is_empty {
 		_write_byte(fi, '\n')
@@ -2648,21 +2687,34 @@ fmt_struct_fields :: proc(fi: ^Info, parent: any, index: int, the_verb: rune, in
 		_write_byte(fi, '}')
 	}
 
+	is_soa := info.soa_kind != .None
+	next_column := column
 	field_count := -1
-	for name, i in info.names[:count] {
+	for name, i in fields.names[:fields.field_count] {
 		optional_len: int = -1
 		use_nul_termination: bool = false
 		verb := the_verb if the_verb == 'w' else 'v'
-		data, type := struct_field(parent, info, index, i)
+
+		split        := is_soa && .Soa_Split in fields.field_flags[i]
+		field_column := next_column
+		data, type   := rawptr(nil), fields.types[i]
+		if !split {
+			data, type = struct_field(parent, info, index, field_column if is_soa else i)
+		}
+		if is_soa {
+			next_column += soa_split_column_count(type) if split else 1
+		}
 
 		// NOTE(bill): Most fields have no tag. Those only need `parent_struct` set while they are formatted.
-		has_tag := info.tags[i] != ""
+		has_tag := fields.tags[i] != ""
 		new_state: Info_State = ---
 		if has_tag {
 			new_state = fi.state
-			new_state.parent_struct    = parent
-			new_state.parent_soa_index = index
-			if handle_tag(&new_state, info.tags[i], type, &verb, &optional_len, &use_nul_termination) {
+			new_state.parent_struct     = parent
+			new_state.parent_soa_index  = index
+			new_state.parent_soa_fields = fields
+			new_state.parent_soa_column = column
+			if handle_tag(&new_state, fields.tags[i], type, &verb, &optional_len, &use_nul_termination) {
 				continue
 			}
 		}
@@ -2694,10 +2746,16 @@ fmt_struct_fields :: proc(fi: ^Info, parent: any, index: int, the_verb: rune, in
 			if has_tag {
 				fi.state = new_state
 			} else {
-				fi.parent_struct    = parent
-				fi.parent_soa_index = index
+				fi.parent_struct     = parent
+				fi.parent_soa_index  = index
+				fi.parent_soa_fields = fields
+				fi.parent_soa_column = column
 			}
-			_fmt_arg(fi, data, type.id, type, verb)
+			if split {
+				fmt_soa_split(fi, parent, index, verb, info, type, field_column)
+			} else {
+				_fmt_arg(fi, data, type.id, type, verb)
+			}
 			fi.state = prev_state
 		}
 

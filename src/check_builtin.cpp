@@ -5666,71 +5666,31 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 
 		operand->mode = Addressing_Type;
-		Type *soa_struct = nullptr;
+
+		if (count > I32_MAX) {
+			count = I32_MAX;
+			error(call, "Array count too large for an #soa struct, got %lld", cast(long long)count);
+		}
+		Type *soa_struct = alloc_type_struct();
+		soa_struct->Struct.node = operand->expr;
+		soa_struct->Struct.soa_kind = StructSoa_Fixed;
+		soa_struct->Struct.soa_elem = elem;
+		soa_struct->Struct.soa_count = cast(i32)count;
+
 		Scope *scope = nullptr;
-
 		if (is_type_array(elem)) {
-			Type *old_array = base_type(elem);
-			soa_struct = alloc_type_struct();
-			soa_struct->Struct.fields = permanent_slice_make<Entity *>(cast(isize)old_array->Array.count);
-			soa_struct->Struct.tags = permanent_alloc_array<String>(cast(isize)old_array->Array.count);
-			soa_struct->Struct.node = operand->expr;
-			soa_struct->Struct.soa_kind = StructSoa_Fixed;
-			soa_struct->Struct.soa_elem = elem;
-			soa_struct->Struct.soa_count = cast(i32)count;
-
 			scope = create_scope(c->info, c->scope);
-			soa_struct->Struct.scope = scope;
-
-			String params_xyzw[4] = {
-				str_lit("x"),
-				str_lit("y"),
-				str_lit("z"),
-				str_lit("w")
-			};
-
-			for (isize i = 0; i < cast(isize)old_array->Array.count; i++) {
-				Type *array_type = alloc_type_array(old_array->Array.elem, count);
-				Token token = {};
-				token.string = params_xyzw[i];
-
-				Entity *new_field = alloc_entity_field(scope, token, array_type, false, cast(i32)i);
-				soa_struct->Struct.fields[i] = new_field;
-				add_entity(c, scope, nullptr, new_field);
-				add_entity_use(c, nullptr, new_field);
-			}
-
 		} else {
-			GB_ASSERT(is_type_struct(elem));
+			scope = create_scope(c->info, bt_elem->Struct.scope->parent);
+		}
+		soa_struct->Struct.scope = scope;
 
-			Type *old_struct = base_type(elem);
-			soa_struct = alloc_type_struct();
-			soa_struct->Struct.fields = permanent_slice_make<Entity *>(old_struct->Struct.fields.count);
-			soa_struct->Struct.tags = permanent_alloc_array<String>(old_struct->Struct.fields.count);
-			soa_struct->Struct.node = operand->expr;
-			soa_struct->Struct.soa_kind = StructSoa_Fixed;
-			soa_struct->Struct.soa_elem = elem;
-			if (count > I32_MAX) {
-				count = I32_MAX;
-				error(call, "Array count too large for an #soa struct, got %lld", cast(long long)count);
-			}
-			soa_struct->Struct.soa_count = cast(i32)count;
-
-			scope = create_scope(c->info, old_struct->Struct.scope->parent);
-			soa_struct->Struct.scope = scope;
-
-			for_array(i, old_struct->Struct.fields) {
-				Entity *old_field = old_struct->Struct.fields[i];
-				if (old_field->kind == Entity_Variable) {
-					Type *array_type = alloc_type_array(old_field->type, count);
-					Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_index);
-					soa_struct->Struct.fields[i] = new_field;
-					add_entity(c, scope, nullptr, new_field);
-				} else {
-					soa_struct->Struct.fields[i] = old_field;
-				}
-
-				soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
+		isize column_count = soa_make_columns(soa_struct, scope, 0);
+		for (isize i = 0; i < column_count; i++) {
+			Entity *column = soa_struct->Struct.fields[i];
+			if (column->scope == scope) {
+				add_entity(c, scope, nullptr, column);
+				add_entity_use(c, nullptr, column);
 			}
 		}
 		wait_signal_set(&soa_struct->Struct.fields_wait_signal);

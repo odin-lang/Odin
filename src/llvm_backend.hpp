@@ -62,6 +62,8 @@ struct lbAddr {
 		struct {
 			lbValue index;
 			Ast *index_expr;
+			i32 column; // the first column of a `#soa_split` field's value, e.g. `s[i].pos`
+			Type *elem; // the type of that value, or nullptr for the whole element
 		} soa;
 		struct {
 			lbValue index;

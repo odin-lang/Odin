@@ -442,9 +442,7 @@ gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_
 	lbValue count = {};
 	Type *expr_type = nullptr;
 	if (is_soa_elem) {
-		Type *soa = base_type(type_deref(soa_elem->addr.type));
-		GB_ASSERT(soa->kind == Type_Struct && soa->Struct.soa_kind != StructSoa_None);
-		expr_type = base_type(soa->Struct.soa_elem);
+		expr_type = base_type(lb_soa_variable_elem_type(*soa_elem));
 	} else {
 		expr_type = base_type(type_deref(expr.type));
 	}
@@ -539,7 +537,7 @@ gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_
 	case Type_Array: {
 		if (val_type != nullptr) {
 			if (is_soa_elem) {
-				lbValue ptr = lb_soa_array_component_elem_ptr(p, soa_elem->addr, idx, soa_elem->soa.index, expr_type->Array.count);
+				lbValue ptr = lb_soa_array_component_elem_ptr(p, *soa_elem, idx, expr_type->Array.count);
 				lbAddr component = lb_addr_soa_field_elem(ptr);
 				val = lb_emit_load(p, component.addr);
 			} else {

@@ -2164,6 +2164,39 @@ gb_internal bool is_soa_inline_column_of_value(Entity *e) {
 	return is_type_soa_struct(soa) && soa->Struct.soa_kind == StructSoa_FixedCapacityDynamic;
 }
 
+// Whether the variable `e` is an #soa element: the value of a for-in loop over an #soa array, or an #soa pointer
+gb_internal bool is_soa_element_variable(Entity *e) {
+	if (e == nullptr || e->kind != Entity_Variable) {
+		return false;
+	}
+	if (is_type_soa_pointer(e->type)) {
+		return true;
+	}
+	return (e->flags & EntityFlag_SoaPtrField) != 0 &&
+	       e->Variable.for_loop_parent_type != nullptr &&
+	       is_type_soa_struct(type_deref(e->Variable.for_loop_parent_type));
+}
+
+// Whether the operand `o` of `expr` is an #soa element, or a `#soa_split` field's value in one, spread over columns
+gb_internal bool is_soa_element_operand(Operand const *o, Ast *expr) {
+	expr = unparen_expr(expr);
+	if (o->mode == Addressing_SoaVariable) {
+		// a lane, `soa[i][j]`, is in a single column
+		return !(expr->kind == Ast_IndexExpr && is_type_array(type_of_expr(expr->IndexExpr.expr)));
+	}
+	return is_type_soa_pointer(o->type) || is_soa_element_variable(entity_of_node(expr));
+}
+
+// Whether `e`, reached through `using` on an #soa element, is a `#soa_split` field's value
+gb_internal bool is_soa_split_using_variable(Entity *e) {
+	if ((e->flags & EntityFlag_Using) == 0 || !is_soa_element_variable(e->using_parent)) {
+		return false;
+	}
+	Entity *parent = e->using_parent;
+	Selection sel = lookup_field(parent->type, entity_interned_name(e), false);
+	return is_soa_split_selection(type_deref(parent->type), sel);
+}
+
 gb_internal void error_soa_column_not_addressable(Operand *o, Ast *node) {
 	gbString str = expr_to_string(node);
 	error(node, "Cannot take the column '%s' of an #soa array, value is not addressable", str);
@@ -2325,6 +2358,8 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		}
 		if (is_soa_inline_column_of_value(e)) {
 			error_soa_column_not_addressable(o, n);
+		} else if (o->mode == Addressing_Variable && is_soa_split_using_variable(e)) {
+			o->mode = Addressing_SoaVariable;
 		}
 		break;
 
@@ -3448,6 +3483,19 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 			}
 			o->mode = Addressing_Invalid;
 			return;
+		}
+		if (o->mode == Addressing_SoaVariable && node->kind == Ast_UnaryExpr) {
+			// `soa[i]`, `p^` and `soa[i][j]` have pointers of their own
+			Ast *expr = unparen_expr(node->UnaryExpr.expr);
+			if (expr->kind == Ast_SelectorExpr || expr->kind == Ast_Ident) {
+				ERROR_BLOCK();
+				gbString str = expr_to_string(expr);
+				error(op, "Cannot take the pointer address of '%s' which is a '#soa_split' field of an #soa element", str);
+				error_line("\tIts fields are stored in separate #soa columns, so only each of its fields has an address\n");
+				gb_string_free(str);
+				o->mode = Addressing_Invalid;
+				return;
+			}
 		}
 		if (analysis_in_use(AnalysisFlag_Atomic)) {
 			if (Entity *e = check_atomic_location(o->expr)) {
@@ -6249,6 +6297,15 @@ gb_internal ExactValue get_constant_soa_field(Type *soa, ExactValue value, Selec
 	i32 field_index = sel.index[0];
 	Entity *field   = soa->Struct.fields[field_index];
 
+	// the element's field for the column, after the columns of any `#soa_split` fields before it
+	if (elem->kind == Type_Struct) {
+		i32 column = field_index;
+		field_index = soa_split_column_field(elem, &column);
+		if (is_soa_split_field(elem->Struct.fields[field_index])) {
+			return empty_exact_value;
+		}
+	}
+
 	Type *field_elem_type = base_type(field->type)->Array.elem;
 
 	isize count   = soa->Struct.soa_count;
@@ -6939,6 +6996,12 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 
 	add_entity_use(c, selector, entity);
 
+	// an #soa element, whose `#soa_split` fields have no address
+	Type *soa_elem = nullptr;
+	if (is_soa_element_operand(operand, op_expr)) {
+		soa_elem = type_deref(operand->type);
+	}
+
 	operand->type = entity->type;
 	operand->expr = node;
 
@@ -6985,6 +7048,9 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			operand->mode = Addressing_Variable;
 		} else {
 			operand->mode = Addressing_Value;
+		}
+		if (operand->mode == Addressing_Variable && soa_elem != nullptr && is_soa_split_selection(soa_elem, sel)) {
+			operand->mode = Addressing_SoaVariable;
 		}
 		break;
 	case Entity_TypeName:

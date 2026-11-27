@@ -1032,6 +1032,9 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 			if (f->flags & EntityFlag_Using) {
 				type_writer_appendc(w, "using ");
 			}
+			if (f->flags & EntityFlag_SoaSplit) {
+				type_writer_appendc(w, "#soa_split ");
+			}
 			type_writer_append(w, f->token.string.text, f->token.string.len);
 			type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
 			write_type_to_canonical_string(w, f->type);

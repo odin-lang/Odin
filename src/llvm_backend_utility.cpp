@@ -1745,10 +1745,17 @@ gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection 
 			addr = lb_emit_load(p, addr);
 			soa_index = lb_emit_load(p, soa_index);
 
-			lbValue arr = lb_emit_struct_ep(p, addr, index);
-
 			Type *t = base_type(type_deref(addr.type));
 			GB_ASSERT(is_type_soa_struct(t));
+
+			// down the `#soa_split` fields to the column
+			i32 column = 0;
+			isize next = i;
+			Type *split = soa_split_select(t->Struct.soa_elem, sel, &next, &column);
+			GB_ASSERT_MSG(split == nullptr, "a '#soa_split' field has no address");
+			i = next-1;
+
+			lbValue arr = lb_emit_struct_ep(p, addr, column);
 
 			if (soa_has_inline_fields(t)) {
 				e = lb_emit_array_ep(p, arr, soa_index);
@@ -2154,15 +2161,7 @@ gb_internal lbValue lb_soa_struct_len(lbProcedure *p, lbValue value) {
 	          t->Struct.soa_kind == StructSoa_Dynamic ||
 	          t->Struct.soa_kind == StructSoa_FixedCapacityDynamic);
 
-	isize n = 0;
-	Type *elem = base_type(t->Struct.soa_elem);
-	if (elem->kind == Type_Struct) {
-		n = cast(isize)elem->Struct.fields.count;
-	} else if (elem->kind == Type_Array) {
-		n = cast(isize)elem->Array.count;
-	} else {
-		GB_PANIC("Unreachable");
-	}
+	isize n = soa_field_count(t);
 
 	if (is_ptr) {
 		lbValue v = lb_emit_struct_ep(p, value, cast(i32)n);
@@ -2186,15 +2185,7 @@ gb_internal lbValue lb_soa_struct_cap(lbProcedure *p, lbValue value) {
 
 	GB_ASSERT(t->Struct.soa_kind == StructSoa_Dynamic);
 
-	isize n = 0;
-	Type *elem = base_type(t->Struct.soa_elem);
-	if (elem->kind == Type_Struct) {
-		n = cast(isize)elem->Struct.fields.count+1;
-	} else if (elem->kind == Type_Array) {
-		n = cast(isize)elem->Array.count+1;
-	} else {
-		GB_PANIC("Unreachable");
-	}
+	isize n = soa_field_count(t)+1;
 
 	if (is_ptr) {
 		lbValue v = lb_emit_struct_ep(p, value, cast(i32)n);

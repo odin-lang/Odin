@@ -477,7 +477,8 @@ index :: proc(val: any, i: int, loc := #caller_location) -> any {
 	return nil
 }
 
-// Returns the number of fields of the #soa type `T` that hold the fields of its elements, or returns 0 if `T` is not an #soa type
+// Returns the number of fields of the #soa type `T` that hold the fields of its elements, or returns 0 if `T` is not an #soa type.
+// A '#soa_split' field of the elements is held by one field for each of its own fields (or lanes).
 @(require_results)
 soa_field_count :: proc(T: typeid) -> int {
 	info, ok := type_info_base(type_info_of(T)).variant.(^Type_Info_Struct)
@@ -497,7 +498,8 @@ soa_field_count :: proc(T: typeid) -> int {
 	return 0
 }
 
-// Returns the field `field` of the element `index` of the #soa value `val`, or returns `nil` if `val` is not an #soa value
+// Returns the field `field` of the element `index` of the #soa value `val`, or returns `nil` if `val` is not an #soa value.
+// The fields are those `soa_field_count` counts.
 //     soa_field_value(s, i, f) -> the field `f` of `s[i]`
 @(require_results)
 soa_field_value :: proc(val: any, index, field: int, loc := #caller_location) -> any {
