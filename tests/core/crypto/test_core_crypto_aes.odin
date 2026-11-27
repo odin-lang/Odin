@@ -1,6 +1,8 @@
 package test_core_crypto
 
 import "base:runtime"
+import "core:bytes"
+import "core:encoding/endian"
 import "core:encoding/hex"
 import "core:log"
 import "core:testing"
@@ -225,4 +227,138 @@ test_aes_ctr :: proc(t: ^testing.T, impl: aes.Implementation) {
 		expected_digest_str,
 		digest_str,
 	)
+}
+
+@(test)
+test_aes_ctr_counters :: proc(t: ^testing.T) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	impls := supported_aes_impls()
+
+	key_sizes := [?]int{aes.KEY_SIZE_128, aes.KEY_SIZE_192, aes.KEY_SIZE_256}
+	lengths := [?]int{0, 1, 15, 16, 17, 63, 64, 255, 256, 257, 511, 512, 1000, 4101}
+	chunk_sizes := [?]int{1, 7, 16, 33, 255, 256, 300}
+	ivs := [?]struct {
+		iv:      string,
+		is_le64: bool,
+	} {
+		{"00000000000000000000000000000000", false},
+		{"0102030405060708ffffffffffffffeb", false},
+		{"ffffffffffffffffffffffffffffffeb", false},
+		{"00000000000000000000000000000000", true},
+		{"01000000000000000000000000000000", true},
+		{"ebffffffffffffff0123456789abcdef", true},
+	}
+
+	max_len := lengths[len(lengths) - 1]
+	src := make([]byte, max_len, context.temp_allocator)
+	for &b, i in src {
+		b = byte(i * 31 + 7)
+	}
+	expected := make([]byte, max_len, context.temp_allocator)
+	dst := make([]byte, max_len, context.temp_allocator)
+	zeroes := make([]byte, max_len, context.temp_allocator)
+
+	for impl in impls {
+		for key_size in key_sizes {
+			key: [aes.KEY_SIZE_256]byte
+			for &b, i in key {
+				b = byte(i * 17 + key_size)
+			}
+			for v in ivs {
+				iv, _ := hex.decode(transmute([]byte)(v.iv), context.temp_allocator)
+				for n in lengths {
+					ctx: aes.Context_CTR
+
+					ctr_reference(expected[:n], src[:n], key[:key_size], iv, v.is_le64)
+
+					init_ctr_counter(&ctx, key[:key_size], iv, v.is_le64, impl)
+					aes.xor_bytes_ctr(&ctx, dst[:n], src[:n])
+					testing.expectf(
+						t,
+						bytes.equal(dst[:n], expected[:n]),
+						"AES-CTR/%v: one-shot mismatch, key %d, iv %s, le64 %v, length %d",
+						impl, key_size, v.iv, v.is_le64, n,
+					)
+
+					for chunk in chunk_sizes {
+						init_ctr_counter(&ctx, key[:key_size], iv, v.is_le64, impl)
+						for off := 0; off < n; off += chunk {
+							end := min(off + chunk, n)
+							aes.xor_bytes_ctr(&ctx, dst[off:end], src[off:end])
+						}
+						testing.expectf(
+							t,
+							bytes.equal(dst[:n], expected[:n]),
+							"AES-CTR/%v: chunked mismatch, key %d, iv %s, le64 %v, length %d, chunk %d",
+							impl, key_size, v.iv, v.is_le64, n, chunk,
+						)
+					}
+
+					copy(dst[:n], src[:n])
+					init_ctr_counter(&ctx, key[:key_size], iv, v.is_le64, impl)
+					aes.xor_bytes_ctr(&ctx, dst[:n], dst[:n])
+					testing.expectf(
+						t,
+						bytes.equal(dst[:n], expected[:n]),
+						"AES-CTR/%v: in-place mismatch, key %d, iv %s, le64 %v, length %d",
+						impl, key_size, v.iv, v.is_le64, n,
+					)
+
+					ctr_reference(expected[:n], zeroes[:n], key[:key_size], iv, v.is_le64)
+					init_ctr_counter(&ctx, key[:key_size], iv, v.is_le64, impl)
+					aes.keystream_bytes_ctr(&ctx, dst[:n])
+					testing.expectf(
+						t,
+						bytes.equal(dst[:n], expected[:n]),
+						"AES-CTR/%v: keystream mismatch, key %d, iv %s, le64 %v, length %d",
+						impl, key_size, v.iv, v.is_le64, n,
+					)
+
+					aes.reset_ctr(&ctx)
+				}
+			}
+		}
+	}
+}
+
+init_ctr_counter :: proc(ctx: ^aes.Context_CTR, key, iv: []byte, is_le64: bool, impl: aes.Implementation) {
+	if is_le64 {
+		aes.init_ctr_le64(ctx, key, iv, impl)
+	} else {
+		aes.init_ctr(ctx, key, iv, impl)
+	}
+}
+
+ctr_reference :: proc(dst, src, key, iv: []byte, is_le64: bool) {
+	ecb: aes.Context_ECB
+	aes.init_ecb(&ecb, key, aes.Implementation.Portable)
+	defer aes.reset_ecb(&ecb)
+
+	hi, lo: u64
+	if is_le64 {
+		lo = endian.unchecked_get_u64le(iv[0:])
+	} else {
+		hi = endian.unchecked_get_u64be(iv[0:])
+		lo = endian.unchecked_get_u64be(iv[8:])
+	}
+
+	for off := 0; off < len(src); off += aes.BLOCK_SIZE {
+		blk, ks: [aes.BLOCK_SIZE]byte
+		if is_le64 {
+			endian.unchecked_put_u64le(blk[0:], lo)
+			copy(blk[8:], iv[8:])
+		} else {
+			endian.unchecked_put_u64be(blk[0:], hi)
+			endian.unchecked_put_u64be(blk[8:], lo)
+			if lo == max(u64) {
+				hi += 1
+			}
+		}
+		lo += 1
+		aes.encrypt_ecb(&ecb, ks[:], blk[:])
+		for i in 0 ..< min(aes.BLOCK_SIZE, len(src) - off) {
+			dst[off + i] = src[off + i] ~ ks[i]
+		}
+	}
 }

@@ -7,8 +7,10 @@ import "core:compress/bzip2"
 import "core:compress/deflate"
 import "core:compress/lz4"
 import "core:compress/lzma"
+import pkzip_legacy "core:compress/pkzip-legacy"
 import "core:compress/ppmd"
 import "core:compress/shoco"
+import "core:io"
 import "core:mem"
 import "core:testing"
 
@@ -167,6 +169,35 @@ test_leak_writer_init_oom :: proc(t: ^testing.T) {
 		}
 		return err
 	})
+}
+
+@(test)
+test_leak_stream_context_oom :: proc(t: ^testing.T) {
+	leak_oom_sweep(t, "stream context", proc(allocator: runtime.Allocator) -> compress.Error {
+		data := [?]u8{1, 2, 3}
+		r: bytes.Reader
+		ctx, err := compress.init_context_from_stream(bytes.reader_init(&r, data[:]), nil, nil, allocator)
+		compress.destroy_context(&ctx)
+		return err
+	})
+	leak_oom_sweep(t, "legacy reader on a stream", proc(allocator: runtime.Allocator) -> compress.Error {
+		data := [?]u8{'a', 0}
+		r: bytes.Reader
+		ctx := compress.init_context_from_stream(bytes.reader_init(&r, data[:]))
+		defer compress.destroy_context(&ctx)
+		lr: pkzip_legacy.Reader
+		err := pkzip_legacy.reader_init_unshrink(&lr, &ctx, 1, {}, allocator)
+		pkzip_legacy.reader_destroy(&lr)
+		return err
+	})
+
+	data := [?]u8{1, 2, 3}
+	r: bytes.Reader
+	buffer: [64]u8
+	_, buffer_err := compress.init_context_from_stream(bytes.reader_init(&r, data[:]), nil, buffer[:], runtime.nil_allocator())
+	testing.expect_value(t, buffer_err, runtime.Allocator_Error.None)
+	lone := compress.init_context(bytes.reader_init(&r, data[:]), nil, nil, runtime.nil_allocator())
+	testing.expect_value(t, compress.refill_window(&lone, 1), io.Error.Buffer_Full)
 }
 
 @(test)
