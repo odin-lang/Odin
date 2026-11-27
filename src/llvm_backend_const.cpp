@@ -1261,6 +1261,8 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			// NOTE(bill): do not cast intrinsics as they are not really procedures that can be casted
 			res.value = LLVMConstPointerCast(res.value, lb_type(m, res.type));
 		}
+		// the procedure may have been cast, so the value takes the type it is used as
+		res.type = original_type;
 		return res;
 	}
 
