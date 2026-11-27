@@ -1617,6 +1617,29 @@ index_rune :: proc(s: string, r: rune) -> (res: int) {
 	return index(s, string(b[:w]))
 }
 
+// Same as `index_rune`, runs through the string in reverse
+@(require_results)
+last_index_rune :: proc(s: string, r: rune) -> (res: int) {
+	switch {
+	case u32(r) < utf8.RUNE_SELF:
+		return last_index_byte(s, byte(r))
+
+	case r == utf8.RUNE_ERROR:
+		#reverse for c, i in s {
+			if c == utf8.RUNE_ERROR {
+				return i
+			}
+		}
+		return -1
+
+	case !utf8.valid_rune(r):
+		return -1
+	}
+
+	b, w := utf8.encode_rune(r)
+	return last_index(s, string(b[:w]))
+}
+
 @private PRIME_RABIN_KARP :: 16777619
 /*
 Returns the byte offset of the string `substr` in the string `s`, -1 when not found.
