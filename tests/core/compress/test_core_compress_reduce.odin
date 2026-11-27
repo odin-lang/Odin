@@ -168,7 +168,7 @@ reduce_test_length_extension :: proc(t: ^testing.T) {
 }
 
 @test
-reduce_test_prefix :: proc(t: ^testing.T) {
+reduce_test_reuse :: proc(t: ^testing.T) {
 	w: Reduce_Writer
 	defer delete(w.buffer)
 	reduce_writer_init(&w, {})
@@ -179,10 +179,18 @@ reduce_test_prefix :: proc(t: ^testing.T) {
 
 	output: [dynamic]u8
 	defer delete(output)
+	reserve(&output, 64)
 	append(&output, "PREFIX")
+	buffer := raw_data(output)
 	err := pkzip_legacy.expand(&output, data, 4, 5)
 	testing.expect_value(t, err, nil)
-	testing.expect_value(t, string(output[:]), "PREFIXq\x00\x00\x00\x00")
+	testing.expect_value(t, string(output[:]), "q\x00\x00\x00\x00")
+	testing.expect_value(t, raw_data(output), buffer)
+
+	err = pkzip_legacy.expand(&output, {}, 4, 0)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, len(output), 0)
+	testing.expect_value(t, raw_data(output), buffer)
 }
 
 @test

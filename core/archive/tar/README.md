@@ -26,7 +26,7 @@ read_texts :: proc(path: string) -> (err: tar.Error) {
 - GNU long names and link targets; GNU and pax sparse files, whose holes read as zeros
 - gzip, bzip2, LZ4 (frame), LZMA (`.lzma`) and XZ compression, detected from the content
 - Regular files, directories, symlinks, hard links, devices and named pipes
-- `extract_current` writes a member to an `io.Writer` and `open_current` streams it through an `io.Reader`; `find` looks one up by path for `extract` or `open_member`
+- `extract_current` writes a member to an `io.Writer` or into a `[dynamic]u8`, and `open_current` streams it through an `io.Reader`; `find` looks one up by path for `extract` or `open_member`
 - The reader has one position, shared by its iterators, `find`, `extract` and `open_member`
 - A tar's members are only known once read, so ask `iterator_error` why iteration stopped
 - Unlike zip's and 7z's, a tar opened from a path isn't locked

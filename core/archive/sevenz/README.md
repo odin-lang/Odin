@@ -26,7 +26,7 @@ read_texts :: proc(path: string) -> (err: sevenz.Error) {
 - Solid archives, compressed and encrypted headers, and anti-items
 - 7-Zip AES-256, with the password in `archive.Read_Options`: at `open` for an encrypted header, at extraction for encrypted members. `max_key_derivations` caps the key derivations per reader (default 16)
 - The iterator walks members in storage order, which decodes each solid folder only once; `find` looks a member up by path for `extract` or `open_member`
-- `extract_current` writes a member to an `io.Writer` and `open_current` streams it through an `io.Reader`
+- `extract_current` writes a member to an `io.Writer` or into a `[dynamic]u8`, and `open_current` streams it through an `io.Reader`
 - Extraction checks the CRC-32. A packed stream its coder didn't read to the end fails with `SevenZ_Error.Size_Mismatch`
 
 # Writing

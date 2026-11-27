@@ -204,35 +204,8 @@ _extract_target :: proc(it: ^Extract_Iterator, t: ^Target, fi: File_Info, again:
 			return _extract_to_path(it, to, fi, again)
 		}
 	case ^[dynamic]u8:
-		clear(to)
-		defer if err != nil {
-			clear(to)
-		}
-		r := open_current(&it.it, {password = it.options.password}) or_return
 		it.total += fi.size
-		chunk: [16 * 1024]u8
-		stalled := 0
-		for {
-			n, read_err := io.read(r, chunk[:])
-			if n > 0 {
-				stalled = 0
-				_, append_err := append(to, ..chunk[:n])
-				if append_err != nil {
-					return append_err
-				}
-			} else if read_err == nil {
-				stalled += 1
-				if stalled > 100 {
-					return io.Error.No_Progress
-				}
-			}
-			if read_err == .EOF {
-				return nil
-			}
-			if read_err != nil {
-				return read_err
-			}
-		}
+		return extract_current(&it.it, to, {password = it.options.password})
 	case io.Writer:
 		it.total += fi.size
 		return extract_current(&it.it, to, {password = it.options.password})

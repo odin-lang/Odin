@@ -16,6 +16,12 @@ import "core:strings"
 import "core:time"
 import "core:unicode/utf8"
 
+// Extracts the current member's data to a writer or into a buffer
+extract_current :: proc{extract_current_to_writer, extract_current_to_dynamic}
+
+// Extracts a member's data to a writer or into a buffer
+extract :: proc{extract_to_writer, extract_to_dynamic}
+
 /*
 Opens a 7z archive held in memory
 
@@ -225,7 +231,7 @@ Returns:
 - err: `General_Error.No_Current_Member` if `iterate` hasn't returned a member, or the member's
   error, or `nil`
 */
-extract_current :: proc(it: ^Iterator, w: io.Writer, options := archive.Read_Options{}) -> (err: Error) {
+extract_current_to_writer :: proc(it: ^Iterator, w: io.Writer, options := archive.Read_Options{}) -> (err: Error) {
 	if !_has_current(it) {
 		return archive.General_Error.No_Current_Member
 	}
@@ -233,6 +239,24 @@ extract_current :: proc(it: ^Iterator, w: io.Writer, options := archive.Read_Opt
 	password := _password(it.reader, options)
 	d := _iterator_decoder(it, password) or_return
 	return _extract(it.reader, it.index, d, w, password)
+}
+
+/*
+Reads the current member's data into a buffer, decompressed and checked
+
+Inputs:
+- it: The iterator, on the member `iterate` returned last
+- output: Replaced by the member's data, grown with its own allocator; emptied on an error
+- options: The member's password, if encrypted; else the one given at open (default: {})
+
+Returns:
+- err: `General_Error.No_Current_Member` if `iterate` hasn't returned a member, an allocator
+  error, the member's error, or `nil`
+*/
+extract_current_to_dynamic :: proc(it: ^Iterator, output: ^[dynamic]u8, options := archive.Read_Options{}) -> (err: Error) {
+	d: archive._Dynamic_Output
+	err = extract_current_to_writer(it, archive._dynamic_output_writer(&d, output), options)
+	return archive._dynamic_output_finish(&d, err)
 }
 
 /*
@@ -338,9 +362,30 @@ Inputs:
 Returns:
 - err: `General_Error.Not_Found` for a stale handle, the member's error, or `nil`
 */
-extract :: proc(r: ^Reader, handle: archive.Handle, w: io.Writer, options := archive.Read_Options{}) -> (err: Error) {
+extract_to_writer :: proc(r: ^Reader, handle: archive.Handle, w: io.Writer, options := archive.Read_Options{}) -> (err: Error) {
 	index := _handle_index(r, handle) or_return
 	return _extract(r, index, nil, w, _password(r, options))
+}
+
+/*
+Reads a member's data into a buffer, decompressed and checked
+
+In a solid folder, the folder is decoded from its start up to the member.
+
+Inputs:
+- r: An open reader
+- handle: The member, from `File_Info.handle` or `find`
+- output: Replaced by the member's data, grown with its own allocator; emptied on an error
+- options: The member's password, if encrypted; else the one given at open (default: {})
+
+Returns:
+- err: `General_Error.Not_Found` for a stale handle, an allocator error, the member's error, or
+  `nil`
+*/
+extract_to_dynamic :: proc(r: ^Reader, handle: archive.Handle, output: ^[dynamic]u8, options := archive.Read_Options{}) -> (err: Error) {
+	d: archive._Dynamic_Output
+	err = extract_to_writer(r, handle, archive._dynamic_output_writer(&d, output), options)
+	return archive._dynamic_output_finish(&d, err)
 }
 
 /*
