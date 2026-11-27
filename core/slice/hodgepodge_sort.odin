@@ -4,13 +4,64 @@ package slice
 import "base:builtin"
 import "base:intrinsics"
 
-// NOTE(bill, 2026-11-25): hodgepodge sort is the sort behind every procedure in this package.
-// It is stable, sorts in place, and needs no allocator: its only scratch space is a stack buffer of at most HODGEPODGE_SWAP_BYTES.
-// It is no one algorithm but a hodgepodge, each part for the input it suits: branchless networks for small runs, merges
-// through the buffer for input with order in it, drop-merge for input sorted apart from scattered items, a stable partition
-// around a sampled pivot for input without order (4-byte numbers four lanes at a time on most targets), and an in-place
-// radix sort for integers in their own order.
-// A comparator that is not a strict weak order still leaves a permutation of the input.
+/*
+	NOTE(bill, 2026-11-25): hodgepodge sort is the sort behind every procedure in this package.
+	It is stable, sorts in place, and needs no allocator: its only scratch space is a stack buffer of at most HODGEPODGE_SWAP_BYTES.
+	A comparator that is not a strict weak order still leaves a permutation of the input.
+
+	No one algorithm is fastest on every input, and this sort is a hodgepodge of them, hence its name:
+	a cheap look at the input chooses, part by part, the technique that suits it.
+	Comparisons are cheap for numbers in their own order and for comparators known at compile time.
+	Where each comparison is a call instead, the sort does more of its other work to make fewer of them.
+
+	## Small arrays
+	Fewer than 8 items with cheap comparisons take sorting networks, and other small arrays take insertion sort.
+	Up to HODGEPODGE_SMALL items, quad swaps and parity merges sort through a small stack buffer
+	(hodgepodge_tiny_sort, hodgepodge_tail_swap), from quadsort [1].
+
+	## Merges
+	Through the buffer, a branchless merge fills the output from both ends at once (hodgepodge_cross_merge), from quadsort [1].
+	Merges longer than the buffer split by a monobound binary search and rotations
+	(hodgepodge_rank, hodgepodge_rotate_merge_block, hodgepodge_trinity_rotation), after blitsort [2].
+	Where both sides are long and interleave, blocks of half the buffer are put in order and merged locally instead
+	(hodgepodge_block_merge), after the block merge of Huang and Langston [3].
+
+	## Reading the input
+	Descents counted in four quarters choose the route (hodgepodge_analyse), after fluxsort [4] and blitsort [2].
+	Sorted and reversed quarters cost one pass.
+	With cheap comparisons, quarters with order in them take the merges above.
+	Otherwise they merge their natural runs in the order of Powersort [5], with the lazy unsorted runs of Glidesort [6],
+	and input sorted apart from scattered items takes drop-merge sort [7].
+
+	## Input without order
+	A stable partition around a pivot sampled from about the cube root of n items (hodgepodge_partition), after fluxsort [4].
+	A range within the buffer partitions through it, and a longer one halves and rotates, after blitsort [2].
+	A much longer one collects each side in blocks that are then put in order, like the block distribution of IPS4o [8].
+	Where a byte shuffle is one instruction, f32 keys move four lanes at a time with a shuffle table, after Gueron and Krasnov [9].
+	Integers in their own order take an in-place radix sort instead (hodgepodge_radix_sort): the American flag sort [10].
+
+	## Large elements and code size
+	Elements over 512 bytes, where fewer than 32 fit the buffer, are sorted by insertion in blocks of HODGEPODGE_BLOCK
+	and then merged as above (hodgepodge_large_element_sort).
+	At -o:size, element types of one size and alignment share one body (Sort_Shared_Item).
+
+	## Sources
+	[1]  Igor van den Hoven, quadsort (2020): https://github.com/scandum/quadsort
+	[2]  Igor van den Hoven, blitsort (2021): https://github.com/scandum/blitsort
+	[3]  Bing-Chao Huang and Michael A. Langston, "Practical In-Place Merging", Communications of the ACM 31(3), 1988:
+	     https://doi.org/10.1145/42392.42403
+	[4]  Igor van den Hoven, fluxsort (2021): https://github.com/scandum/fluxsort
+	[5]  J. Ian Munro and Sebastian Wild, "Nearly-Optimal Mergesorts: Fast, Practical Sorting Methods That Optimally Adapt
+	     to Existing Runs", ESA 2018: https://arxiv.org/abs/1805.04154
+	[6]  Orson Peters, Glidesort (2023): https://github.com/orlp/glidesort
+	[7]  Emil Ernerfeldt, drop-merge sort (2016): https://github.com/emilk/drop-merge-sort
+	[8]  Michael Axtmann, Sascha Witt, Daniel Ferizovic, and Peter Sanders, "In-place Parallel Super Scalar Samplesort
+	     (IPS4o)", ESA 2017: https://arxiv.org/abs/1705.02257
+	[9]  Shay Gueron and Vlad Krasnov, "Fast Quicksort Implementation Using AVX Instructions", The Computer Journal 59(1),
+	     2016: https://doi.org/10.1093/comjnl/bxv063
+	[10] Peter M. McIlroy, Keith Bostic, and M. Douglas McIlroy, "Engineering Radix Sort", Computing Systems 6(1), 1993:
+	     https://www.usenix.org/legacy/publications/compsystems/1993/win_mcilroy.pdf
+*/
 
 ORD :: intrinsics.type_is_ordered
 
@@ -206,7 +257,7 @@ hodgepodge_sort_typed :: proc(data: []$E, call: $P, $KIND: Sort_Kind) #no_bounds
 
 hodgepodge_large_buffered_sort :: #force_no_inline proc(data: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	swap: [HODGEPODGE_LARGE]E = ---
-	hodgepodge_analyze(data, swap[:], call, KIND)
+	hodgepodge_analyse(data, swap[:], call, KIND)
 }
 
 hodgepodge_buffered_sort :: #force_no_inline proc(data: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
@@ -231,7 +282,7 @@ hodgepodge_buffered_sort :: #force_no_inline proc(data: []$E, call: $P, $KIND: S
 		if len(data) <= 132 {
 			hodgepodge_quadsort(data, swap[:], call, KIND)
 		} else {
-			hodgepodge_analyze(data, swap[:], call, KIND)
+			hodgepodge_analyse(data, swap[:], call, KIND)
 		}
 	}
 }
@@ -1392,7 +1443,7 @@ hodgepodge_sorted_at_scale :: proc(a: []$E, call: $P, $KIND: Sort_Kind) -> bool 
 	return descents < HODGEPODGE_FAR_DESCENTS
 }
 
-// Drop-merge, after Ernerfeldt's drop-merge sort (2017), for input sorted apart from scattered items: a non-decreasing
+// Drop-merge, after Ernerfeldt's drop-merge sort (2016), for input sorted apart from scattered items: a non-decreasing
 // sequence stays in place, and the items that break it are set aside sorted, each with its slot, the number of kept
 // items that came before it. Slots settle ties against kept items when the two merge. A kept item that is a lone spike
 // is set aside instead of what follows it. When the buffer is full, what is done so far merges into one sorted segment
@@ -2044,7 +2095,7 @@ hodgepodge_partition :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_
 	}
 }
 
-hodgepodge_analyze :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+hodgepodge_analyse :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	// Integers in their own order take a radix sort where a partition would go. Single bytes need one
 	// counting pass, which beats any use of the order already there.
 	RADIX :: (KIND == .Ordered || KIND == .Ordered_Reverse) && intrinsics.type_is_integer(E) && intrinsics.type_is_endian_platform(E)
