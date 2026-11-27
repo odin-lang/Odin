@@ -245,6 +245,51 @@ test_soa_split_fields :: proc(t: ^testing.T) {
 	testing.expect_value(t, lanes[1], [2]Split_Particle{want, {}})
 }
 
+@(private="file")
+Split_Body :: struct {
+	#soa_split pos: [3]f32,
+	#soa_split vel: [3]f32,
+	life:           f32,
+}
+
+// Arithmetic on a '#soa_split' array, and on the elements of an #soa array of arrays, one lane per column
+@(test)
+test_soa_split_arithmetic :: proc(t: ^testing.T) {
+	bs: #soa[dynamic]Split_Body
+	defer delete(bs)
+	for i in 0..<37 {
+		append(&bs, Split_Body{pos = {f32(i), 1, 2}, vel = {1, 2, 3}, life = f32(i % 2)})
+	}
+	for &b in bs {
+		b.pos += b.vel * 0.5
+	}
+	for &b in bs {
+		if b.life > 0 {
+			b.pos = b.pos*2 - b.vel
+		}
+	}
+	for b, i in bs {
+		want := [3]f32{f32(i) + 0.5, 2, 3.5}
+		if i % 2 == 1 {
+			want = want*2 - [3]f32{1, 2, 3}
+		}
+		testing.expect_value(t, b.pos, want)
+	}
+
+	vs: #soa[dynamic][4]i32
+	defer delete(vs)
+	for i in 0..<21 {
+		append(&vs, [4]i32{i32(i), 1, 2, 3})
+	}
+	k := 5
+	vs[k] += 10
+	for &v in vs {
+		v = v*3 + 1
+	}
+	testing.expect_value(t, vs[20], [4]i32{61, 4, 7, 10})
+	testing.expect_value(t, vs[k], [4]i32{46, 34, 37, 40})
+}
+
 // 'soa_unzip' gives one result for each field of the element, and the '#soa[]' view of a '#soa_split' field
 @(test)
 test_soa_split_unzip :: proc(t: ^testing.T) {
