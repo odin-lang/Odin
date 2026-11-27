@@ -95,6 +95,10 @@ Sort_Kind :: enum {
 	Shared,
 }
 
+// The kinds that compare the items themselves with `<` and `>`, and the kinds whose comparator is known at compile time.
+HODGEPODGE_ORDERED_KINDS  :: bit_set[Sort_Kind]{.Ordered, .Ordered_Reverse}
+HODGEPODGE_CONSTANT_KINDS :: bit_set[Sort_Kind]{.Less_Constant, .Less_Reverse_Constant, .Cmp_Constant, .Cmp_Reverse_Constant}
+
 Sort_Less_With_Data :: struct($E: typeid) {
 	less:      proc(i, j: E, user_data: rawptr) -> bool,
 	user_data: rawptr,
@@ -222,10 +226,10 @@ hodgepodge_sort_typed :: proc(data: []$E, call: $P, $KIND: Sort_Kind) #no_bounds
 		return
 	}
 
-	CHEAP    :: (KIND == .Ordered || KIND == .Ordered_Reverse) && !intrinsics.type_is_string(E)
-	CONSTANT :: KIND == .Less_Constant || KIND == .Less_Reverse_Constant || KIND == .Cmp_Constant || KIND == .Cmp_Reverse_Constant
+	ORDERED  :: KIND in HODGEPODGE_ORDERED_KINDS && !intrinsics.type_is_string(E)
+	CONSTANT :: KIND in HODGEPODGE_CONSTANT_KINDS
 
-	when CHEAP || (CONSTANT && size_of(E) <= HODGEPODGE_NETWORK_BYTES) {
+	when ORDERED || CONSTANT && size_of(E) <= HODGEPODGE_NETWORK_BYTES {
 		if n < 8 {
 			tiny: [7]E = ---
 			hodgepodge_tiny_sort(data, tiny[:], call, KIND)
@@ -270,16 +274,9 @@ hodgepodge_large_buffered_sort :: #force_no_inline proc(data: []$E, call: $P, $K
 }
 
 hodgepodge_buffered_sort :: #force_no_inline proc(data: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
-	when size_of(E)*512 <= HODGEPODGE_SWAP_BYTES {
-		SWAP_LEN :: 512
-	} else when size_of(E)*256 <= HODGEPODGE_SWAP_BYTES {
-		SWAP_LEN :: 256
-	} else when size_of(E)*128 <= HODGEPODGE_SWAP_BYTES {
-		SWAP_LEN :: 128
-	} else when size_of(E)*64 <= HODGEPODGE_SWAP_BYTES {
-		SWAP_LEN :: 64
-	} else when size_of(E)*32 <= HODGEPODGE_SWAP_BYTES {
-		SWAP_LEN :: 32
+	// A power of two from 32 to 512 items, or as many as fit.
+	when size_of(E)*32 <= HODGEPODGE_SWAP_BYTES {
+		SWAP_LEN :: builtin.min(512, 1 << intrinsics.constant_log2(HODGEPODGE_SWAP_BYTES/size_of(E)))
 	} else {
 		SWAP_LEN :: builtin.max(HODGEPODGE_SWAP_BYTES/size_of(E), 1)
 	}
@@ -565,6 +562,18 @@ hodgepodge_quad_swap_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_b
 // Returns true when the whole of `a` was one descending run, which is now sorted.
 @(require_results)
 hodgepodge_quad_swap :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) -> bool #no_bounds_check {
+	// Whether the seams between the pairs of a[i:][:8] all ascend, or all descend.
+	seams_ascend :: #force_inline proc(a: []E, i: int, call: P) -> bool #no_bounds_check {
+		return !hodgepodge_greater(a[i+1], a[i+2], call, KIND) &&
+		       !hodgepodge_greater(a[i+3], a[i+4], call, KIND) &&
+		       !hodgepodge_greater(a[i+5], a[i+6], call, KIND)
+	}
+	seams_descend :: #force_inline proc(a: []E, i: int, call: P) -> bool #no_bounds_check {
+		return hodgepodge_greater(a[i+1], a[i+2], call, KIND) &&
+		       hodgepodge_greater(a[i+3], a[i+4], call, KIND) &&
+		       hodgepodge_greater(a[i+5], a[i+6], call, KIND)
+	}
+
 	n     := len(a)
 	count := n / 8
 	i     := 0
@@ -586,17 +595,12 @@ hodgepodge_quad_swap :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) -> bool #no
 			v4 := hodgepodge_greater(a[i+6], a[i+7], call, KIND)
 
 			if !(v1 || v2 || v3 || v4) {
-				if !hodgepodge_greater(a[i+1], a[i+2], call, KIND) &&
-				   !hodgepodge_greater(a[i+3], a[i+4], call, KIND) &&
-				   !hodgepodge_greater(a[i+5], a[i+6], call, KIND) {
+				if seams_ascend(a, i, call) {
 					i += 8
 					continue blocks
 				}
 				hodgepodge_quad_swap_merge(a[i:i+8], s, call, KIND)
-			} else if v1 && v2 && v3 && v4 &&
-			          hodgepodge_greater(a[i+1], a[i+2], call, KIND) &&
-			          hodgepodge_greater(a[i+3], a[i+4], call, KIND) &&
-			          hodgepodge_greater(a[i+5], a[i+6], call, KIND) {
+			} else if v1 && v2 && v3 && v4 && seams_descend(a, i, call) {
 				pts = i
 				in_reversed_run = true
 				continue blocks
@@ -642,28 +646,19 @@ hodgepodge_quad_swap :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) -> bool #no
 		o4 := !hodgepodge_greater(a[i+6], a[i+7], call, KIND)
 
 		if !(o1 || o2 || o3 || o4) {
-			if hodgepodge_greater(a[i-1], a[i],   call, KIND) &&
-			   hodgepodge_greater(a[i+1], a[i+2], call, KIND) &&
-			   hodgepodge_greater(a[i+3], a[i+4], call, KIND) &&
-			   hodgepodge_greater(a[i+5], a[i+6], call, KIND) {
+			if hodgepodge_greater(a[i-1], a[i], call, KIND) && seams_descend(a, i, call) {
 				continue blocks
 			}
 		}
 		hodgepodge_reverse(a[pts:i])
 		in_reversed_run = false
 
-		if o1 && o2 && o3 && o4 &&
-		   !hodgepodge_greater(a[i+1], a[i+2], call, KIND) &&
-		   !hodgepodge_greater(a[i+3], a[i+4], call, KIND) &&
-		   !hodgepodge_greater(a[i+5], a[i+6], call, KIND) {
+		if o1 && o2 && o3 && o4 && seams_ascend(a, i, call) {
 			i += 8
 			continue blocks
 		}
 
-		if !(o1 || o2 || o3 || o4) &&
-		   hodgepodge_greater(a[i+1], a[i+2], call, KIND) &&
-		   hodgepodge_greater(a[i+3], a[i+4], call, KIND) &&
-		   hodgepodge_greater(a[i+5], a[i+6], call, KIND) {
+		if !(o1 || o2 || o3 || o4) && seams_descend(a, i, call) {
 			pts = i
 			in_reversed_run = true
 			continue blocks
@@ -674,9 +669,7 @@ hodgepodge_quad_swap :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) -> bool #no
 		hodgepodge_swap_if(a, i+4, !o3)
 		hodgepodge_swap_if(a, i+6, !o4)
 
-		if hodgepodge_greater(a[i+1], a[i+2], call, KIND) ||
-		   hodgepodge_greater(a[i+3], a[i+4], call, KIND) ||
-		   hodgepodge_greater(a[i+5], a[i+6], call, KIND) {
+		if !seams_ascend(a, i, call) {
 			hodgepodge_quad_swap_merge(a[i:i+8], s, call, KIND)
 		}
 		i += 8
@@ -846,11 +839,7 @@ hodgepodge_quad_merge :: proc(a, s: []$E, start_block: int, call: $P, $KIND: Sor
 }
 
 hodgepodge_partial_forward_merge :: proc(a, s: []$E, block: int, call: $P, $KIND: Sort_Kind) #no_bounds_check {
-	n := len(a)
-	if block == 0 || n == block {
-		return
-	}
-
+	n   := len(a)
 	ptr := block
 	tpr := n - 1
 	if !hodgepodge_greater(a[ptr-1], a[ptr], call, KIND) {
@@ -942,11 +931,7 @@ hodgepodge_backward_merge_step :: #force_inline proc(a, s: []$E, tpl, tpr, tpa: 
 }
 
 hodgepodge_partial_backward_merge :: proc(a, s: []$E, block: int, call: $P, $KIND: Sort_Kind) #no_bounds_check {
-	n := len(a)
-	if block == 0 || n == block {
-		return
-	}
-
+	n   := len(a)
 	tpl := block - 1
 	tpa := n - 1
 	if !hodgepodge_greater(a[tpl], a[tpl+1], call, KIND) {
@@ -1259,8 +1244,9 @@ hodgepodge_bit_rank :: #force_inline proc "contextless" (words: []u64, ranks: []
 // of Huang and Langston ("Practical In-Place Merging", 1988) with the buffer outside the array. The blocks are put in
 // order of their first items, the left side's first on a tie, and one pass merges each block with what is left of the
 // blocks before it, through the buffer. The left side's first left%b items start what is left, and the right side's
-// last items short of a block merge in at the end.
-hodgepodge_block_merge :: proc(a, s: []$E, left: int, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+// last items short of a block merge in at the end. It stays out of line, or its bit sets sit in every recursive frame of
+// rotate_merge_block.
+hodgepodge_block_merge :: #force_no_inline proc(a, s: []$E, left: int, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	WORDS :: HODGEPODGE_BLOCKS / 64
 
 	n      := len(a)
@@ -1327,7 +1313,21 @@ hodgepodge_block_merge :: proc(a, s: []$E, left: int, call: $P, $KIND: Sort_Kind
 }
 
 hodgepodge_rotate_merge_block :: proc(a, s: []$E, block, count: int, call: $P, $KIND: Sort_Kind, try_blocks := true) #no_bounds_check {
-	if block == 0 || !hodgepodge_greater(a[block-1], a[block], call, KIND) {
+	// Merges a part through the buffer where the part fits, or where its sides differ more than twofold and one of them
+	// fits: a backward merge buffers the right side, and a forward merge the left. Other parts take rotations.
+	part :: proc(a, s: []E, block, count: int, call: P, try_blocks: bool) {
+		unbalanced := count*2 < block || block*2 < count
+		switch {
+		case unbalanced && count <= len(s) || block+count <= len(s):
+			hodgepodge_partial_backward_merge(a, s, block, call, KIND)
+		case unbalanced && block <= len(s):
+			hodgepodge_partial_forward_merge(a, s, block, call, KIND)
+		case:
+			hodgepodge_rotate_merge_block(a, s, block, count, call, KIND, try_blocks)
+		}
+	}
+
+	if !hodgepodge_greater(a[block-1], a[block], call, KIND) {
 		return
 	}
 
@@ -1370,31 +1370,12 @@ hodgepodge_rotate_merge_block :: proc(a, s: []$E, block, count: int, call: $P, $
 			hodgepodge_cross_merge(a[:lblock+left], s[:lblock+left], lblock, left, call, KIND)
 		} else {
 			hodgepodge_trinity_rotation(a[lblock:lblock+rblock+left], s, rblock)
-
-			unbalanced := left*2 < lblock || lblock*2 < left
-			switch {
-			case unbalanced && left <= len(s):
-				hodgepodge_partial_backward_merge(a[:lblock+left], s, lblock, call, KIND)
-			case unbalanced && lblock <= len(s):
-				hodgepodge_partial_forward_merge(a[:lblock+left], s, lblock, call, KIND)
-			case:
-				hodgepodge_rotate_merge_block(a[:lblock+left], s, lblock, left, call, KIND, try_halves)
-			}
+			part(a[:lblock+left], s, lblock, left, call, try_halves)
 		}
 	}
 
 	if right > 0 {
-		rest := a[lblock+left:lblock+left+rblock+right]
-
-		unbalanced := right*2 < rblock || rblock*2 < right
-		switch {
-		case (unbalanced && right <= len(s)) || right+rblock <= len(s):
-			hodgepodge_partial_backward_merge(rest, s, rblock, call, KIND)
-		case unbalanced && rblock <= len(s):
-			hodgepodge_partial_forward_merge(rest, s, rblock, call, KIND)
-		case:
-			hodgepodge_rotate_merge_block(rest, s, rblock, right, call, KIND, try_halves)
-		}
+		part(a[lblock+left:lblock+left+rblock+right], s, rblock, right, call, try_halves)
 	}
 }
 
@@ -1402,7 +1383,7 @@ hodgepodge_rotate_merge :: proc(a, s: []$E, start_block: int, call: $P, $KIND: S
 	n     := len(a)
 	block := start_block
 
-	if block <= n && n <= block*2 && n-block <= len(s) {
+	if block < n && n <= block*2 && n-block <= len(s) {
 		hodgepodge_partial_backward_merge(a, s, block, call, KIND)
 		return
 	}
@@ -1805,7 +1786,7 @@ hodgepodge_partition_lanes :: #force_inline proc(src, lows, highs: ^$E, pivot: E
 hodgepodge_stable_partition :: proc(a, s: []$E, pivot: E, call: $P, $KIND: Sort_Kind, $FRONT: Hodgepodge_Front) -> (count: int) #no_bounds_check {
 	// Integers come here from hodgepodge_radix_sort when they have few distinct values.
 	NUMERIC :: (intrinsics.type_is_integer(E) || intrinsics.type_is_float(E)) && intrinsics.type_is_endian_platform(E)
-	LANES   :: 4 when HODGEPODGE_PARTITION_SIMD && (KIND == .Ordered || KIND == .Ordered_Reverse) && NUMERIC && size_of(E) == 4 else 1
+	LANES   :: 4 when HODGEPODGE_PARTITION_SIMD && KIND in HODGEPODGE_ORDERED_KINDS && NUMERIC && size_of(E) == 4 else 1
 
 	n := len(a)
 	if n <= len(s) {
@@ -2194,12 +2175,11 @@ hodgepodge_partition :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_
 hodgepodge_analyse :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	// Integers in their own order take a radix sort where a partition would go. Single bytes need one
 	// counting pass, which beats any use of the order already there.
-	RADIX :: (KIND == .Ordered || KIND == .Ordered_Reverse) && intrinsics.type_is_integer(E) && intrinsics.type_is_endian_platform(E)
+	RADIX :: KIND in HODGEPODGE_ORDERED_KINDS && intrinsics.type_is_integer(E) && intrinsics.type_is_endian_platform(E)
 	// Where a comparison is a call, not a few inlined instructions, a quarter with order in it merges its natural runs
 	// instead of being sorted in fixed blocks, input sorted apart from scattered items takes drop-merge, and input sorted
 	// at large scale merges its natural runs: fewer comparisons, and merges that follow the data.
-	CHEAP :: (KIND == .Ordered || KIND == .Ordered_Reverse) && !intrinsics.type_is_string(E) ||
-	         KIND == .Less_Constant || KIND == .Less_Reverse_Constant || KIND == .Cmp_Constant || KIND == .Cmp_Reverse_Constant
+	CHEAP :: KIND in HODGEPODGE_ORDERED_KINDS && !intrinsics.type_is_string(E) || KIND in HODGEPODGE_CONSTANT_KINDS
 	when RADIX && size_of(E) == 1 {
 		hodgepodge_radix_sort(a, s, call, KIND)
 		return
