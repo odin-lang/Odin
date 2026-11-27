@@ -35,6 +35,36 @@ test_clone :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_open_file_can_be_renamed_and_removed :: proc(t: ^testing.T) {
+	dir, dir_err := os.make_directory_temp("", "odin-open-file-*", context.temp_allocator)
+	if dir_err != nil {
+		testing.fail_now(t, "could not create temporary directory")
+	}
+	defer os.remove_all(dir)
+
+	named, n_err := os.join_path({dir, "named.txt"}, context.temp_allocator)
+	testing.expect_value(t, n_err, nil)
+	renamed, r_err := os.join_path({dir, "renamed.txt"}, context.temp_allocator)
+	testing.expect_value(t, r_err, nil)
+	testing.expect_value(t, os.write_entire_file(named, "still readable"), nil)
+
+	f, err := os.open(named)
+	if err != nil {
+		testing.fail_now(t, "could not open the file")
+	}
+	defer os.close(f)
+
+	testing.expect_value(t, os.rename(named, renamed), nil)
+	testing.expect_value(t, os.remove(renamed), nil)
+	testing.expect(t, !os.exists(renamed))
+
+	buf: [32]byte
+	n, read_err := os.read(f, buf[:])
+	testing.expect_value(t, read_err, nil)
+	testing.expect_value(t, string(buf[:n]), "still readable")
+}
+
+@(test)
 test_temp_names_ignore_context_random_generator :: proc(t: ^testing.T) {
 	rand.reset(u64(7547))
 	first, first_err := os.make_directory_temp("", "odin-temp-name-*", context.temp_allocator)
