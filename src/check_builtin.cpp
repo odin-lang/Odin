@@ -2632,6 +2632,10 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 			}
 		}
 
+		if (result == LoadDirective_Success && cache->files.count == 0) {
+			warning(call, "%.*s - directory holds only subdirectories, which are not loaded, so the result is empty: %.*s", LIT(name), LIT(original_string));
+		}
+
 		array_sort(cache->files, file_cache_sort_cmp);
 
 	}

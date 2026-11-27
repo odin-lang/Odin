@@ -925,6 +925,14 @@ else
 	exit 1
 fi
 
+$ODIN check ../test_paths_load_directory_subdirs -no-entry-point $COMMON_CHECK
+if [[ $($ODIN check ../test_paths_load_directory_subdirs -no-entry-point $COMMON_CHECK 2>&1 | grep -c "Warning: load_directory - directory holds only subdirectories") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 rm -rf identity
 cp -R ../test_paths_identity identity
 ln -s pkg identity/alias

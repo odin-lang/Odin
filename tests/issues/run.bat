@@ -366,6 +366,8 @@ rmdir spelled_link
 %ODIN% check ..\test_paths_directives -no-entry-point %COMMON% 2>&1 | find /c "it contains a NUL byte" | findstr /x "1" || exit /b
 %ODIN% check ..\test_paths_directives -no-entry-point %COMMON% 2>&1 | find /c "Unknown library collection" | findstr /x "1" || exit /b
 %ODIN% check ..\test_paths_directives -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% check ..\test_paths_load_directory_subdirs -no-entry-point %COMMON% 2>&1 | find /c "Warning: load_directory - directory holds only subdirectories" | findstr /x "1" || exit /b
+%ODIN% check ..\test_paths_load_directory_subdirs -no-entry-point %COMMON% || exit /b
 
 if exist identity\alias rmdir identity\alias
 if exist identity rmdir /S /Q identity
