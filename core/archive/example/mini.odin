@@ -1,6 +1,6 @@
 /*
-A minimal archive tool on `core:archive`: lists a zip archive, tests it, unpacks one member, or
-creates or updates an archive.
+A minimal archive tool on `core:archive`: lists a zip or 7z archive, tests it, unpacks one
+member, or creates or updates an archive.
 
 Build it with `odin build core/archive/example -out:mini`, then run:
 
@@ -11,24 +11,27 @@ Build it with `odin build core/archive/example -out:mini`, then run:
 	                                  base name, unless a file of that name exists
 	mini create <archive> <path>...   packs files and directory trees into a new archive, with
 	                                  the format's default options, unless the archive exists
-	mini update <archive> <path>...   adds files and directory trees to a zip archive,
+	mini update <archive> <path>...   adds files and directory trees to a zip or 7z archive,
 	                                  replacing the members it has at the same paths
 	mini -help                        shows the usage
 
-`archive.open` tells the formats apart by their contents, self-extracting zip archives included.
-A format's package registers it with `core:archive` when imported.
+`archive.open` tells the formats apart by their contents, self-extracting zip and 7z archives
+included. A format's package registers it with `core:archive` when imported.
 
 Reading goes through `core:archive`, which has no writers, so `create` and `update` call the
-format's own package. `create` takes the format from the name, which must end in `.zip`, and
-`update` from the archive's contents.
+format's own package. `create` takes the format from the name, which must end in `.zip` or
+`.7z`, and `update` from the archive's contents.
 
-`core:archive` reads encrypted zip archives, but this tool takes no password. A program passes
-one in `archive.Read_Options` to `archive.extract` or `archive.extract_current`. Without one,
-encrypted members are listed but don't test or unpack.
+`core:archive` reads encrypted zip and 7z archives, but this tool takes no password. A program
+passes one in `archive.Read_Options`: to `archive.open` for a 7z archive's encrypted header, and
+to `archive.extract` or `archive.extract_current` for encrypted members. Without one, a 7z
+archive with an encrypted header doesn't open, and encrypted members are listed but don't test
+or unpack.
 */
 package mini
 
 import "core:archive"
+import "core:archive/sevenz"
 import "core:archive/zip"
 import "core:flags"
 import "core:fmt"
@@ -59,7 +62,7 @@ USAGE :: `usage:
                                     base name, unless a file of that name exists
   mini create <archive> <path>...   packs files and directory trees into a new archive, with
                                     the format's default options, unless the archive exists
-  mini update <archive> <path>...   adds files and directory trees to a zip archive,
+  mini update <archive> <path>...   adds files and directory trees to a zip or 7z archive,
                                     replacing the members it has at the same paths
   mini -help                        shows the usage
 `
@@ -234,6 +237,8 @@ pack :: proc(path: string, sources: []string, update: bool) -> bool {
 		return false
 	case strings.has_suffix(path, ".zip"):
 		format = .Zip
+	case strings.has_suffix(path, ".7z"):
+		format = .SevenZ
 	}
 
 	at:  string
@@ -241,8 +246,10 @@ pack :: proc(path: string, sources: []string, update: bool) -> bool {
 	#partial switch format {
 	case .Zip:
 		at, err = pack_zip(path, sources, update)
+	case .SevenZ:
+		at, err = pack_7z(path, sources, update)
 	case:
-		fmt.eprintfln("%v: a new archive's name must end in .zip", path)
+		fmt.eprintfln("%v: a new archive's name must end in .zip or .7z", path)
 		return false
 	}
 	if err != nil {
@@ -286,6 +293,32 @@ pack_zip :: proc(path: string, sources: []string, update: bool) -> (at: string, 
 	}
 	at = path
 	return at, zip.commit(&zw)
+}
+
+pack_7z :: proc(path: string, sources: []string, update: bool) -> (at: string, err: archive.Error) {
+	at = path
+	sw: sevenz.Writer
+	if update {
+		sevenz.update(&sw, path) or_return
+	} else {
+		sevenz.create(&sw, path) or_return
+	}
+	defer sevenz.close(&sw)
+
+	options := sevenz.Entry_Options{replace = update}
+	for source in sources {
+		at = source
+		fi := describe(source) or_return
+		if fi.type == .Directory {
+			sevenz.write_directory(&sw, source, fi.path, options) or_return
+		} else {
+			f := os.open(source) or_return
+			defer os.close(f)
+			sevenz.write_entry(&sw, fi, os.to_reader(f), options) or_return
+		}
+	}
+	at = path
+	return at, sevenz.commit(&sw)
 }
 
 method_name :: proc(fi: archive.File_Info, method: archive.Method) -> string {
