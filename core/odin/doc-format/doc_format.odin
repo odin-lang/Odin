@@ -12,7 +12,7 @@ String :: distinct Array(byte)
 
 Version_Type_Major :: 0
 Version_Type_Minor :: 3
-Version_Type_Patch :: 2
+Version_Type_Patch :: 3
 
 Version_Type :: struct {
 	major, minor, patch: u8,
@@ -113,6 +113,8 @@ Entity_Flag :: enum u32le {
 	Param_By_Ptr       = 9, // #by_ptr
 	Param_No_Broadcast = 10, // #no_broadcast
 
+	Field_Subtype   = 17, // #subtype
+	Field_Soa_Split = 18, // #soa_split
 	Bit_Field_Field = 19,
 
 	Type_Alias = 20,

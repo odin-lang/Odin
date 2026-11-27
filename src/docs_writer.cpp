@@ -888,6 +888,8 @@ gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) 
 		if (e->flags & EntityFlag_BitFieldField) {
 			flags |= OdinDocEntityFlag_BitField_Field;
 		}
+		if (e->flags & EntityFlag_Subtype)  { flags |= OdinDocEntityFlag_Field_Subtype;  }
+		if (e->flags & EntityFlag_SoaSplit) { flags |= OdinDocEntityFlag_Field_SoaSplit; }
 
 		if (e->Variable.is_foreign) { flags |= OdinDocEntityFlag_Foreign; }
 		if (e->Variable.is_export)  { flags |= OdinDocEntityFlag_Export;  }
