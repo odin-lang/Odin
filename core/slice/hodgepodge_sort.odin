@@ -83,8 +83,10 @@ HODGEPODGE_INSERTION_SMALL  :: 8
 HODGEPODGE_INSERTION_LARGE  :: 32
 HODGEPODGE_INSERTION_HUGE   :: 64
 HODGEPODGE_NETWORK_BYTES    :: 16
-HODGEPODGE_PARTITION_BLOCKS :: 4096
+HODGEPODGE_BLOCKS           :: 4096
 HODGEPODGE_PARTITION_HALVES :: 4
+HODGEPODGE_MERGE_STEP       :: 32
+HODGEPODGE_MERGE_CARRIED    :: 2
 HODGEPODGE_RADIX_SMALL      :: 64
 HODGEPODGE_RUN_MIN          :: 32
 HODGEPODGE_DROP_DESCENTS    :: 16
@@ -1099,9 +1101,196 @@ hodgepodge_monobound_binary_first :: proc(a: []$E, value: E, top: int, call: $P,
 	return end
 }
 
-hodgepodge_rotate_merge_block :: proc(a, s: []$E, block, count: int, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+// How many items of the sorted `a` are not greater than x: where x goes after any equal item.
+@(require_results)
+hodgepodge_binary_last :: proc(a: []$E, x: E, call: $P, $KIND: Sort_Kind) -> int #no_bounds_check {
+	lo, hi := 0, len(a)
+	for lo < hi {
+		mid := lo + (hi-lo)/2
+		if hodgepodge_greater(a[mid], x, call, KIND) {
+			hi = mid
+		} else {
+			lo = mid + 1
+		}
+	}
+	return lo
+}
+
+// Whether a[:left] and a[left:] interleave enough for a block merge. They are taken in steps of g items, in order of
+// the steps' first items. A step that ends before the other side's step before it has what is left of that step carried
+// past it, and fewer than 1/HODGEPODGE_MERGE_CARRIED of the steps may be. Each side needs two steps.
+@(require_results)
+hodgepodge_interleaved :: proc(a: []$E, left, g: int, call: $P, $KIND: Sort_Kind) -> bool #no_bounds_check {
+	head   := left % g
+	lefts  := left / g
+	rights := (len(a)-left) / g
+	steps  := lefts + rights
+	if lefts < 2 || rights < 2 {
+		return false
+	}
+
+	carried, l := 0, 0
+	last_l, last_r := -1, -1
+	for t in 0..<steps {
+		r := t - l
+		if l == lefts || r < rights && hodgepodge_greater(a[head + l*g], a[left + r*g], call, KIND) {
+			last_r = left + r*g + g-1
+			carried += int(last_l >= 0 && hodgepodge_greater(a[last_l], a[last_r], call, KIND))
+		} else {
+			last_l = head + l*g + g-1
+			carried += int(last_r >= 0 && !hodgepodge_greater(a[last_l], a[last_r], call, KIND))
+			l += 1
+		}
+		// The steps still to come cannot change the answer.
+		if carried*HODGEPODGE_MERGE_CARRIED >= steps {
+			return false
+		}
+		if (carried + steps-1-t)*HODGEPODGE_MERGE_CARRIED < steps {
+			return true
+		}
+	}
+	return true
+}
+
+// Merges what is left, c[:f], with the next block c[f:], of the other side, until one of them runs out: the merged items
+// go to the front of `c`, and what is left of the other stays at the back. Returns how many items merged and whether what
+// is left is the right side's. The left side's items go before equal items of the right side.
+@(require_results)
+hodgepodge_merge_fragment :: proc(c, s: []$E, f: int, f_right: bool, call: $P, $KIND: Sort_Kind) -> (merged: int, rest_right: bool) #no_bounds_check {
+	// How many items of the sorted `a` go before x, of the other side.
+	rank :: proc(a: []E, x: E, a_right: bool, call: P) -> int {
+		return hodgepodge_monobound_binary_first(a, x, len(a), call, KIND) if a_right else hodgepodge_binary_last(a, x, call, KIND)
+	}
+
+	x      := len(c) - f
+	f_last := c[f-1]
+	x_last := c[len(c)-1]
+	// Whether what is left runs out first: its last item goes before the block's.
+	f_first := hodgepodge_greater(x_last, f_last, call, KIND) if f_right else !hodgepodge_greater(f_last, x_last, call, KIND)
+
+	// The items that merge: the block's up to the last of what is left, or what is left up to the block's last.
+	taken_f, taken_x := f, x
+	if f_first {
+		taken_x = rank(c[f:], f_last, !f_right, call)
+	} else {
+		taken_f = rank(c[:f], x_last, f_right, call)
+	}
+	l, r := c[:taken_f], c[f:][:taken_x]
+	if f_right {
+		l, r = r, l
+	}
+	copy(s, l)
+	copy(s[len(l):], r)
+	// The rest of what is left goes after the block.
+	copy(c[taken_f+x:], c[taken_f:f])
+	hodgepodge_cross_merge(c[:taken_f+taken_x], s, len(l), len(r), call, KIND)
+	return taken_f + taken_x, f_right != f_first
+}
+
+// Merges a[:left] and a[left:] in blocks of half the buffer, at most HODGEPODGE_BLOCKS of them, after the block merge
+// of Huang and Langston ("Practical In-Place Merging", 1988) with the buffer outside the array. The blocks are put in
+// order of their first items, the left side's first on a tie, and one pass merges each block with what is left of the
+// blocks before it, through the buffer. The left side's first left%b items start what is left, and the right side's
+// last items short of a block merge in at the end.
+hodgepodge_block_merge :: proc(a, s: []$E, left: int, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+	WORDS :: HODGEPODGE_BLOCKS / 64
+
+	n      := len(a)
+	b      := len(s) / 2
+	head   := left % b
+	lefts  := left / b
+	blocks := lefts + (n-left) / b
+	tail   := (n-left) % b
+	words  := (blocks+63) / 64
+
+	// Bit t: the t-th block in order is the right side's.
+	rights: [WORDS]u64 = ---
+	for &word in rights[:words] {
+		word = 0
+	}
+	for t, l := 0, 0; t < blocks; t += 1 {
+		r := t - l
+		right := l == lefts || r < blocks-lefts && hodgepodge_greater(a[head + l*b], a[left + r*b], call, KIND)
+		rights[t>>6] |= u64(right) << uint(t&63)
+		l += int(!right)
+	}
+
+	// Puts the blocks in order, following each cycle with one block held in the buffer. The block that goes at t is the
+	// left side's next one or the right side's, by how many of the right side's go before it.
+	ranks: [WORDS]int = ---
+	ranks[0] = 0
+	for i in 1..<words {
+		ranks[i] = ranks[i-1] + int(intrinsics.count_ones(rights[i-1]))
+	}
+	source :: #force_inline proc(t, lefts: int, rights: []u64, ranks: []int) -> int {
+		word := rights[t>>6]
+		r    := ranks[t>>6] + int(intrinsics.count_ones(word & (1 << uint(t&63) - 1)))
+		return lefts + r if word & (1 << uint(t&63)) != 0 else t - r
+	}
+	placed: [WORDS]u64 = ---
+	for &word in placed[:words] {
+		word = 0
+	}
+	for start in 0..<blocks {
+		from := source(start, lefts, rights[:], ranks[:])
+		if from == start || placed[start>>6] & (1 << uint(start&63)) != 0 {
+			continue
+		}
+		copy(s[:b], a[head + start*b:][:b])
+		t := start
+		for from != start {
+			placed[t>>6] |= 1 << uint(t&63)
+			copy(a[head + t*b:][:b], a[head + from*b:][:b])
+			t, from = from, source(from, lefts, rights[:], ranks[:])
+		}
+		placed[t>>6] |= 1 << uint(t&63)
+		copy(a[head + t*b:][:b], s[:b])
+	}
+
+	// a[o:pos] is what is left of the blocks before pos, all from one side. Each side's blocks come in order, and the other
+	// side's blocks still to come start no lower than the next block: before a block of its own side, what is left is in
+	// place.
+	o, pos := 0, head
+	f_right := false
+	for t in 0..<blocks {
+		x_right := rights[t>>6] & (1 << uint(t&63)) != 0
+		end := pos + b
+		if o == pos || x_right == f_right {
+			o, f_right = pos, x_right
+		} else {
+			merged: int
+			merged, f_right = hodgepodge_merge_fragment(a[o:end], s, pos-o, f_right, call, KIND)
+			o += merged
+		}
+		pos = end
+	}
+	if tail > 0 {
+		hodgepodge_partial_backward_merge(a, s, n-tail, call, KIND)
+	}
+}
+
+hodgepodge_rotate_merge_block :: proc(a, s: []$E, block, count: int, call: $P, $KIND: Sort_Kind, try_blocks := true) #no_bounds_check {
 	if block == 0 || !hodgepodge_greater(a[block-1], a[block], call, KIND) {
 		return
+	}
+
+	// Where both sides overlap the other by more than the buffer, a block merge moves each item about three times, and
+	// rotations move it once per halving. The left side's items not above the right side's first are in place, and so
+	// are the right side's items not below the left side's last. The halves below try a block merge only where this merge
+	// has too many blocks for one.
+	try_halves := false
+	b := len(s) / 2
+	if try_blocks && block > len(s) && count > len(s) && b > 0 {
+		lo := hodgepodge_binary_last(a[:block], a[block], call, KIND)
+		hi := block + hodgepodge_monobound_binary_first(a[block:], a[block-1], count, call, KIND)
+		if block-lo > len(s) && hi-block > len(s) {
+			if (hi-lo)/b > HODGEPODGE_BLOCKS {
+				try_halves = true
+			} else if hodgepodge_interleaved(a[lo:hi], block-lo, builtin.max(b, HODGEPODGE_MERGE_STEP), call, KIND) {
+				hodgepodge_block_merge(a[lo:hi], s, block-lo, call, KIND)
+				return
+			}
+		}
 	}
 
 	if block == 1 {
@@ -1132,7 +1321,7 @@ hodgepodge_rotate_merge_block :: proc(a, s: []$E, block, count: int, call: $P, $
 			case unbalanced && lblock <= len(s):
 				hodgepodge_partial_forward_merge(a[:lblock+left], s, lblock, call, KIND)
 			case:
-				hodgepodge_rotate_merge_block(a[:lblock+left], s, lblock, left, call, KIND)
+				hodgepodge_rotate_merge_block(a[:lblock+left], s, lblock, left, call, KIND, try_halves)
 			}
 		}
 	}
@@ -1147,7 +1336,7 @@ hodgepodge_rotate_merge_block :: proc(a, s: []$E, block, count: int, call: $P, $
 		case unbalanced && rblock <= len(s):
 			hodgepodge_partial_forward_merge(rest, s, rblock, call, KIND)
 		case:
-			hodgepodge_rotate_merge_block(rest, s, rblock, right, call, KIND)
+			hodgepodge_rotate_merge_block(rest, s, rblock, right, call, KIND, try_halves)
 		}
 	}
 }
@@ -1221,7 +1410,7 @@ hodgepodge_drop_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds
 	slots := ([^]int)(rawptr(at))[:limit]
 
 	// Merges the kept a[base:base+k] with the set-aside items[:d] into a[base:base+k+d], from the back.
-	flush :: proc(a, items: []$E, slots: []int, base, k, d: int, call: $P, $KIND: Sort_Kind) {
+	flush :: proc(a, items: []E, slots: []int, base, k, d: int, call: P) {
 		i, j, w := d-1, base+k-1, base+k+d-1
 		for i >= 0 {
 			take_kept := false
@@ -1242,22 +1431,9 @@ hodgepodge_drop_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds
 			w -= 1
 		}
 	}
-	// How many items of the sorted `a` are not greater than x: where x goes after any equal item.
-	rank :: proc(a: []$E, x: E, call: $P, $KIND: Sort_Kind) -> int {
-		lo, hi := 0, len(a)
-		for lo < hi {
-			mid := lo + (hi-lo)/2
-			if hodgepodge_greater(a[mid], x, call, KIND) {
-				hi = mid
-			} else {
-				lo = mid + 1
-			}
-		}
-		return lo
-	}
 	// Inserts x after any equal set-aside item.
-	set_aside :: proc(items: []$E, slots: []int, d: int, x: E, slot: int, call: $P, $KIND: Sort_Kind) {
-		lo := rank(items[:d], x, call, KIND)
+	set_aside :: proc(items: []E, slots: []int, d: int, x: E, slot: int, call: P) {
+		lo := hodgepodge_binary_last(items[:d], x, call, KIND)
 		copy(items[lo+1:d+1], items[lo:d])
 		copy(slots[lo+1:d+1], slots[lo:d])
 		items[lo] = x
@@ -1275,7 +1451,7 @@ hodgepodge_drop_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds
 			continue
 		}
 		if d == limit {
-			flush(a, items, slots, base, k, d, call, KIND)
+			flush(a, items, slots, base, k, d, call)
 			base, k, d = i, 1, 0
 			continue
 		}
@@ -1284,10 +1460,10 @@ hodgepodge_drop_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds
 		spike := k >= 2 && !hodgepodge_greater(a[top-2], x, call, KIND) && i+1 < n && hodgepodge_greater(a[top-1], a[i+1], call, KIND)
 		if spike {
 			// Whatever was set aside while the spike was last is below the kept item before it, so no slot moves.
-			set_aside(items, slots, d, a[top-1], k-1, call, KIND)
+			set_aside(items, slots, d, a[top-1], k-1, call)
 			a[top-1] = x
 		} else {
-			set_aside(items, slots, d, x, k, call, KIND)
+			set_aside(items, slots, d, x, k, call)
 		}
 		d += 1
 
@@ -1295,17 +1471,17 @@ hodgepodge_drop_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds
 		// A few kept outliers, or one low item, do not look like that.
 		if d % HODGEPODGE_DROP_NEW_RUN == 0 && i+3 < n {
 			kept := a[base:base+k]
-			if k - rank(kept, a[i+1], call, KIND) >= HODGEPODGE_DROP_NEW_RUN &&
-			   k - rank(kept, a[i+2], call, KIND) >= HODGEPODGE_DROP_NEW_RUN &&
-			   k - rank(kept, a[i+3], call, KIND) >= HODGEPODGE_DROP_NEW_RUN {
-				flush(a, items, slots, base, k, d, call, KIND)
+			if k - hodgepodge_binary_last(kept, a[i+1], call, KIND) >= HODGEPODGE_DROP_NEW_RUN &&
+			   k - hodgepodge_binary_last(kept, a[i+2], call, KIND) >= HODGEPODGE_DROP_NEW_RUN &&
+			   k - hodgepodge_binary_last(kept, a[i+3], call, KIND) >= HODGEPODGE_DROP_NEW_RUN {
+				flush(a, items, slots, base, k, d, call)
 				hodgepodge_partition(a, s, call, KIND)
 				return
 			}
 		}
 	}
 	if d > 0 {
-		flush(a, items, slots, base, k, d, call, KIND)
+		flush(a, items, slots, base, k, d, call)
 	}
 	if base > 0 {
 		hodgepodge_power_merge(a, s, call, KIND)
@@ -1351,7 +1527,7 @@ hodgepodge_power_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bound
 		sorted:            bool,
 	}
 
-	next_run :: proc(a: []$E, start: int, call: $P, $KIND: Sort_Kind) -> Run {
+	next_run :: proc(a: []E, start: int, call: P) -> Run {
 		end := hodgepodge_natural_run(a, start, call, KIND)
 		if end-start >= HODGEPODGE_RUN_MIN {
 			return {start, end, 0, true}
@@ -1359,7 +1535,7 @@ hodgepodge_power_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bound
 		return {start, builtin.min(start + HODGEPODGE_RUN_MIN, len(a)), 0, false}
 	}
 
-	sort_run :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) {
+	sort_run :: proc(a, s: []E, call: P) {
 		if len(a) <= HODGEPODGE_OUT {
 			hodgepodge_quadsort(a, s, call, KIND)
 		} else {
@@ -1367,15 +1543,15 @@ hodgepodge_power_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bound
 		}
 	}
 
-	merge :: proc(a, s: []$E, left, right: Run, call: $P, $KIND: Sort_Kind) -> Run {
+	merge :: proc(a, s: []E, left, right: Run, call: P) -> Run {
 		if !left.sorted && !right.sorted {
 			return {left.start, right.end, 0, false}
 		}
 		if !left.sorted {
-			sort_run(a[left.start:left.end], s, call, KIND)
+			sort_run(a[left.start:left.end], s, call)
 		}
 		if !right.sorted {
-			sort_run(a[right.start:right.end], s, call, KIND)
+			sort_run(a[right.start:right.end], s, call)
 		}
 		hodgepodge_rotate_merge_block(a[left.start:right.end], s, left.end-left.start, right.end-left.end, call, KIND)
 		return {left.start, right.end, 0, true}
@@ -1385,22 +1561,22 @@ hodgepodge_power_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bound
 	stack: [64]Run
 	top := 0
 	n   := len(a)
-	run := next_run(a, 0, call, KIND)
+	run := next_run(a, 0, call)
 	for {
 		// Past the last run, everything left on the stack merges.
 		next: Run
 		power_here := -1
 		if run.end < n {
-			next       = next_run(a, run.end, call, KIND)
+			next       = next_run(a, run.end, call)
 			power_here = power(run.start, run.end-run.start, next.end-run.end, n)
 		}
 		for top > 0 && stack[top-1].power > power_here {
 			top -= 1
-			run = merge(a, s, stack[top], run, call, KIND)
+			run = merge(a, s, stack[top], run, call)
 		}
 		if run.end == n {
 			if !run.sorted {
-				sort_run(a[run.start:run.end], s, call, KIND)
+				sort_run(a[run.start:run.end], s, call)
 			}
 			return
 		}
@@ -1599,7 +1775,7 @@ hodgepodge_stable_partition :: proc(a, s: []$E, pivot: E, call: $P, $KIND: Sort_
 	// Up to HODGEPODGE_PARTITION_HALVES levels of halving and rotating are cheaper than the block passes.
 	// A block leaves the rest of its half of the buffer for what one step carries past it.
 	block := len(s)/2 - (LANES-1)
-	if n > len(s) << HODGEPODGE_PARTITION_HALVES && block >= LANES && n <= HODGEPODGE_PARTITION_BLOCKS*block {
+	if n > len(s) << HODGEPODGE_PARTITION_HALVES && block >= LANES && n <= HODGEPODGE_BLOCKS*block {
 		return hodgepodge_block_partition(a, s, block, pivot, call, KIND, FRONT, LANES)
 	}
 
@@ -1614,7 +1790,7 @@ hodgepodge_stable_partition :: proc(a, s: []$E, pivot: E, call: $P, $KIND: Sort_
 // The blocks are then put in order. Every item moves a fixed number of times, not once per level of halving.
 @(require_results)
 hodgepodge_block_partition :: proc(a, s: []$E, b: int, pivot: E, call: $P, $KIND: Sort_Kind, $FRONT: Hodgepodge_Front, $LANES: int) -> (count: int) #no_bounds_check {
-	WORDS :: HODGEPODGE_PARTITION_BLOCKS / 64
+	WORDS :: HODGEPODGE_BLOCKS / 64
 
 	n     := len(a)
 	half  := len(s) / 2
