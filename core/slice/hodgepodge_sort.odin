@@ -47,6 +47,10 @@ import "base:intrinsics"
 	and then merged as above (hodgepodge_large_element_sort).
 	At -o:size, element types of one size and alignment share one body (Sort_Shared_Item).
 
+	## Provenance
+	The code that came from blitsort [2], with its parts of quadsort [1] and fluxsort [4], is in the public domain under
+	the Unlicense. The other sources gave ideas only: no code was taken from them.
+
 	## Sources
 	[1]  Igor van den Hoven, quadsort (2020): https://github.com/scandum/quadsort
 	[2]  Igor van den Hoven, blitsort (2021): https://github.com/scandum/blitsort
