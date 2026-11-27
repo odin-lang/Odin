@@ -829,11 +829,6 @@ gb_internal String temporary_directory(gbAllocator allocator) {
 	u16 *b = gb_alloc_array(heap_allocator(), u16, len+1);
 	defer (gb_free(heap_allocator(), b));
 	n = GetTempPathW(len, cast(wchar_t *)b);
-	if (n == 3 && b[1] == ':' && b[2] == '\\') {
-
-	} else if (n > 0 && b[n-1] == '\\') {
-		n -= 1;
-	}
 	b[n] = 0;
 	String16 s = make_string16(b, n);
 	return string16_to_string(allocator, s);
