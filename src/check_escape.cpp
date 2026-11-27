@@ -5689,13 +5689,15 @@ gb_internal void escape_graph_place_calls(CheckedCall *calls, isize count) {
 }
 
 // NOTE(bill): A range loop over a `[dynamic]T` or `[dynamic; N]T` reads the array's header (its data and length)
-// for each element that which the body writes may hold the header. When the body can write nothing else which could,
+// for each element that which the body writes may hold the header, and one over an `#soa[]T` or `#soa[dynamic]T` reads
+// the columns from its header for each field of an element. When the body can write nothing else which could,
 // the backend reads the header once before the loop instead, once it checks that the memory the body writes is apart from it.
 // The body may only call builtins which write no memory, and may only write the elements, its own locals, and outer locals and globals.
 // Any other write, or any other call, may change the array (e.g. through `append`).
 struct EscapeRangeSnapshot {
 	Scope *         body_scope;
 	Entity *        elem;         // the loop's value
+	Entity *        soa_elem;     // the loop's value when it is an #soa element, whose address holds the header's
 	bool            writes_elems; // through the loop's value
 	Array<Entity *> outer;
 };
@@ -5777,19 +5779,19 @@ gb_internal bool escape_range_snapshot_builtin(BuiltinProcId id) {
 	return false;
 }
 
-gb_internal bool escape_range_snapshot_expr(Ast *expr);
+gb_internal bool escape_range_snapshot_expr(EscapeRangeSnapshot *s, Ast *expr);
 
-gb_internal bool escape_range_snapshot_exprs(Slice<Ast *> const &exprs) {
+gb_internal bool escape_range_snapshot_exprs(EscapeRangeSnapshot *s, Slice<Ast *> const &exprs) {
 	for (Ast *expr : exprs) {
-		if (!escape_range_snapshot_expr(expr)) {
+		if (!escape_range_snapshot_expr(s, expr)) {
 			return false;
 		}
 	}
 	return true;
 }
 
-// Whether `expr` writes no memory, and calls nothing which could
-gb_internal bool escape_range_snapshot_expr(Ast *expr) {
+// Whether `expr` writes no memory, calls nothing which could, and takes no address of an #soa element
+gb_internal bool escape_range_snapshot_expr(EscapeRangeSnapshot *s, Ast *expr) {
 	if (expr == nullptr || expr->tav.mode == Addressing_Constant || expr->tav.mode == Addressing_Type) {
 		return true;
 	}
@@ -5802,37 +5804,41 @@ gb_internal bool escape_range_snapshot_expr(Ast *expr) {
 	case Ast_ImplicitSelectorExpr:
 		return true;
 	case_ast_node(cl, CompoundLit, expr);
-		return escape_range_snapshot_exprs(cl->elems);
+		return escape_range_snapshot_exprs(s, cl->elems);
 	case_end;
 	case_ast_node(fv, FieldValue, expr);
-		return escape_range_snapshot_expr(fv->field) && escape_range_snapshot_expr(fv->value);
+		return escape_range_snapshot_expr(s, fv->field) && escape_range_snapshot_expr(s, fv->value);
 	case_end;
 	case_ast_node(te, TagExpr, expr);
-		return escape_range_snapshot_expr(te->expr);
+		return escape_range_snapshot_expr(s, te->expr);
 	case_end;
 	case_ast_node(ue, UnaryExpr, expr);
-		return escape_range_snapshot_expr(ue->expr);
+		if (ue->op.kind == Token_And && s->soa_elem != nullptr && entity_of_node(unparen_expr(ue->expr)) == s->soa_elem) {
+			// NOTE(bill): it would hold the address of the snapshot, which ends with the loop
+			return false;
+		}
+		return escape_range_snapshot_expr(s, ue->expr);
 	case_end;
 	case_ast_node(be, BinaryExpr, expr);
-		return escape_range_snapshot_expr(be->left) && escape_range_snapshot_expr(be->right);
+		return escape_range_snapshot_expr(s, be->left) && escape_range_snapshot_expr(s, be->right);
 	case_end;
 	case_ast_node(pe, ParenExpr, expr);
-		return escape_range_snapshot_expr(pe->expr);
+		return escape_range_snapshot_expr(s, pe->expr);
 	case_end;
 	case_ast_node(se, SelectorExpr, expr);
-		return escape_range_snapshot_expr(se->expr);
+		return escape_range_snapshot_expr(s, se->expr);
 	case_end;
 	case_ast_node(ie, IndexExpr, expr);
-		return escape_range_snapshot_expr(ie->expr) && escape_range_snapshot_expr(ie->index);
+		return escape_range_snapshot_expr(s, ie->expr) && escape_range_snapshot_expr(s, ie->index);
 	case_end;
 	case_ast_node(mie, MatrixIndexExpr, expr);
-		return escape_range_snapshot_expr(mie->expr) && escape_range_snapshot_expr(mie->row_index) && escape_range_snapshot_expr(mie->column_index);
+		return escape_range_snapshot_expr(s, mie->expr) && escape_range_snapshot_expr(s, mie->row_index) && escape_range_snapshot_expr(s, mie->column_index);
 	case_end;
 	case_ast_node(de, DerefExpr, expr);
-		return escape_range_snapshot_expr(de->expr);
+		return escape_range_snapshot_expr(s, de->expr);
 	case_end;
 	case_ast_node(se, SliceExpr, expr);
-		return escape_range_snapshot_expr(se->expr) && escape_range_snapshot_expr(se->low) && escape_range_snapshot_expr(se->high);
+		return escape_range_snapshot_expr(s, se->expr) && escape_range_snapshot_expr(s, se->low) && escape_range_snapshot_expr(s, se->high);
 	case_end;
 	case_ast_node(ce, CallExpr, expr);
 		TypeAndValue tv = type_and_value_of_expr(ce->proc);
@@ -5844,31 +5850,31 @@ gb_internal bool escape_range_snapshot_expr(Ast *expr) {
 		} else if (tv.mode != Addressing_Type) {
 			return false;
 		}
-		return escape_range_snapshot_exprs(ce->args);
+		return escape_range_snapshot_exprs(s, ce->args);
 	case_end;
 	case_ast_node(te, TernaryIfExpr, expr);
-		return escape_range_snapshot_expr(te->x) && escape_range_snapshot_expr(te->cond) && escape_range_snapshot_expr(te->y);
+		return escape_range_snapshot_expr(s, te->x) && escape_range_snapshot_expr(s, te->cond) && escape_range_snapshot_expr(s, te->y);
 	case_end;
 	case_ast_node(te, TernaryWhenExpr, expr);
-		return escape_range_snapshot_expr(te->x) && escape_range_snapshot_expr(te->cond) && escape_range_snapshot_expr(te->y);
+		return escape_range_snapshot_expr(s, te->x) && escape_range_snapshot_expr(s, te->cond) && escape_range_snapshot_expr(s, te->y);
 	case_end;
 	case_ast_node(oe, OrElseExpr, expr);
-		return escape_range_snapshot_expr(oe->x) && escape_range_snapshot_expr(oe->y);
+		return escape_range_snapshot_expr(s, oe->x) && escape_range_snapshot_expr(s, oe->y);
 	case_end;
 	case_ast_node(oe, OrReturnExpr, expr);
-		return escape_range_snapshot_expr(oe->expr);
+		return escape_range_snapshot_expr(s, oe->expr);
 	case_end;
 	case_ast_node(oe, OrBranchExpr, expr);
-		return escape_range_snapshot_expr(oe->expr);
+		return escape_range_snapshot_expr(s, oe->expr);
 	case_end;
 	case_ast_node(ta, TypeAssertion, expr);
-		return escape_range_snapshot_expr(ta->expr);
+		return escape_range_snapshot_expr(s, ta->expr);
 	case_end;
 	case_ast_node(tc, TypeCast, expr);
-		return escape_range_snapshot_expr(tc->expr);
+		return escape_range_snapshot_expr(s, tc->expr);
 	case_end;
 	case_ast_node(ac, AutoCast, expr);
-		return escape_range_snapshot_expr(ac->expr);
+		return escape_range_snapshot_expr(s, ac->expr);
 	case_end;
 	}
 	return false;
@@ -5884,7 +5890,7 @@ gb_internal bool escape_range_snapshot_write(EscapeRangeSnapshot *s, Ast *lhs) {
 	if (is_blank_ident(lhs)) {
 		return true;
 	}
-	if (!escape_range_snapshot_expr(lhs)) {
+	if (!escape_range_snapshot_expr(s, lhs)) {
 		return false;
 	}
 
@@ -5934,10 +5940,10 @@ gb_internal bool escape_range_snapshot_stmt(EscapeRangeSnapshot *s, Ast *stmt) {
 	case Ast_BranchStmt:
 		return true;
 	case_ast_node(es, ExprStmt, stmt);
-		return escape_range_snapshot_expr(es->expr);
+		return escape_range_snapshot_expr(s, es->expr);
 	case_end;
 	case_ast_node(as, AssignStmt, stmt);
-		if (!escape_range_snapshot_exprs(as->rhs)) {
+		if (!escape_range_snapshot_exprs(s, as->rhs)) {
 			return false;
 		}
 		for (Ast *lhs : as->lhs) {
@@ -5948,13 +5954,13 @@ gb_internal bool escape_range_snapshot_stmt(EscapeRangeSnapshot *s, Ast *stmt) {
 		return true;
 	case_end;
 	case_ast_node(vd, ValueDecl, stmt);
-		return escape_range_snapshot_exprs(vd->values);
+		return escape_range_snapshot_exprs(s, vd->values);
 	case_end;
 	case_ast_node(bs, BlockStmt, stmt);
 		return escape_range_snapshot_stmts(s, bs->stmts);
 	case_end;
 	case_ast_node(is, IfStmt, stmt);
-		return escape_range_snapshot_stmt(s, is->init) && escape_range_snapshot_expr(is->cond) &&
+		return escape_range_snapshot_stmt(s, is->init) && escape_range_snapshot_expr(s, is->cond) &&
 		       escape_range_snapshot_stmt(s, is->body) && escape_range_snapshot_stmt(s, is->else_stmt);
 	case_end;
 	case_ast_node(ws, WhenStmt, stmt);
@@ -5964,28 +5970,28 @@ gb_internal bool escape_range_snapshot_stmt(EscapeRangeSnapshot *s, Ast *stmt) {
 		return escape_range_snapshot_stmt(s, ws->body) && escape_range_snapshot_stmt(s, ws->else_stmt);
 	case_end;
 	case_ast_node(fs, ForStmt, stmt);
-		return escape_range_snapshot_stmt(s, fs->init) && escape_range_snapshot_expr(fs->cond) &&
+		return escape_range_snapshot_stmt(s, fs->init) && escape_range_snapshot_expr(s, fs->cond) &&
 		       escape_range_snapshot_stmt(s, fs->post) && escape_range_snapshot_stmt(s, fs->body);
 	case_end;
 	case_ast_node(rs, RangeStmt, stmt);
-		return escape_range_snapshot_stmt(s, rs->init) && escape_range_snapshot_expr(rs->expr) && escape_range_snapshot_stmt(s, rs->body);
+		return escape_range_snapshot_stmt(s, rs->init) && escape_range_snapshot_expr(s, rs->expr) && escape_range_snapshot_stmt(s, rs->body);
 	case_end;
 	case_ast_node(rs, UnrollRangeStmt, stmt);
-		return escape_range_snapshot_stmt(s, rs->init) && escape_range_snapshot_exprs(rs->args) &&
-		       escape_range_snapshot_expr(rs->expr) && escape_range_snapshot_stmt(s, rs->body);
+		return escape_range_snapshot_stmt(s, rs->init) && escape_range_snapshot_exprs(s, rs->args) &&
+		       escape_range_snapshot_expr(s, rs->expr) && escape_range_snapshot_stmt(s, rs->body);
 	case_end;
 	case_ast_node(ss, SwitchStmt, stmt);
-		return escape_range_snapshot_stmt(s, ss->init) && escape_range_snapshot_expr(ss->tag) && escape_range_snapshot_stmt(s, ss->body);
+		return escape_range_snapshot_stmt(s, ss->init) && escape_range_snapshot_expr(s, ss->tag) && escape_range_snapshot_stmt(s, ss->body);
 	case_end;
 	case_ast_node(ss, TypeSwitchStmt, stmt);
-		bool tag = ss->tag->kind == Ast_AssignStmt ? escape_range_snapshot_exprs(ss->tag->AssignStmt.rhs) : escape_range_snapshot_expr(ss->tag);
+		bool tag = ss->tag->kind == Ast_AssignStmt ? escape_range_snapshot_exprs(s, ss->tag->AssignStmt.rhs) : escape_range_snapshot_expr(s, ss->tag);
 		return tag && escape_range_snapshot_stmt(s, ss->body);
 	case_end;
 	case_ast_node(cc, CaseClause, stmt);
-		return escape_range_snapshot_exprs(cc->list) && escape_range_snapshot_stmts(s, cc->stmts);
+		return escape_range_snapshot_exprs(s, cc->list) && escape_range_snapshot_stmts(s, cc->stmts);
 	case_end;
 	case_ast_node(rs, ReturnStmt, stmt);
-		return escape_range_snapshot_exprs(rs->results);
+		return escape_range_snapshot_exprs(s, rs->results);
 	case_end;
 	}
 	return false;
@@ -5996,8 +6002,10 @@ gb_internal void escape_range_snapshot(AstRangeStmt *rs) {
 	if (is_ast_range(expr) || expr->tav.mode == Addressing_Type || rs->body->kind != Ast_BlockStmt) {
 		return;
 	}
+	// NOTE(bill): the columns of `#soa[N]T` and `#soa[dynamic; N]T` are within the header, and need not be read from it
 	Type *t = base_type(type_deref(expr->tav.type));
-	if (t == nullptr || (t->kind != Type_DynamicArray && t->kind != Type_FixedCapacityDynamicArray)) {
+	bool is_soa = is_type_soa_struct(t) && !soa_has_inline_fields(t);
+	if (t == nullptr || (t->kind != Type_DynamicArray && t->kind != Type_FixedCapacityDynamicArray && !is_soa)) {
 		return;
 	}
 
@@ -6009,6 +6017,7 @@ gb_internal void escape_range_snapshot(AstRangeStmt *rs) {
 	EscapeRangeSnapshot s = {};
 	s.body_scope = rs->body->BlockStmt.scope;
 	s.elem       = val0 != nullptr ? entity_of_node(val0) : nullptr;
+	s.soa_elem   = is_soa ? s.elem : nullptr;
 	s.outer      = array_make<Entity *>(heap_allocator());
 	defer (array_free(&s.outer));
 	if (!escape_range_snapshot_stmt(&s, rs->body)) {
