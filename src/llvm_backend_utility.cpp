@@ -1328,6 +1328,7 @@ gb_internal i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index) {
 		}
 	}
 	if (t->kind == Type_FixedCapacityDynamicArray) {
+		type_size_of(t);
 		switch (index) {
 		case 0: return 0; // data
 		case 1:
