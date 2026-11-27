@@ -2163,13 +2163,6 @@ gb_internal i32 soa_split_column_offset(Type *t, i32 index) {
 	return offset;
 }
 
-struct SoaColumn {
-	Entity *field; // the element's field, or nullptr for a lane
-	Token   token;
-	Type *  type;
-	String  tag;
-};
-
 gb_internal String soa_column_name(String prefix, String name) {
 	if (prefix.len == 0) {
 		return name;
@@ -2218,69 +2211,51 @@ gb_internal bool is_soa_split_selection(Type *t, Selection const &sel) {
 	return sel.index.count > 0 && soa_split_select(t, sel, &depth, &column) != nullptr;
 }
 
-// The columns of the split value of type `t`, named as fields and lanes under `prefix` (e.g. `pos.x`)
-gb_internal void soa_columns_of(Array<SoaColumn> *columns, Type *t, String prefix) {
+// Fills in the columns of the #soa struct `soa` from `*index` on with those of the split value of type `t`,
+// named as fields and lanes under `prefix` (e.g. `pos.x`)
+gb_internal void soa_columns_of(Type *soa, Scope *scope, Type *t, String prefix, isize *index) {
 	static String const lanes[4] = {str_lit("x"), str_lit("y"), str_lit("z"), str_lit("w")};
 
 	t = base_type(t);
-	if (t->kind == Type_Array) {
-		for (i64 i = 0; i < t->Array.count; i++) {
-			SoaColumn c = {};
-			c.token = make_token_ident(soa_column_name(prefix, lanes[i]));
-			c.type  = t->Array.elem;
-			array_add(columns, c);
+	isize count = t->kind == Type_Array ? cast(isize)t->Array.count : t->Struct.fields.count;
+	for (isize i = 0; i < count; i++) {
+		Token token = {};
+		Type *type  = nullptr;
+		if (t->kind == Type_Array) {
+			token = make_token_ident(soa_column_name(prefix, lanes[i]));
+			type  = t->Array.elem;
+		} else {
+			Entity *f = t->Struct.fields[i];
+			token = f->token;
+			token.string = soa_column_name(prefix, f->token.string);
+			if (is_soa_split_field(f)) {
+				soa_columns_of(soa, scope, f->type, token.string, index);
+				continue;
+			}
+			type = f->type;
+			if (t->Struct.tags != nullptr) {
+				soa->Struct.tags[*index] = t->Struct.tags[i];
+			}
 		}
-		return;
-	}
-	for_array(i, t->Struct.fields) {
-		Entity *f = t->Struct.fields[i];
-		Token token = f->token;
-		token.string = soa_column_name(prefix, f->token.string);
-		if (is_soa_split_field(f)) {
-			soa_columns_of(columns, f->type, token.string);
-			continue;
+
+		Type *column_type = soa_has_inline_fields(soa) ? alloc_type_array(type, soa->Struct.soa_count) : alloc_type_multi_pointer(type);
+		Entity *column = alloc_entity_field(scope, token, column_type, false, cast(i32)*index);
+		if (soa->Struct.soa_kind != StructSoa_Fixed) {
+			column->flags |= EntityFlag_SoaPtrField;
 		}
-		SoaColumn c = {};
-		c.field = f;
-		c.token = token;
-		c.type  = f->type;
-		if (t->Struct.tags != nullptr) {
-			c.tag = t->Struct.tags[i];
-		}
-		array_add(columns, c);
+		soa->Struct.fields[(*index)++] = column;
 	}
 }
 
 // Allocates the fields of the #soa struct `soa` and fills in its columns, returning their number.
 // The caller fills in the `extra_field_count` hidden fields after them (e.g. `__$len`) and adds the columns to `scope`.
 gb_internal isize soa_make_columns(Type *soa, Scope *scope, isize extra_field_count) {
-	auto columns = array_make<SoaColumn>(heap_allocator());
-	defer (array_free(&columns));
-	soa_columns_of(&columns, soa->Struct.soa_elem, {});
-
-	isize count = columns.count;
+	isize count = soa_field_count(soa);
 	soa->Struct.fields = permanent_slice_make<Entity *>(count+extra_field_count);
 	soa->Struct.tags   = permanent_alloc_array<String>(count+extra_field_count);
-	for_array(i, columns) {
-		SoaColumn const &c = columns[i];
-		soa->Struct.tags[i] = c.tag;
-		if (c.field != nullptr && c.field->kind != Entity_Variable) {
-			soa->Struct.fields[i] = c.field;
-			continue;
-		}
 
-		Type *column_type = nullptr;
-		if (soa_has_inline_fields(soa)) {
-			column_type = alloc_type_array(c.type, soa->Struct.soa_count);
-		} else {
-			column_type = alloc_type_multi_pointer(c.type);
-		}
-		Entity *column = alloc_entity_field(scope, c.token, column_type, false, cast(i32)i);
-		if (soa->Struct.soa_kind != StructSoa_Fixed) {
-			column->flags |= EntityFlag_SoaPtrField;
-		}
-		soa->Struct.fields[i] = column;
-	}
+	isize index = 0;
+	soa_columns_of(soa, scope, soa->Struct.soa_elem, {}, &index);
 	return count;
 }
 

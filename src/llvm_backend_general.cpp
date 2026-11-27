@@ -997,9 +997,6 @@ gb_internal lbValue lb_soa_array_component_elem_ptr(lbProcedure *p, lbAddr const
 		// with bounds checks off the access is out of bounds by definition
 		return lb_const_nil(p->module, alloc_type_pointer(elem->Array.elem));
 	}
-	lbValue soa_ptr    = soa_addr.addr;
-	lbValue elem_index = soa_addr.soa.index;
-	i32     column     = soa_addr.soa.column;
 	// do chain select between the component pointers;
 	// an element array holds at most 4 components, so this is at most 3 compares and 3 selects (branchless),
 	// and it is folded if j is resolved to constant after inlining/unrolling;
@@ -1008,9 +1005,9 @@ gb_internal lbValue lb_soa_array_component_elem_ptr(lbProcedure *p, lbAddr const
 	//
 	// lb_emit_select evaluates both arms, so every candidate address is
 	// formed; only the selected one is dereferenced
-	lbValue ptr = lb_soa_field_elem_ptr(p, soa_ptr, column, elem_index);
+	lbValue ptr = lb_soa_field_elem_ptr(p, soa_addr.addr, soa_addr.soa.column, soa_addr.soa.index);
 	for (i64 component = 1; component < component_count; component++) {
-		lbValue candidate = lb_soa_field_elem_ptr(p, soa_ptr, column + cast(i32)component, elem_index);
+		lbValue candidate = lb_soa_field_elem_ptr(p, soa_addr.addr, soa_addr.soa.column + cast(i32)component, soa_addr.soa.index);
 		lbValue is_component = lb_emit_comp(p, Token_CmpEq, component_index, lb_const_int(p->module, t_int, component));
 		ptr = lb_emit_select(p, is_component, candidate, ptr);
 	}

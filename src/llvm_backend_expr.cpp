@@ -2368,7 +2368,6 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	return {};
 }
 
-// NOTE(bill): `(#soa[N]T)(a)` and `([N]T)(s)` copy one field at a time, a loop for each column.
 gb_internal lbValue lb_emit_soa_array_conv(lbProcedure *p, lbValue value, Type *t) {
 	lbValue src = lb_address_from_load_or_generate_local(p, value);
 	lbAddr  res = lb_add_local_generated(p, t, true);
@@ -5093,8 +5092,6 @@ gb_internal lbAddr lb_get_soa_variable_addr(lbProcedure *p, Entity *e) {
 // The field along `sel` of the #soa element `addr`, an lbAddr_SoaVariable again for a `#soa_split` field's value
 gb_internal lbAddr lb_addr_soa_variable_select(lbProcedure *p, lbAddr addr, Selection const &sel) {
 	GB_ASSERT(addr.kind == lbAddr_SoaVariable);
-	lbValue index = addr.soa.index;
-
 	i32 column = addr.soa.column;
 	isize depth = 0;
 	if (Type *split = soa_split_select(lb_soa_variable_elem_type(addr), sel, &depth, &column)) {
@@ -5117,11 +5114,10 @@ gb_internal lbAddr lb_addr_soa_variable_select(lbProcedure *p, lbAddr addr, Sele
 	}
 
 	lbValue item = {};
-
 	if (soa_has_inline_fields(t)) {
-		item = lb_emit_array_ep(p, arr, index);
+		item = lb_emit_array_ep(p, arr, addr.soa.index);
 	} else {
-		item = lb_emit_ptr_offset(p, lb_emit_load(p, arr), index);
+		item = lb_emit_ptr_offset(p, lb_emit_load(p, arr), addr.soa.index);
 	}
 
 	// make sure it's ^T and not [^]T
@@ -5129,7 +5125,6 @@ gb_internal lbAddr lb_addr_soa_variable_select(lbProcedure *p, lbAddr addr, Sele
 	if (sub_sel.index.count > 0) {
 		item = lb_emit_deep_field_gep(p, item, sub_sel);
 	}
-
 	return lb_addr(item);
 }
 
@@ -5524,21 +5519,9 @@ gb_internal lbValue lb_build_soa_split_view(lbProcedure *p, Ast *expr) {
 	if (is_type_pointer(type_deref(soa.type))) {
 		soa = lb_emit_load(p, soa);
 	}
-	Type *t = base_type(type_deref(soa.type));
-	Selection sel = lookup_field(t->Struct.soa_elem, unparen_expr(se->selector)->Ident.interned, false);
-	i32 first = soa_split_column_offset(t->Struct.soa_elem, sel.index[0]);
-
-	Type *view_type = type_of_expr(expr);
-	i32 count = cast(i32)soa_field_count(view_type);
-	lbAddr view = lb_add_local_generated(p, view_type, false);
-	for (i32 i = 0; i < count; i++) {
-		lbValue column = lb_emit_struct_ep(p, soa, first + i);
-		lbValue data = soa_has_inline_fields(t) ? lb_emit_array_epi(p, column, 0) : lb_emit_load(p, column);
-		lbValue dst = lb_emit_struct_ep(p, view.addr, i);
-		lb_emit_store(p, dst, lb_emit_conv(p, data, type_deref(dst.type)));
-	}
-	lb_emit_store(p, lb_emit_struct_ep(p, view.addr, count), lb_soa_struct_len(p, soa));
-	return lb_addr_load(p, view);
+	Type *elem = base_type(type_deref(soa.type))->Struct.soa_elem;
+	Selection sel = lookup_field(elem, unparen_expr(se->selector)->Ident.interned, false);
+	return lb_soa_split_view(p, soa, soa_split_column_offset(elem, sel.index[0]), type_of_expr(expr));
 }
 
 gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {

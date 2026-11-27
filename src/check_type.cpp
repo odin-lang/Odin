@@ -4795,11 +4795,8 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 
 	field_count = soa_make_columns(t, scope, extra_field_count);
 	for (isize i = 0; i < field_count; i++) {
-		Entity *column = t->Struct.fields[i];
-		if (column->scope == scope) {
-			add_entity(scope, column);
-			column->flags |= EntityFlag_Used;
-		}
+		add_entity(scope, t->Struct.fields[i]);
+		t->Struct.fields[i]->flags |= EntityFlag_Used;
 	}
 
 	if (t->Struct.soa_kind != StructSoa_Fixed) {
@@ -4835,6 +4832,14 @@ gb_internal WORKER_TASK_PROC(complete_soa_type_worker) {
 }
 
 
+gb_internal isize add_soa_columns(CheckerContext *ctx, Type *soa, Scope *scope, isize extra_field_count) {
+	isize count = soa_make_columns(soa, scope, extra_field_count);
+	for (isize i = 0; i < count; i++) {
+		add_entity(ctx, scope, nullptr, soa->Struct.fields[i]);
+		add_entity_use(ctx, nullptr, soa->Struct.fields[i]);
+	}
+	return count;
+}
 
 gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem, i64 count, Type *generic_type, StructSoaKind soa_kind) {
 	Type *bt_elem = base_type(elem);
@@ -4904,14 +4909,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		GB_ASSERT(is_type_array(elem) || is_type_struct(elem));
 		GB_ASSERT(!soa_has_inline_fields(soa_struct) || count >= 0);
 
-		field_count = soa_make_columns(soa_struct, scope, extra_field_count);
-		for (isize i = 0; i < field_count; i++) {
-			Entity *column = soa_struct->Struct.fields[i];
-			if (column->scope == scope) {
-				add_entity(ctx, scope, nullptr, column);
-				add_entity_use(ctx, nullptr, column);
-			}
-		}
+		field_count = add_soa_columns(ctx, soa_struct, scope, extra_field_count);
 		is_complete = true;
 	}
 

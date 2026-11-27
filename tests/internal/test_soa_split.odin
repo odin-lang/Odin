@@ -80,7 +80,15 @@ test_soa_split_columns :: proc(t: ^testing.T) {
 	testing.expect(t, typeid_of(struct { #soa_split v: Split_Vec }) != typeid_of(struct { v: Split_Vec }))
 }
 
-// Every #soa kind stores and loads its elements through the columns
+@(private="file")
+split_sum_x :: proc(v: #soa[]Split_Vec) -> (sum: f32) {
+	for e in v {
+		sum += e.x
+	}
+	return
+}
+
+// Every #soa kind stores and loads its elements through the columns, and has an '#soa[]' view of the columns of a '#soa_split' field
 @(test)
 test_soa_split_kinds :: proc(t: ^testing.T) {
 	fixed: #soa[5]Split_Particle
@@ -88,6 +96,19 @@ test_soa_split_kinds :: proc(t: ^testing.T) {
 		fixed[i] = split_particle(i)
 	}
 	expect_split_particles(t, fixed[:])
+	testing.expect_value(t, typeid_of(type_of(fixed.pos)), typeid_of(#soa[]Split_Vec))
+	testing.expect_value(t, typeid_of(type_of(fixed.col)), typeid_of(#soa[][4]u8))
+	testing.expect_value(t, len(fixed.pos), 5)
+	testing.expect_value(t, fixed.pos[2], Split_Vec{2, 3, 4})
+	testing.expect_value(t, fixed.col[2], [4]u8{2, 3, 4, 5})
+	testing.expect_value(t, split_sum_x(fixed.pos), 10)
+	testing.expect_value(t, split_sum_x(fixed.pos[1:3]), 3)
+	fixed.pos[1].z = 99
+	fixed.pos.x[3] = 42
+	fixed.col.w[0] = 7
+	testing.expect_value(t, fixed[1].pos, Split_Vec{1, 2, 99})
+	testing.expect_value(t, fixed[3].pos.x, 42)
+	testing.expect_value(t, fixed[0].col, [4]u8{0, 1, 2, 7})
 
 	slice := make_soa(#soa[]Split_Particle, 5)
 	defer delete(slice)
@@ -95,6 +116,7 @@ test_soa_split_kinds :: proc(t: ^testing.T) {
 		slice[i] = split_particle(i)
 	}
 	expect_split_particles(t, slice)
+	testing.expect_value(t, slice[1:4].pos.x[0], 1)
 
 	dynamic_array: #soa[dynamic]Split_Particle
 	defer delete(dynamic_array)
@@ -102,6 +124,13 @@ test_soa_split_kinds :: proc(t: ^testing.T) {
 		append(&dynamic_array, split_particle(i))
 	}
 	expect_split_particles(t, dynamic_array[:])
+	for &v, i in dynamic_array.pos {
+		v.y = f32(i*100)
+	}
+	pd := &dynamic_array
+	testing.expect_value(t, len(pd.pos), 40)
+	testing.expect_value(t, pd.pos[4], Split_Vec{4, 400, 6})
+	testing.expect_value(t, dynamic_array[3].vel, split_particle(3).vel)
 
 	appended: #soa[dynamic]Split_Particle
 	defer delete(appended)
@@ -113,6 +142,9 @@ test_soa_split_kinds :: proc(t: ^testing.T) {
 		append(&capacity, split_particle(i))
 	}
 	expect_split_particles(t, capacity[:])
+	testing.expect_value(t, len(capacity.pos), 6)
+	testing.expect_value(t, capacity.pos.z[1], 3)
+	testing.expect_value(t, capacity.col[0], [4]u8{0, 1, 2, 3})
 
 	wide: #soa[dynamic]Split_Wide
 	defer delete(wide)
@@ -194,6 +226,13 @@ test_soa_split_fields :: proc(t: ^testing.T) {
 	testing.expect_value(t, n[1], Split_Nested{p = want, w = 1.5})
 	testing.expect_value(t, n[0], Split_Nested{})
 
+	n.p.pos[0].x = 7
+	testing.expect_value(t, typeid_of(type_of(n.p)), typeid_of(#soa[]Split_Particle))
+	testing.expect_value(t, n.p[1], want)
+	testing.expect_value(t, n.p.pos[1], want.pos)
+	testing.expect_value(t, n.p.vel[1], want.vel)
+	testing.expect_value(t, n[0].p.pos, Split_Vec{7, 0, 0})
+
 	// A lane of an array element holds the whole value, '#soa_split' fields included
 	lanes: #soa[2][2]Split_Particle
 	lanes[1][0] = split_particle(3)
@@ -204,68 +243,6 @@ test_soa_split_fields :: proc(t: ^testing.T) {
 	want.pos.y = 9
 	want.pos.z = 8
 	testing.expect_value(t, lanes[1], [2]Split_Particle{want, {}})
-}
-
-@(private="file")
-split_sum_x :: proc(v: #soa[]Split_Vec) -> (sum: f32) {
-	for e in v {
-		sum += e.x
-	}
-	return
-}
-
-// A '#soa_split' field of an #soa array is an '#soa[]' view of its columns, for every kind of #soa array
-@(test)
-test_soa_split_views :: proc(t: ^testing.T) {
-	fixed: #soa[4]Split_Particle
-	for i in 0..<len(fixed) {
-		fixed[i] = split_particle(i)
-	}
-	testing.expect_value(t, typeid_of(type_of(fixed.pos)), typeid_of(#soa[]Split_Vec))
-	testing.expect_value(t, typeid_of(type_of(fixed.col)), typeid_of(#soa[][4]u8))
-	testing.expect_value(t, len(fixed.pos), 4)
-	testing.expect_value(t, fixed.pos[2], Split_Vec{2, 3, 4})
-	testing.expect_value(t, split_sum_x(fixed.pos), 6)
-	testing.expect_value(t, split_sum_x(fixed.pos[1:3]), 3)
-	fixed.pos[1].z = 99
-	fixed.pos.x[3] = 42
-	fixed.col.w[0] = 7
-	testing.expect_value(t, fixed[1].pos, Split_Vec{1, 2, 99})
-	testing.expect_value(t, fixed[3].pos.x, 42)
-	testing.expect_value(t, fixed[0].col, [4]u8{0, 1, 2, 7})
-	testing.expect_value(t, fixed.col[2], [4]u8{2, 3, 4, 5})
-
-	dynamic_array: #soa[dynamic]Split_Particle
-	defer delete(dynamic_array)
-	for i in 0..<5 {
-		append(&dynamic_array, split_particle(i))
-	}
-	for &v, i in dynamic_array.pos {
-		v.y = f32(i*100)
-	}
-	pd := &dynamic_array
-	testing.expect_value(t, len(pd.pos), 5)
-	testing.expect_value(t, pd.pos[4], Split_Vec{4, 400, 6})
-	testing.expect_value(t, dynamic_array[3].vel, split_particle(3).vel)
-
-	capacity: #soa[dynamic; 8]Split_Particle
-	append(&capacity, split_particle(7), split_particle(8))
-	testing.expect_value(t, len(capacity.pos), 2)
-	testing.expect_value(t, capacity.pos.z[1], 10)
-	testing.expect_value(t, capacity.col[0], [4]u8{7, 8, 9, 10})
-
-	slice := dynamic_array[1:4]
-	testing.expect_value(t, len(slice.pos), 3)
-	testing.expect_value(t, slice.pos.x[0], 1)
-
-	n: #soa[3]Split_Nested
-	n[2] = {p = split_particle(5), w = 2}
-	n.p.pos[1].x = 7
-	testing.expect_value(t, typeid_of(type_of(n.p)), typeid_of(#soa[]Split_Particle))
-	testing.expect_value(t, n.p.pos[2], Split_Vec{5, 6, 7})
-	testing.expect_value(t, n.p[2], split_particle(5))
-	testing.expect_value(t, n.p.vel[2], split_particle(5).vel)
-	testing.expect_value(t, n[1].p.pos, Split_Vec{7, 0, 0})
 }
 
 // 'soa_unzip' gives one result for each field of the element, and the '#soa[]' view of a '#soa_split' field
@@ -300,7 +277,7 @@ test_soa_split_unzip :: proc(t: ^testing.T) {
 }
 
 @(private="file")
-SPLIT_CONSTANT ::#soa[2]Split_Particle{{{1, 2, 3}, {4, 5, 6}, {7, 8, 9, 10}, 11}, {id = 12}}
+SPLIT_CONSTANT :: #soa[2]Split_Particle{{{1, 2, 3}, {4, 5, 6}, {7, 8, 9, 10}, 11}, {id = 12}}
 
 @(private="file", rodata)
 g_split := #soa[2]Split_Particle{{pos = {1, 2, 3}, id = 4}, {col = {5, 6, 7, 8}}}

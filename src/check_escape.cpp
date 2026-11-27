@@ -3686,7 +3686,7 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 			}
 		}
 		if (se->is_soa_split_view) {
-			// the columns of a `#soa_split` field, as a slice of the array is
+			// NOTE(bill): the columns of a `#soa_split` field, as a slice of the array is
 			return escape_elems_of(ea, se->expr);
 		}
 		EscapePath path = {};

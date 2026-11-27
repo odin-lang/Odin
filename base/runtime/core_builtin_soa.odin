@@ -447,9 +447,6 @@ _copy_soa_and_slice :: proc "contextless" (soa: $S/#soa[]$E, aos: []E, $TO_SOA: 
 				}
 			}
 			when _SOA_NEON {
-				// NOTE(bill): Four elements at a time, a wide access and stride shuffles that become ld3, ld4, or st4.
-				// With 3 fields the 16 lanes loaded reach past the 4 elements, into elements which must exist.
-				// There is no st3: its 12-lane interleave cannot be written as a #simd type.
 				G :: #simd[16]u32
 				switch k {
 				case 3:
@@ -621,7 +618,6 @@ _copy_soa_and_slice :: proc "contextless" (soa: $S/#soa[]$E, aos: []E, $TO_SOA: 
 				}
 			}
 			when _SOA_NEON {
-				// NOTE(bill): Two elements at a time, as ld3, ld4, or st4, the same as for 4-byte fields.
 				G :: #simd[8]u64
 				switch k {
 				case 3:

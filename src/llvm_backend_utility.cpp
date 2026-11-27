@@ -434,6 +434,21 @@ gb_internal lbValue lb_soa_zip(lbProcedure *p, AstCallExpr *ce, TypeAndValue con
 	return lb_addr_load(p, res);
 }
 
+// The `#soa[]` view of type `view_type` of the columns of the #soa array `soa` points to, from `column` on
+gb_internal lbValue lb_soa_split_view(lbProcedure *p, lbValue soa, i32 column, Type *view_type) {
+	Type *t = base_type(type_deref(soa.type));
+	i32 count = cast(i32)soa_field_count(view_type);
+	lbAddr view = lb_add_local_generated(p, view_type, false);
+	for (i32 i = 0; i < count; i++) {
+		lbValue data = lb_emit_struct_ep(p, soa, column+i);
+		data = soa_has_inline_fields(t) ? lb_emit_array_epi(p, data, 0) : lb_emit_load(p, data);
+		lbValue dst = lb_emit_struct_ep(p, view.addr, i);
+		lb_emit_store(p, dst, lb_emit_conv(p, data, type_deref(dst.type)));
+	}
+	lb_emit_store(p, lb_emit_struct_ep(p, view.addr, count), lb_soa_struct_len(p, soa));
+	return lb_addr_load(p, view);
+}
+
 gb_internal lbValue lb_soa_unzip(lbProcedure *p, AstCallExpr *ce, TypeAndValue const &tv) {
 	GB_ASSERT(ce->args.count == 1);
 
@@ -445,6 +460,7 @@ gb_internal lbValue lb_soa_unzip(lbProcedure *p, AstCallExpr *ce, TypeAndValue c
 
 	lbAddr res = lb_add_local_generated(p, tv.type, true);
 	lbValue rp = lb_addr_get_ptr(p, res);
+	lbValue soa = {};
 	bool is_tuple = is_type_tuple(tv.type);
 	i32 result_count = is_tuple ? cast(i32)tv.type->Tuple.variables.count : 1;
 	i32 column = 0;
@@ -455,13 +471,12 @@ gb_internal lbValue lb_soa_unzip(lbProcedure *p, AstCallExpr *ce, TypeAndValue c
 			lb_fill_slice(p, lb_addr(is_tuple ? lb_emit_struct_ep(p, rp, i) : rp), ptr, len);
 			continue;
 		}
-		// the `#soa[]` view of a `#soa_split` field's columns
-		lbValue dst = is_tuple ? lb_emit_struct_ep(p, rp, i) : rp;
-		i32 count = cast(i32)soa_field_count(result);
-		for (i32 j = 0; j < count; j++) {
-			lb_emit_store(p, lb_emit_struct_ep(p, dst, j), lb_emit_struct_ev(p, arg, column++));
+		// NOTE(bill): the `#soa[]` view of a `#soa_split` field's columns
+		if (soa.value == nullptr) {
+			soa = lb_address_from_load_or_generate_local(p, arg);
 		}
-		lb_emit_store(p, lb_emit_struct_ep(p, dst, count), len);
+		lb_emit_store(p, is_tuple ? lb_emit_struct_ep(p, rp, i) : rp, lb_soa_split_view(p, soa, column, result));
+		column += cast(i32)soa_field_count(result);
 	}
 
 	return lb_addr_load(p, res);
@@ -1755,7 +1770,6 @@ gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection 
 			Type *t = base_type(type_deref(addr.type));
 			GB_ASSERT(is_type_soa_struct(t));
 
-			// down the `#soa_split` fields to the column
 			i32 column = 0;
 			isize next = i;
 			Type *split = soa_split_select(t->Struct.soa_elem, sel, &next, &column);
