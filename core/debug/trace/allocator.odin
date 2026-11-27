@@ -188,6 +188,10 @@ tracking_allocator_proc :: proc(
 
 	sync.mutex_guard(&data.mutex)
 
+	if mode == .Thread_Attach || mode == .Thread_Detach {
+		return nil, .Mode_Not_Implemented
+	}
+
 	if mode == .Query_Info {
 		info := (^mem.Allocator_Query_Info)(old_memory)
 		if info != nil && info.pointer != nil {
@@ -277,7 +281,7 @@ tracking_allocator_proc :: proc(
 		}
 		return nil, nil
 
-	case .Query_Info:
+	case .Query_Info, .Thread_Attach, .Thread_Detach:
 		unreachable()
 	}
 

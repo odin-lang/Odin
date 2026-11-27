@@ -134,6 +134,9 @@ panic_allocator_proc :: proc(
 		}
 		return nil, nil
 
+	case .Thread_Attach, .Thread_Detach:
+		return nil, .Mode_Not_Implemented
+
 	case .Query_Info:
 		panic("mem: panic allocator, .Query_Info called", loc=loc)
 	}
@@ -459,7 +462,7 @@ arena_allocator_proc :: proc(
 			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free_All, .Resize, .Resize_Non_Zeroed, .Query_Features}
 		}
 		return nil, nil
-	case .Query_Info:
+	case .Query_Info, .Thread_Attach, .Thread_Detach:
 		return nil, .Mode_Not_Implemented
 	}
 	return nil, nil
@@ -960,7 +963,7 @@ scratch_allocator_proc :: proc(
 			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Free_All, .Resize, .Resize_Non_Zeroed, .Query_Features}
 		}
 		return nil, nil
-	case .Query_Info:
+	case .Query_Info, .Thread_Attach, .Thread_Detach:
 		return nil, .Mode_Not_Implemented
 	}
 	return nil, nil
@@ -1384,7 +1387,7 @@ stack_allocator_proc :: proc(
 			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Free_All, .Resize, .Resize_Non_Zeroed, .Query_Features}
 		}
 		return nil, nil
-	case .Query_Info:
+	case .Query_Info, .Thread_Attach, .Thread_Detach:
 		return nil, .Mode_Not_Implemented
 	}
 	return nil, nil
@@ -1803,7 +1806,7 @@ small_stack_allocator_proc :: proc(
 			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Free_All, .Resize, .Resize_Non_Zeroed, .Query_Features}
 		}
 		return nil, nil
-	case .Query_Info:
+	case .Query_Info, .Thread_Attach, .Thread_Detach:
 		return nil, .Mode_Not_Implemented
 	}
 	return nil, nil
@@ -2255,6 +2258,9 @@ dynamic_arena_allocator_proc :: proc(
 			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free_All, .Resize, .Resize_Non_Zeroed, .Query_Features, .Query_Info}
 		}
 		return nil, nil
+	case .Thread_Attach, .Thread_Detach:
+		return nil, .Mode_Not_Implemented
+
 	case .Query_Info:
 		info := (^Allocator_Query_Info)(old_memory)
 		if info != nil && info.pointer != nil {
@@ -2619,6 +2625,9 @@ buddy_allocator_proc :: proc(
 			set^ = {.Query_Features, .Alloc, .Alloc_Non_Zeroed, .Resize, .Resize_Non_Zeroed, .Free, .Free_All, .Query_Info}
 		}
 		return nil, nil
+	case .Thread_Attach, .Thread_Detach:
+		return nil, .Mode_Not_Implemented
+
 	case .Query_Info:
 		info := (^Allocator_Query_Info)(old_memory)
 		if info != nil && info.pointer != nil {
@@ -2744,6 +2753,9 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 	case .Free_All:
 		return rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location)
+
+	case .Thread_Attach, .Thread_Detach:
+		return nil, .Mode_Not_Implemented
 
 	case .Query_Info:
 		info := (^Allocator_Query_Info)(old_memory)
