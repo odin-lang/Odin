@@ -706,6 +706,10 @@ gb_internal bool escape_eq(T *a, T *b) {
 	return a == b;
 }
 
+gb_internal bool escape_eq(i32 a, i32 b) {
+	return a == b;
+}
+
 template <typename T>
 gb_internal bool escape_contains(Array<T> const &array, T const &x) {
 	for (T const &y : array) {
@@ -5699,6 +5703,7 @@ struct EscapeRangeSnapshot {
 	Entity *        elem;         // the loop's value
 	Entity *        soa_elem;     // the loop's value when it is an #soa element, whose address holds the header's
 	bool            writes_elems; // through the loop's value
+	Array<i32>      columns;      // of the #soa array, those the body writes
 	Array<Entity *> outer;
 };
 
@@ -5880,6 +5885,44 @@ gb_internal bool escape_range_snapshot_expr(EscapeRangeSnapshot *s, Ast *expr) {
 	return false;
 }
 
+// The #soa columns a value within the loop's element takes, and the `#soa_split` value they hold, nullptr once nothing narrows them
+struct EscapeSoaColumns {
+	Type *split;
+	i32   first;
+	i32   count;
+};
+
+// The #soa columns of the value `x` within the loop's element, all of the element's when it is not narrowed to fewer
+gb_internal EscapeSoaColumns escape_range_snapshot_soa_columns(EscapeRangeSnapshot *s, Ast *x) {
+	x = unparen_expr(x);
+	EscapeSoaColumns c = {};
+	switch (x->kind) {
+	case Ast_SelectorExpr:
+		c = escape_range_snapshot_soa_columns(s, x->SelectorExpr.expr);
+		if (c.split != nullptr) {
+			Selection sel = lookup_field(c.split, x->SelectorExpr.selector->Ident.interned, false);
+			if (sel.entity == nullptr) {
+				c.split = nullptr;
+				return c;
+			}
+			isize depth = 0;
+			c.split = soa_split_select(c.split, sel, &depth, &c.first);
+			c.count = c.split != nullptr ? soa_split_column_count(c.split) : 1;
+		}
+		return c;
+	case Ast_IndexExpr:
+		c = escape_range_snapshot_soa_columns(s, x->IndexExpr.expr);
+		c.split = nullptr;
+		return c;
+	}
+	c.split = s->soa_elem->type;
+	c.count = soa_split_column_count(c.split);
+	if (entity_of_node(x) != s->soa_elem) {
+		c.split = nullptr;
+	}
+	return c;
+}
+
 // Whether the body may store to `lhs`: an element, a local of its own, or an outer local or global, which is recorded
 gb_internal bool escape_range_snapshot_write(EscapeRangeSnapshot *s, Ast *lhs) {
 	// NOTE(bill): a swizzle or a bit field is within what it is selected from
@@ -5902,6 +5945,12 @@ gb_internal bool escape_range_snapshot_write(EscapeRangeSnapshot *s, Ast *lhs) {
 	}
 	if (e == s->elem) {
 		s->writes_elems = true;
+		if (s->soa_elem != nullptr) {
+			EscapeSoaColumns c = escape_range_snapshot_soa_columns(s, lhs);
+			for (i32 i = c.first; i < c.first + c.count; i++) {
+				escape_add_unique(&s->columns, i);
+			}
+		}
 		return true;
 	}
 	if (escape_is_reference(e)) {
@@ -6018,7 +6067,9 @@ gb_internal void escape_range_snapshot(AstRangeStmt *rs) {
 	s.body_scope = rs->body->BlockStmt.scope;
 	s.elem       = val0 != nullptr ? entity_of_node(val0) : nullptr;
 	s.soa_elem   = is_soa ? s.elem : nullptr;
+	s.columns    = array_make<i32>(heap_allocator());
 	s.outer      = array_make<Entity *>(heap_allocator());
+	defer (array_free(&s.columns));
 	defer (array_free(&s.outer));
 	if (!escape_range_snapshot_stmt(&s, rs->body)) {
 		return;
@@ -6026,6 +6077,7 @@ gb_internal void escape_range_snapshot(AstRangeStmt *rs) {
 
 	AstRangeSnapshot *snapshot = permanent_alloc_item<AstRangeSnapshot>();
 	snapshot->writes_elems = s.writes_elems;
+	snapshot->columns      = slice_clone_from_array(permanent_allocator(), s.columns);
 	snapshot->outer        = slice_clone_from_array(permanent_allocator(), s.outer);
 	rs->snapshot = snapshot;
 }

@@ -54,6 +54,62 @@ test_soa_header_in_elements :: proc(t: ^testing.T) {
 	testing.expect_value(t, sum, 1 + 20 + 30)
 }
 
+@(private="file")
+Inner :: struct {
+	a:     int,
+	items: #soa[dynamic]Outer,
+}
+
+@(private="file")
+Outer :: struct {
+	v: int,
+	#soa_split inner: Inner,
+}
+
+// The header is inside the elements in a column other than the first, that of `inner.items`: writing another header into it,
+// or into all of `inner`, moves the loop onto that array, and writing only the other columns does not
+@(test)
+test_soa_header_in_split_column :: proc(t: ^testing.T) {
+	root, other: #soa[dynamic]Outer
+	defer delete(root)
+	defer delete(other)
+	append(&root, Outer{v = 1}, Outer{v = 2}, Outer{v = 3})
+	append(&other, Outer{v = 10}, Outer{v = 20}, Outer{v = 30})
+	h := &root[0].inner.items
+
+	h^ = root
+	sum := 0
+	for &x, i in h {
+		sum += x.v
+		if i == 0 {
+			x.inner.items = other
+		}
+	}
+	testing.expect_value(t, sum, 1 + 20 + 30)
+
+	h^ = root
+	sum = 0
+	for &x, i in h {
+		sum += x.v
+		if i == 0 {
+			x.inner = Inner{a = 7, items = other}
+		}
+	}
+	testing.expect_value(t, sum, 1 + 20 + 30)
+	testing.expect_value(t, root[0].inner.a, 7)
+
+	h^ = root
+	sum = 0
+	for &x in h {
+		sum += x.v
+		x.v += 100
+		x.inner.a = 8
+	}
+	testing.expect_value(t, sum, 1 + 2 + 3)
+	testing.expect_value(t, root[2].v, 103)
+	testing.expect_value(t, root[2].inner.a, 8)
+}
+
 // Overwriting the array being ranged over moves the loop onto the new columns, for a local, a global, and an `#soa[]T`
 @(test)
 test_soa_overwritten_array :: proc(t: ^testing.T) {

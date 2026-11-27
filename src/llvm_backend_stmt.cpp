@@ -1508,13 +1508,11 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 	lbRangeSnapshot s = {};
 	s.lo = lb_emit_conv(p, array.addr, t_uintptr);
 	s.hi = lb_emit_conv(p, lb_emit_struct_ep(p, array.addr, columns), t_uintptr);
-	if (rs->snapshot->writes_elems) {
-		lbValue len = lb_emit_conv(p, count, t_uintptr);
-		for (i32 i = 0; i < columns; i++) {
-			lbValue column = lb_emit_load(p, lb_emit_struct_ep(p, copy.addr, i));
-			lbValue size   = lb_emit_arith(p, Token_Mul, len, lb_const_int(m, t_uintptr, type_size_of(type_deref(column.type, true))), t_uintptr);
-			lb_range_snapshot_check(p, &s, column, size);
-		}
+	lbValue len = lb_emit_conv(p, count, t_uintptr);
+	for (i32 i : rs->snapshot->columns) {
+		lbValue column = lb_emit_load(p, lb_emit_struct_ep(p, copy.addr, i));
+		lbValue size   = lb_emit_arith(p, Token_Mul, len, lb_const_int(m, t_uintptr, type_size_of(type_deref(column.type, true))), t_uintptr);
+		lb_range_snapshot_check(p, &s, column, size);
 	}
 	lb_range_snapshot_begin(p, &s, rs->snapshot);
 

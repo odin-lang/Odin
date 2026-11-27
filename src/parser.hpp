@@ -460,6 +460,7 @@ struct AstSplitArgs {
 // see `escape_range_snapshots`
 struct AstRangeSnapshot {
 	bool            writes_elems; // through the loop's value
+	Slice<i32>      columns;      // of an #soa array, those the body writes
 	Slice<Entity *> outer;        // the outer locals and globals
 };
 
