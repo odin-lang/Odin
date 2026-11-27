@@ -706,6 +706,10 @@ gb_internal bool escape_eq(T *a, T *b) {
 	return a == b;
 }
 
+gb_internal bool escape_eq(i32 a, i32 b) {
+	return a == b;
+}
+
 template <typename T>
 gb_internal bool escape_contains(Array<T> const &array, T const &x) {
 	for (T const &y : array) {
@@ -1439,6 +1443,15 @@ gb_internal EscapeValue escape_elems_at(EscapeAnalysis *ea, EscapeValue const &a
 	case Type_DynamicArray:
 	case Type_Map:
 		return escape_load_once(ea, addr, t);
+	case Type_Struct:
+		// the columns of `#soa[N]T` and `#soa[dynamic; N]T` are in the array itself, and the others are pointers
+		if (soa_has_inline_fields(t)) {
+			return escape_pointer_offset(addr, escape_path_of(EscapeStep_AnyElement));
+		}
+		if (t->Struct.soa_kind != StructSoa_None) {
+			return escape_as_pointer(escape_load(ea, addr, t));
+		}
+		break;
 	}
 	return ptr;
 }
@@ -1463,7 +1476,7 @@ gb_internal EscapeValue escape_elems_of(EscapeAnalysis *ea, Ast *x) {
 
 gb_internal bool escape_selector_path(Ast *se_node, EscapePath *path) {
 	ast_node(se, SelectorExpr, se_node);
-	if (se->swizzle_count > 0 || se->is_bit_field) {
+	if (se->swizzle_count > 0 || se->is_bit_field || se->is_soa_split_view) {
 		return false;
 	}
 
@@ -3564,6 +3577,22 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 	return results;
 }
 
+// NOTE(bill): `&s[i]` is an #soa pointer, which holds the address of the #soa array `s` itself
+gb_internal EscapeValue escape_soa_array_addr(EscapeAnalysis *ea, Ast *index_expr) {
+	ast_node(ie, IndexExpr, index_expr);
+	escape_visit_exits(ea, ie->index);
+	Ast *soa = ie->expr;
+	if (is_type_pointer(soa->tav.type)) {
+		return escape_as_pointer(escape_expr(ea, soa));
+	}
+	if (soa->tav.mode == Addressing_Variable || soa->kind == Ast_Ident) {
+		return escape_addr(ea, soa);
+	}
+	EscapeValue v = escape_expr(ea, soa);
+	escape_store_obj(ea, {nullptr, soa}, {}, v, EscapeUpdate_Replace);
+	return escape_value_of(EscapeOrigin_Temp, {nullptr, soa}, {});
+}
+
 gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 	if (expr == nullptr) {
 		return escape_value();
@@ -3578,7 +3607,8 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 	if (tav.mode == Addressing_Constant) {
 		ExactValueKind value_kind = tav.value().kind;
 		// String constants are loaded into read-only memory, they do not use the memory of the stack frame.
-		if (tav.type == nullptr || !is_type_slice(tav.type) || value_kind == ExactValue_String || value_kind == ExactValue_String16) {
+		bool is_slice = tav.type != nullptr && (is_type_slice(tav.type) || is_type_soa_slice(tav.type));
+		if (!is_slice || value_kind == ExactValue_String || value_kind == ExactValue_String16) {
 			return escape_value();
 		}
 		if (expr->kind == Ast_CompoundLit && expr->CompoundLit.elems.count == 0) {
@@ -3609,6 +3639,8 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 		if (t == nullptr) {
 			return v;
 		}
+		// the elements of an #soa literal are of its element type, not its fields
+		bool is_soa = is_type_soa_struct(t);
 		for_array(i, cl->elems) {
 			Ast *elem = cl->elems[i];
 			Ast *value = elem;
@@ -3618,7 +3650,9 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 				value = elem->FieldValue.value;
 			}
 
-			if (t->kind == Type_Struct) {
+			if (is_soa) {
+				elem_type = t->Struct.soa_elem;
+			} else if (t->kind == Type_Struct) {
 				isize index = i;
 				if (elem->kind == Ast_FieldValue) {
 					index = escape_field_index(t->Struct.fields, elem->FieldValue.field);
@@ -3644,7 +3678,7 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 			escape_value_add_at(&v, path, escape_convert(ea, escape_expr(ea, value), value, elem_type));
 		}
 
-		if (t->kind == Type_Slice) {
+		if (t->kind == Type_Slice || is_type_soa_slice(t)) {
 			if (cl->elems.count == 0) {
 				return escape_value();
 			}
@@ -3656,13 +3690,29 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 
 	case_ast_node(ue, UnaryExpr, expr);
 		if (ue->op.kind == Token_And) {
-			return escape_addr(ea, unparen_expr(ue->expr));
+			Ast *x = unparen_expr(ue->expr);
+			if (x->kind == Ast_IndexExpr && is_type_soa_pointer(tav.type)) {
+				ea->addr_site = x;
+				return escape_soa_array_addr(ea, x);
+			}
+			return escape_addr(ea, x);
 		}
 	case_end;
 
 	case_ast_node(se, SelectorExpr, expr);
 		if (Entity *g = escape_package_selector(expr)) {
 			return escape_ident_value(ea, g);
+		}
+		if (se->is_soa_column) {
+			// a column of `#soa[dynamic; N]T` is a slice of the array's own storage
+			Entity *column = entity_of_node(se->selector);
+			if (column != nullptr && is_type_array(column->type)) {
+				return escape_elems_at(ea, escape_addr(ea, expr), base_type(column->type));
+			}
+		}
+		if (se->is_soa_split_view) {
+			// NOTE(bill): the columns of a `#soa_split` field, as a slice of the array is
+			return escape_elems_of(ea, se->expr);
 		}
 		EscapePath path = {};
 		if (!escape_selector_path(expr, &path)) {
@@ -4375,7 +4425,7 @@ gb_internal void escape_outer_location(Ast *lhs, EscapeLocation *loc) {
 		escape_outer_location(ie->expr, loc);
 		// the elements of a slice and such are in the memory it points to
 		Type *bt = base_type(ie->expr->tav.type);
-		bool inline_elems = escape_is_inline_array(bt) || (bt != nullptr && bt->kind == Type_Struct && bt->Struct.soa_kind == StructSoa_Fixed);
+		bool inline_elems = escape_is_inline_array(bt) || (bt != nullptr && bt->kind == Type_Struct && soa_has_inline_fields(bt));
 		if (!inline_elems) {
 			loc->path = escape_path_concat(loc->path, escape_path_of(EscapeStep_Deref));
 		}
@@ -5642,6 +5692,449 @@ gb_internal void escape_graph_place_calls(CheckedCall *calls, isize count) {
 	}
 }
 
+// NOTE(bill): A range loop over a `[dynamic]T` or `[dynamic; N]T` reads the array's header (its data and length)
+// for each element that which the body writes may hold the header, and one over an `#soa[]T` or `#soa[dynamic]T` reads
+// the columns from its header for each field of an element. When the body can write nothing else which could,
+// the backend reads the header once before the loop instead, once it checks that the memory the body writes is apart from it.
+// The body may only call builtins which write no memory, and may only write the elements, its own locals, and outer locals and globals.
+// Any other write, or any other call, may change the array (e.g. through `append`).
+struct EscapeRangeSnapshot {
+	Scope *         body_scope;
+	Entity *        elem;         // the loop's value
+	Entity *        soa_elem;     // the loop's value when it is an #soa element, whose address holds the header's
+	bool            writes_elems; // through the loop's value
+	Array<i32>      columns;      // of the #soa array, those the body writes
+	Array<Entity *> outer;
+};
+
+gb_internal bool escape_range_snapshot_builtin(BuiltinProcId id) {
+	if (BuiltinProc__type_begin < id && id < BuiltinProc__type_end) {
+		return true;
+	}
+	if (BuiltinProc__simd_begin < id && id < BuiltinProc__simd_end) {
+		return id != BuiltinProc_simd_scatter && id != BuiltinProc_simd_masked_store && id != BuiltinProc_simd_masked_compress_store;
+	}
+	switch (id) {
+	case BuiltinProc_len:
+	case BuiltinProc_cap:
+	case BuiltinProc_size_of:
+	case BuiltinProc_align_of:
+	case BuiltinProc_offset_of:
+	case BuiltinProc_offset_of_by_string:
+	case BuiltinProc_type_of:
+	case BuiltinProc_type_info_of:
+	case BuiltinProc_typeid_of:
+	case BuiltinProc_swizzle:
+	case BuiltinProc_complex:
+	case BuiltinProc_quaternion:
+	case BuiltinProc_real:
+	case BuiltinProc_imag:
+	case BuiltinProc_jmag:
+	case BuiltinProc_kmag:
+	case BuiltinProc_conj:
+	case BuiltinProc_expand_values:
+	case BuiltinProc_compress_values:
+	case BuiltinProc_min:
+	case BuiltinProc_max:
+	case BuiltinProc_abs:
+	case BuiltinProc_clamp:
+	case BuiltinProc_unreachable:
+	case BuiltinProc_raw_data:
+	case BuiltinProc_DIRECTIVE:
+	case BuiltinProc_is_package_imported:
+	case BuiltinProc_has_target_feature:
+	case BuiltinProc_constant_log2:
+	case BuiltinProc_constant_floor:
+	case BuiltinProc_constant_trunc:
+	case BuiltinProc_constant_ceil:
+	case BuiltinProc_constant_round:
+	case BuiltinProc_transpose:
+	case BuiltinProc_outer_product:
+	case BuiltinProc_hadamard_product:
+	case BuiltinProc_matrix_flatten:
+	case BuiltinProc_trap:
+	case BuiltinProc_count_ones:
+	case BuiltinProc_count_zeros:
+	case BuiltinProc_count_trailing_zeros:
+	case BuiltinProc_count_leading_zeros:
+	case BuiltinProc_count_trailing_ones:
+	case BuiltinProc_count_leading_ones:
+	case BuiltinProc_reverse_bits:
+	case BuiltinProc_byte_swap:
+	case BuiltinProc_overflow_add:
+	case BuiltinProc_overflow_sub:
+	case BuiltinProc_overflow_mul:
+	case BuiltinProc_saturating_add:
+	case BuiltinProc_saturating_sub:
+	case BuiltinProc_sqrt:
+	case BuiltinProc_fused_mul_add:
+	case BuiltinProc_ptr_offset:
+	case BuiltinProc_ptr_sub:
+	case BuiltinProc_unaligned_load:
+	case BuiltinProc_non_temporal_load:
+	case BuiltinProc_fixed_point_mul:
+	case BuiltinProc_fixed_point_div:
+	case BuiltinProc_fixed_point_mul_sat:
+	case BuiltinProc_fixed_point_div_sat:
+	case BuiltinProc_expect:
+	case BuiltinProc_likely:
+	case BuiltinProc_unlikely:
+		return true;
+	}
+	return false;
+}
+
+gb_internal bool escape_range_snapshot_expr(EscapeRangeSnapshot *s, Ast *expr);
+
+gb_internal bool escape_range_snapshot_exprs(EscapeRangeSnapshot *s, Slice<Ast *> const &exprs) {
+	for (Ast *expr : exprs) {
+		if (!escape_range_snapshot_expr(s, expr)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+// Whether `expr` writes no memory, calls nothing which could, and takes no address of an #soa element
+gb_internal bool escape_range_snapshot_expr(EscapeRangeSnapshot *s, Ast *expr) {
+	if (expr == nullptr || expr->tav.mode == Addressing_Constant || expr->tav.mode == Addressing_Type) {
+		return true;
+	}
+	switch (expr->kind) {
+	case Ast_Ident:
+	case Ast_Implicit:
+	case Ast_Uninit:
+	case Ast_BasicLit:
+	case Ast_BasicDirective:
+	case Ast_ImplicitSelectorExpr:
+		return true;
+	case_ast_node(cl, CompoundLit, expr);
+		return escape_range_snapshot_exprs(s, cl->elems);
+	case_end;
+	case_ast_node(fv, FieldValue, expr);
+		return escape_range_snapshot_expr(s, fv->field) && escape_range_snapshot_expr(s, fv->value);
+	case_end;
+	case_ast_node(te, TagExpr, expr);
+		return escape_range_snapshot_expr(s, te->expr);
+	case_end;
+	case_ast_node(ue, UnaryExpr, expr);
+		if (ue->op.kind == Token_And && s->soa_elem != nullptr && entity_of_node(unparen_expr(ue->expr)) == s->soa_elem) {
+			// NOTE(bill): it would hold the address of the snapshot, which ends with the loop
+			return false;
+		}
+		return escape_range_snapshot_expr(s, ue->expr);
+	case_end;
+	case_ast_node(be, BinaryExpr, expr);
+		return escape_range_snapshot_expr(s, be->left) && escape_range_snapshot_expr(s, be->right);
+	case_end;
+	case_ast_node(pe, ParenExpr, expr);
+		return escape_range_snapshot_expr(s, pe->expr);
+	case_end;
+	case_ast_node(se, SelectorExpr, expr);
+		return escape_range_snapshot_expr(s, se->expr);
+	case_end;
+	case_ast_node(ie, IndexExpr, expr);
+		return escape_range_snapshot_expr(s, ie->expr) && escape_range_snapshot_expr(s, ie->index);
+	case_end;
+	case_ast_node(mie, MatrixIndexExpr, expr);
+		return escape_range_snapshot_expr(s, mie->expr) && escape_range_snapshot_expr(s, mie->row_index) && escape_range_snapshot_expr(s, mie->column_index);
+	case_end;
+	case_ast_node(de, DerefExpr, expr);
+		return escape_range_snapshot_expr(s, de->expr);
+	case_end;
+	case_ast_node(se, SliceExpr, expr);
+		return escape_range_snapshot_expr(s, se->expr) && escape_range_snapshot_expr(s, se->low) && escape_range_snapshot_expr(s, se->high);
+	case_end;
+	case_ast_node(ce, CallExpr, expr);
+		TypeAndValue tv = type_and_value_of_expr(ce->proc);
+		if (tv.mode == Addressing_Builtin) {
+			Entity *e = entity_of_node(ce->proc);
+			if (!escape_range_snapshot_builtin(e != nullptr ? cast(BuiltinProcId)e->Builtin.id : BuiltinProc_DIRECTIVE)) {
+				return false;
+			}
+		} else if (tv.mode != Addressing_Type) {
+			return false;
+		}
+		return escape_range_snapshot_exprs(s, ce->args);
+	case_end;
+	case_ast_node(te, TernaryIfExpr, expr);
+		return escape_range_snapshot_expr(s, te->x) && escape_range_snapshot_expr(s, te->cond) && escape_range_snapshot_expr(s, te->y);
+	case_end;
+	case_ast_node(te, TernaryWhenExpr, expr);
+		return escape_range_snapshot_expr(s, te->x) && escape_range_snapshot_expr(s, te->cond) && escape_range_snapshot_expr(s, te->y);
+	case_end;
+	case_ast_node(oe, OrElseExpr, expr);
+		return escape_range_snapshot_expr(s, oe->x) && escape_range_snapshot_expr(s, oe->y);
+	case_end;
+	case_ast_node(oe, OrReturnExpr, expr);
+		return escape_range_snapshot_expr(s, oe->expr);
+	case_end;
+	case_ast_node(oe, OrBranchExpr, expr);
+		return escape_range_snapshot_expr(s, oe->expr);
+	case_end;
+	case_ast_node(ta, TypeAssertion, expr);
+		return escape_range_snapshot_expr(s, ta->expr);
+	case_end;
+	case_ast_node(tc, TypeCast, expr);
+		return escape_range_snapshot_expr(s, tc->expr);
+	case_end;
+	case_ast_node(ac, AutoCast, expr);
+		return escape_range_snapshot_expr(s, ac->expr);
+	case_end;
+	}
+	return false;
+}
+
+// The #soa columns a value within the loop's element takes, and the `#soa_split` value they hold, nullptr once nothing narrows them
+struct EscapeSoaColumns {
+	Type *split;
+	i32   first;
+	i32   count;
+};
+
+// The #soa columns of the value `x` within the loop's element, all of the element's when it is not narrowed to fewer
+gb_internal EscapeSoaColumns escape_range_snapshot_soa_columns(EscapeRangeSnapshot *s, Ast *x) {
+	x = unparen_expr(x);
+	EscapeSoaColumns c = {};
+	switch (x->kind) {
+	case Ast_SelectorExpr:
+		c = escape_range_snapshot_soa_columns(s, x->SelectorExpr.expr);
+		if (c.split != nullptr) {
+			Selection sel = lookup_field(c.split, x->SelectorExpr.selector->Ident.interned, false);
+			if (sel.entity == nullptr) {
+				c.split = nullptr;
+				return c;
+			}
+			isize depth = 0;
+			c.split = soa_split_select(c.split, sel, &depth, &c.first);
+			c.count = c.split != nullptr ? soa_split_column_count(c.split) : 1;
+		}
+		return c;
+	case Ast_IndexExpr:
+		c = escape_range_snapshot_soa_columns(s, x->IndexExpr.expr);
+		c.split = nullptr;
+		return c;
+	}
+	c.split = s->soa_elem->type;
+	c.count = soa_split_column_count(c.split);
+	if (entity_of_node(x) != s->soa_elem) {
+		c.split = nullptr;
+	}
+	return c;
+}
+
+// Whether the body may store to `lhs`: an element, a local of its own, or an outer local or global, which is recorded
+gb_internal bool escape_range_snapshot_write(EscapeRangeSnapshot *s, Ast *lhs) {
+	// NOTE(bill): a swizzle or a bit field is within what it is selected from
+	lhs = unparen_expr(lhs);
+	while (lhs->kind == Ast_SelectorExpr && (lhs->SelectorExpr.swizzle_count > 0 || lhs->SelectorExpr.is_bit_field)) {
+		lhs = unparen_expr(lhs->SelectorExpr.expr);
+	}
+	if (is_blank_ident(lhs)) {
+		return true;
+	}
+	if (!escape_range_snapshot_expr(s, lhs)) {
+		return false;
+	}
+
+	EscapeLocation loc = {};
+	escape_outer_location(lhs, &loc);
+	Entity *e = loc.root;
+	if (e == nullptr || e->kind != Entity_Variable || escape_path_deref_index(loc.path) != loc.path.count) {
+		return false;
+	}
+	if (e == s->elem) {
+		s->writes_elems = true;
+		if (s->soa_elem != nullptr) {
+			EscapeSoaColumns c = escape_range_snapshot_soa_columns(s, lhs);
+			for (i32 i = c.first; i < c.first + c.count; i++) {
+				escape_add_unique(&s->columns, i);
+			}
+		}
+		return true;
+	}
+	if (escape_is_reference(e)) {
+		// NOTE(bill): the value of another loop or switch, within what that ranges or switches over
+		return false;
+	}
+	Scope *scope = e->scope;
+	while (scope != nullptr && scope != s->body_scope) {
+		scope = scope->parent;
+	}
+	if (scope != nullptr) {
+		// NOTE(bill): a static of the body has no address before the loop to check
+		return escape_is_local(e);
+	}
+	escape_add_unique(&s->outer, e);
+	return true;
+}
+
+gb_internal bool escape_range_snapshot_stmt(EscapeRangeSnapshot *s, Ast *stmt);
+
+gb_internal bool escape_range_snapshot_stmts(EscapeRangeSnapshot *s, Slice<Ast *> const &stmts) {
+	for (Ast *stmt : stmts) {
+		if (!escape_range_snapshot_stmt(s, stmt)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+gb_internal bool escape_range_snapshot_stmt(EscapeRangeSnapshot *s, Ast *stmt) {
+	if (stmt == nullptr) {
+		return true;
+	}
+	switch (stmt->kind) {
+	case Ast_EmptyStmt:
+	case Ast_BranchStmt:
+		return true;
+	case_ast_node(es, ExprStmt, stmt);
+		return escape_range_snapshot_expr(s, es->expr);
+	case_end;
+	case_ast_node(as, AssignStmt, stmt);
+		if (!escape_range_snapshot_exprs(s, as->rhs)) {
+			return false;
+		}
+		for (Ast *lhs : as->lhs) {
+			if (!escape_range_snapshot_write(s, lhs)) {
+				return false;
+			}
+		}
+		return true;
+	case_end;
+	case_ast_node(vd, ValueDecl, stmt);
+		return escape_range_snapshot_exprs(s, vd->values);
+	case_end;
+	case_ast_node(bs, BlockStmt, stmt);
+		return escape_range_snapshot_stmts(s, bs->stmts);
+	case_end;
+	case_ast_node(is, IfStmt, stmt);
+		return escape_range_snapshot_stmt(s, is->init) && escape_range_snapshot_expr(s, is->cond) &&
+		       escape_range_snapshot_stmt(s, is->body) && escape_range_snapshot_stmt(s, is->else_stmt);
+	case_end;
+	case_ast_node(ws, WhenStmt, stmt);
+		if (ws->is_cond_determined) {
+			return escape_range_snapshot_stmt(s, ws->determined_cond ? ws->body : ws->else_stmt);
+		}
+		return escape_range_snapshot_stmt(s, ws->body) && escape_range_snapshot_stmt(s, ws->else_stmt);
+	case_end;
+	case_ast_node(fs, ForStmt, stmt);
+		return escape_range_snapshot_stmt(s, fs->init) && escape_range_snapshot_expr(s, fs->cond) &&
+		       escape_range_snapshot_stmt(s, fs->post) && escape_range_snapshot_stmt(s, fs->body);
+	case_end;
+	case_ast_node(rs, RangeStmt, stmt);
+		return escape_range_snapshot_stmt(s, rs->init) && escape_range_snapshot_expr(s, rs->expr) && escape_range_snapshot_stmt(s, rs->body);
+	case_end;
+	case_ast_node(rs, UnrollRangeStmt, stmt);
+		return escape_range_snapshot_stmt(s, rs->init) && escape_range_snapshot_exprs(s, rs->args) &&
+		       escape_range_snapshot_expr(s, rs->expr) && escape_range_snapshot_stmt(s, rs->body);
+	case_end;
+	case_ast_node(ss, SwitchStmt, stmt);
+		return escape_range_snapshot_stmt(s, ss->init) && escape_range_snapshot_expr(s, ss->tag) && escape_range_snapshot_stmt(s, ss->body);
+	case_end;
+	case_ast_node(ss, TypeSwitchStmt, stmt);
+		bool tag = ss->tag->kind == Ast_AssignStmt ? escape_range_snapshot_exprs(s, ss->tag->AssignStmt.rhs) : escape_range_snapshot_expr(s, ss->tag);
+		return tag && escape_range_snapshot_stmt(s, ss->body);
+	case_end;
+	case_ast_node(cc, CaseClause, stmt);
+		return escape_range_snapshot_exprs(s, cc->list) && escape_range_snapshot_stmts(s, cc->stmts);
+	case_end;
+	case_ast_node(rs, ReturnStmt, stmt);
+		return escape_range_snapshot_exprs(s, rs->results);
+	case_end;
+	}
+	return false;
+}
+
+gb_internal void escape_range_snapshot(AstRangeStmt *rs) {
+	Ast *expr = unparen_expr(rs->expr);
+	if (is_ast_range(expr) || expr->tav.mode == Addressing_Type || rs->body->kind != Ast_BlockStmt) {
+		return;
+	}
+	// NOTE(bill): the columns of `#soa[N]T` and `#soa[dynamic; N]T` are within the header, and need not be read from it
+	Type *t = base_type(type_deref(expr->tav.type));
+	bool is_soa = is_type_soa_struct(t) && !soa_has_inline_fields(t);
+	if (t == nullptr || (t->kind != Type_DynamicArray && t->kind != Type_FixedCapacityDynamicArray && !is_soa)) {
+		return;
+	}
+
+	Ast *val0 = rs->vals.count > 0 ? unparen_expr(rs->vals[0]) : nullptr;
+	if (val0 != nullptr && val0->kind == Ast_UnaryExpr && val0->UnaryExpr.op.kind == Token_And) {
+		val0 = val0->UnaryExpr.expr;
+	}
+
+	EscapeRangeSnapshot s = {};
+	s.body_scope = rs->body->BlockStmt.scope;
+	s.elem       = val0 != nullptr ? entity_of_node(val0) : nullptr;
+	s.soa_elem   = is_soa ? s.elem : nullptr;
+	s.columns    = array_make<i32>(heap_allocator());
+	s.outer      = array_make<Entity *>(heap_allocator());
+	defer (array_free(&s.columns));
+	defer (array_free(&s.outer));
+	if (!escape_range_snapshot_stmt(&s, rs->body)) {
+		return;
+	}
+
+	AstRangeSnapshot *snapshot = permanent_alloc_item<AstRangeSnapshot>();
+	snapshot->writes_elems = s.writes_elems;
+	snapshot->columns      = slice_clone_from_array(permanent_allocator(), s.columns);
+	snapshot->outer        = slice_clone_from_array(permanent_allocator(), s.outer);
+	rs->snapshot = snapshot;
+}
+
+// The range loops of a body, wherever they are in it
+gb_internal void escape_range_snapshots_in(Ast *stmt) {
+	if (stmt == nullptr) {
+		return;
+	}
+	switch (stmt->kind) {
+	case_ast_node(bs, BlockStmt, stmt);
+		for (Ast *s : bs->stmts) {
+			escape_range_snapshots_in(s);
+		}
+	case_end;
+	case_ast_node(is, IfStmt, stmt);
+		escape_range_snapshots_in(is->body);
+		escape_range_snapshots_in(is->else_stmt);
+	case_end;
+	case_ast_node(ws, WhenStmt, stmt);
+		if (ws->is_cond_determined) {
+			escape_range_snapshots_in(ws->determined_cond ? ws->body : ws->else_stmt);
+		}
+	case_end;
+	case_ast_node(fs, ForStmt, stmt);
+		escape_range_snapshots_in(fs->body);
+	case_end;
+	case_ast_node(rs, RangeStmt, stmt);
+		escape_range_snapshot(rs);
+		escape_range_snapshots_in(rs->body);
+	case_end;
+	case_ast_node(rs, UnrollRangeStmt, stmt);
+		escape_range_snapshots_in(rs->body);
+	case_end;
+	case_ast_node(ss, SwitchStmt, stmt);
+		escape_range_snapshots_in(ss->body);
+	case_end;
+	case_ast_node(ss, TypeSwitchStmt, stmt);
+		escape_range_snapshots_in(ss->body);
+	case_end;
+	case_ast_node(cc, CaseClause, stmt);
+		for (Ast *s : cc->stmts) {
+			escape_range_snapshots_in(s);
+		}
+	case_end;
+	case_ast_node(ds, DeferStmt, stmt);
+		escape_range_snapshots_in(ds->stmt);
+	case_end;
+	}
+}
+
+gb_internal void escape_range_snapshots(ProcInfo **procs, isize count) {
+	for (isize k = 0; k < count; k++) {
+		escape_range_snapshots_in(procs[k]->body);
+	}
+}
+
 gb_internal void escape_graph_number_procs(ProcInfo **procs, isize count) {
 	EscapeGraph *g = &escape_graph;
 	i32 first = cast(i32)(procs - g->procs.data);
@@ -5777,6 +6270,13 @@ gb_internal void check_escapes(Checker *c) {
 		return;
 	}
 	g->threaded = !build_context.no_threaded_checker && build_context.thread_count > 1;
+	if (build_context.optimization_level >= OptimizationLevel_Size) {
+		escape_for_procs(g, escape_range_snapshots);
+	}
+	if (!analysis_in_use(AnalysisFlag_Escape) && build_context.no_bounds_check) {
+		// NOTE(bill): only the range loops were wanted
+		return;
+	}
 	escape_for_procs(g, escape_graph_number_procs);
 
 	// the calls of each procedure are counted, and then placed after those of the procedures before it

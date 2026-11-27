@@ -412,6 +412,7 @@ enum FieldFlag : u32 {
 	FieldFlag_no_broadcast = 1<<9, // disallow array programming
 
 	FieldFlag_no_capture  = 1<<11,
+	FieldFlag_soa_split   = 1<<12,
 
 	// Internal use by the parser only
 	FieldFlag_Tags      = 1<<15,
@@ -426,7 +427,7 @@ enum FieldFlag : u32 {
 	                      FieldFlag_const|FieldFlag_any_int|FieldFlag_by_ptr|FieldFlag_no_broadcast|
 	                      FieldFlag_no_capture,
 
-	FieldFlag_Struct    = FieldFlag_using|FieldFlag_subtype|FieldFlag_Tags,
+	FieldFlag_Struct    = FieldFlag_using|FieldFlag_subtype|FieldFlag_soa_split|FieldFlag_Tags,
 };
 
 enum StmtAllowFlag {
@@ -453,6 +454,14 @@ gb_global char const *union_type_kind_strings[UnionType_COUNT] = {
 struct AstSplitArgs {
 	Slice<Ast *> positional;
 	Slice<Ast *> named;
+};
+
+// What the body of a range loop over an array with a header writes, when nothing else in it could change the header,
+// see `escape_range_snapshots`
+struct AstRangeSnapshot {
+	bool            writes_elems; // through the loop's value
+	Slice<i32>      columns;      // of an #soa array, those the body writes
+	Slice<Entity *> outer;        // the outer locals and globals
 };
 
 enum AsmMemoryOperandKind : u8 {
@@ -521,6 +530,7 @@ struct AsmMemClassify {
 		Token open, close; \
 		i64 max_count; \
 		Ast *tag; \
+		Type *soa_backing; /*the #soa[N]T an #soa[]T literal is a slice of*/ \
 	}) \
 	AST_KIND(AsmTemplate, "asm template", struct { \
 		Token        token;            \
@@ -599,6 +609,8 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		u8 swizzle_count; /*maximum of 4 components, if set, count >= 2*/ \
 		u8 swizzle_indices; /*2 bits per component*/ \
 		bool is_bit_field; \
+		bool is_soa_column; \
+		bool is_soa_split_view; \
 	}) \
 	AST_KIND(ImplicitSelectorExpr, "implicit selector expression",    struct { Token token; Ast *selector; }) \
 	AST_KIND(SelectorCallExpr, "selector call expression", struct { \
@@ -707,6 +719,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Ast *expr; \
 		Ast *body; \
 		bool reverse; \
+		AstRangeSnapshot *snapshot; \
 	}) \
 	AST_KIND(UnrollRangeStmt, "#unroll range statement", struct { \
 		Scope *scope; \

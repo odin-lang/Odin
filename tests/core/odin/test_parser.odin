@@ -158,6 +158,45 @@ Bar :: struct {x, y: int /* c4 */} // after`,
 	expect_comments(t, bar.fields.list[0].comment, {"/* c4 */"})
 }
 
+// `#soa_split` is a struct field prefix, and not one for parameters
+@test
+test_parse_soa_split_field :: proc(t: ^testing.T) {
+	context.allocator = context.temp_allocator
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	file := ast.File{
+		fullpath = "test.odin",
+		src = `
+package main
+
+Foo :: struct {
+	#soa_split pos: V,
+	#subtype base:  B,
+	plain:          int,
+}`,
+	}
+	p := parser.default_parser()
+	testing.expect(t, parser.parse_file(&p, &file), "bad parse")
+	testing.expect_value(t, file.syntax_error_count, 0)
+
+	foo := file.decls[0].derived.(^ast.Value_Decl).values[0].derived.(^ast.Struct_Type)
+	testing.expect_value(t, foo.fields.list[0].flags, ast.Field_Flags{.Soa_Split})
+	testing.expect_value(t, foo.fields.list[1].flags, ast.Field_Flags{.Subtype})
+	testing.expect_value(t, foo.fields.list[2].flags, ast.Field_Flags{})
+
+	param := ast.File{
+		fullpath = "param.odin",
+		src = `
+package main
+
+f :: proc(#soa_split v: V) {}`,
+	}
+	q := parser.default_parser()
+	q.err = proc(pos: tokenizer.Pos, format: string, args: ..any) {}
+	parser.parse_file(&q, &param)
+	testing.expect_value(t, param.syntax_error_count, 1)
+}
+
 @test
 test_parse_base_core_vendor :: proc(t: ^testing.T) {
 	for root in ([]string{ODIN_ROOT + "base", ODIN_ROOT + "core", ODIN_ROOT + "vendor"}) {

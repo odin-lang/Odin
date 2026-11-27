@@ -42,6 +42,25 @@ set ODIN_FULL=%CD%\..\..\..\odin.exe
 %ODIN% check "..\test_issue_6874" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_6979" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_7012" -no-entry-point %COMMON% || exit /b
+%ODIN% check "..\test_issue_soa_no_rtti" -target:freestanding_amd64_sysv -no-rtti -no-entry-point %COMMON% || exit /b
+%ODIN% check "..\test_issue_soa_field_unroll" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_soa_of_soa" %COMMON% 2>&1 | find /c "Error:" | findstr /x "8" || exit /b
+%ODIN% check "..\test_issue_soa_column_not_addressable" %COMMON% 2>&1 | find /c "value is not addressable" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_soa_column_escape" %COMMON% 2>&1 | find /c "It is unsafe to return" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_soa_slice_escape" %COMMON% 2>&1 | find /c "It is unsafe to return" | findstr /x "9" || exit /b
+%ODIN% check "..\test_issue_soa_dynamic_literal" %COMMON% 2>&1 | find /c "cannot be a compound literal" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_soa_dynamic_literal" %COMMON% 2>&1 | find /c "Suggestion: Write a fixed set of elements" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_soa_conversion_errors" %COMMON% 2>&1 | find /c "Error:" | findstr /x "5" || exit /b
+%ODIN% check "..\test_issue_soa_conversion_errors" %COMMON% 2>&1 | find /c "an #soa array and an array convert only" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_soa_conversion_errors" %COMMON% 2>&1 | find /c "'copy' copies the elements" | findstr /x "2" || exit /b
+%ODIN% test "..\..\core\runtime" %COMMON% -microarch:native -define:ODIN_TEST_NAMES=test_core_runtime.test_copy_soa_blocks || exit /b
+%ODIN% test "..\test_range_snapshot" %COMMON% -o:speed || exit /b
+%ODIN% check "..\test_issue_soa_split_errors" %COMMON% 2>&1 | find /c "'#soa_split' cannot be applied" | findstr /x "7" || exit /b
+%ODIN% check "..\test_issue_soa_split_errors" %COMMON% 2>&1 | find /c "Error:" | findstr /x "8" || exit /b
+%ODIN% check "..\test_issue_soa_split_address" %COMMON% 2>&1 | find /c "which is a '#soa_split' field of an #soa element" | findstr /x "8" || exit /b
+%ODIN% check "..\test_issue_soa_split_address" %COMMON% 2>&1 | find /c "Error:" | findstr /x "10" || exit /b
+%ODIN% check "..\test_issue_array_conversion_parens" %COMMON% 2>&1 | find /c "needs parentheses" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_array_conversion_parens" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_7199" %COMMON% 2>&1 | find /c "..19988 chars.." | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_7260" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_7304" %COMMON% 2>&1 | find /c "9223372036854775808 is not representable by int" | findstr /x "1" || exit /b

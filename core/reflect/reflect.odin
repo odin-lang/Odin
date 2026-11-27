@@ -286,6 +286,8 @@ is_nil :: proc(v: any) -> bool {
 //     len(map[K]V)
 //     len(string) or len(cstring)
 //     len(string16) or len(cstring16)
+//     len(#soa[N]T) -> N
+//     len(#soa[]T), len(#soa[dynamic]T), or len(#soa[dynamic; N]T)
 @(require_results)
 length :: proc(val: any) -> int {
 	if val == nil { return 0 }
@@ -295,7 +297,7 @@ length :: proc(val: any) -> int {
 		return length({val.data, a.base.id})
 
 	case ^Type_Info_Pointer:
-		return length({val.data, a.elem.id})
+		return length(deref(val))
 
 	case ^Type_Info_Array:
 		return a.count
@@ -333,6 +335,15 @@ length :: proc(val: any) -> int {
 
 	case ^Type_Info_Simd_Vector:
 		return a.count
+
+	case ^Type_Info_Struct:
+		switch a.soa_kind {
+		case .None:
+		case .Fixed:
+			return int(a.soa_len)
+		case .Slice, .Dynamic, .Fixed_Capacity_Dynamic:
+			return (^int)(uintptr(val.data) + a.offsets[soa_field_count(val.id)])^
+		}
 	}
 
 	return 0
@@ -344,6 +355,8 @@ length :: proc(val: any) -> int {
 //     cap(#simd[N]T) -> N
 //     cap([dynamic]T)
 //     cap(map[K]V)
+//     cap(#soa[N]T) or cap(#soa[dynamic; N]T) -> N
+//     cap(#soa[dynamic]T)
 @(require_results)
 capacity :: proc(val: any) -> int {
 	if val == nil { return 0 }
@@ -353,7 +366,7 @@ capacity :: proc(val: any) -> int {
 		return capacity({val.data, a.base.id})
 
 	case ^Type_Info_Pointer:
-		return capacity({val.data, a.elem.id})
+		return capacity(deref(val))
 
 	case ^Type_Info_Array:
 		return a.count
@@ -372,6 +385,15 @@ capacity :: proc(val: any) -> int {
 
 	case ^Type_Info_Simd_Vector:
 		return a.count
+
+	case ^Type_Info_Struct:
+		switch a.soa_kind {
+		case .None, .Slice:
+		case .Fixed, .Fixed_Capacity_Dynamic:
+			return int(a.soa_len)
+		case .Dynamic:
+			return (^int)(uintptr(val.data) + a.offsets[soa_field_count(val.id)+1])^
+		}
 	}
 
 	return 0
@@ -455,6 +477,55 @@ index :: proc(val: any, i: int, loc := #caller_location) -> any {
 	return nil
 }
 
+// Returns the number of fields of the #soa type `T` that hold the fields of its elements, or returns 0 if `T` is not an #soa type.
+// A '#soa_split' field of the elements is held by one field for each of its own fields (or lanes).
+@(require_results)
+soa_field_count :: proc(T: typeid) -> int {
+	info, ok := type_info_base(type_info_of(T)).variant.(^Type_Info_Struct)
+	if !ok {
+		return 0
+	}
+	switch info.soa_kind {
+	case .None:
+		return 0
+	case .Fixed:
+		return int(info.field_count)
+	case .Slice, .Fixed_Capacity_Dynamic:
+		return int(info.field_count) - 1 // len
+	case .Dynamic:
+		return int(info.field_count) - 3 // len, cap, allocator
+	}
+	return 0
+}
+
+// Returns the field `field` of the element `index` of the #soa value `val`, or returns `nil` if `val` is not an #soa value.
+// The fields are those `soa_field_count` counts.
+//     soa_field_value(s, i, f) -> the field `f` of `s[i]`
+@(require_results)
+soa_field_value :: proc(val: any, index, field: int, loc := #caller_location) -> any {
+	if val == nil {
+		return nil
+	}
+	info, ok := type_info_base(type_info_of(val.id)).variant.(^Type_Info_Struct)
+	if !ok || info.soa_kind == .None {
+		return nil
+	}
+	runtime.bounds_check_error_loc(loc, field, soa_field_count(val.id))
+	runtime.bounds_check_error_loc(loc, index, length(val))
+
+	ptr  := uintptr(val.data) + info.offsets[field]
+	elem := info.types[field]
+	switch info.soa_kind {
+	case .None:
+	case .Fixed, .Fixed_Capacity_Dynamic:
+		elem = elem.variant.(^Type_Info_Array).elem
+	case .Slice, .Dynamic:
+		elem = elem.variant.(^Type_Info_Multi_Pointer).elem
+		ptr  = (^uintptr)(ptr)^
+	}
+	return any{rawptr(ptr + uintptr(index*elem.size)), elem.id}
+}
+
 // Dereferences `any` if it represents a pointer-based value (`^T -> T`)
 @(require_results)
 deref :: proc(val: any) -> any {
@@ -480,11 +551,11 @@ Struct_Tag :: distinct string
 
 // `Struct_Field` represents a information of a field of a struct
 Struct_Field :: struct {
-	name:     string,
-	type:     ^Type_Info,
-	tag:      Struct_Tag,
-	offset:   uintptr, // in bytes
-	is_using: bool,
+	name:   string,
+	type:   ^Type_Info,
+	tag:    Struct_Tag,
+	offset: uintptr, // in bytes
+	flags:  runtime.Type_Info_Struct_Field_Flags,
 }
 
 // Returns a `Struct_Field` containing the information for a struct field of a typeid `T` at index `i`
@@ -493,11 +564,11 @@ struct_field_at :: proc(T: typeid, i: int) -> (field: Struct_Field) {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(^runtime.Type_Info_Struct); ok {
 		if 0 <= i && i < int(s.field_count) {
-			field.name     = s.names[i]
-			field.type     = s.types[i]
-			field.tag      = Struct_Tag(s.tags[i])
-			field.offset   = s.offsets[i]
-			field.is_using = s.usings[i]
+			field.name   = s.names[i]
+			field.type   = s.types[i]
+			field.tag    = Struct_Tag(s.tags[i])
+			field.offset = s.offsets[i]
+			field.flags  = s.field_flags[i]
 		}
 	}
 	return
@@ -510,11 +581,11 @@ struct_field_by_name :: proc(T: typeid, name: string) -> (field: Struct_Field) {
 	if s, ok := ti.variant.(^runtime.Type_Info_Struct); ok {
 		for fname, i in s.names[:s.field_count] {
 			if fname == name {
-				field.name     = s.names[i]
-				field.type     = s.types[i]
-				field.tag      = Struct_Tag(s.tags[i])
-				field.offset   = s.offsets[i]
-				field.is_using = s.usings[i]
+				field.name   = s.names[i]
+				field.type   = s.types[i]
+				field.tag    = Struct_Tag(s.tags[i])
+				field.offset = s.offsets[i]
+				field.flags  = s.field_flags[i]
 				break
 			}
 		}
@@ -541,7 +612,7 @@ struct_field_value_by_name :: proc(a: any, field: string, allow_using := false) 
 				}
 			}
 
-			if allow_using && s.usings[i] {
+			if allow_using && .Using in s.field_flags[i] {
 				f := any{
 					rawptr(uintptr(a.data) + s.offsets[i]),
 					s.types[i].id,
@@ -652,7 +723,7 @@ struct_field_count :: proc(T: typeid, method := Struct_Field_Count_Method.Top_Le
 		case .Using:
 			count = int(s.field_count)
 			for type, i in s.types[:s.field_count] {
-				if s.usings[i] {
+				if .Using in s.field_flags[i] {
 					count += struct_field_count(type.id)
 				}
 			}
@@ -678,11 +749,11 @@ struct_fields_zipped :: proc(T: typeid) -> (fields: #soa[]Struct_Field) {
 	ti := runtime.type_info_base(type_info_of(T))
 	if s, ok := ti.variant.(^runtime.Type_Info_Struct); ok {
 		return soa_zip(
-			name     = s.names[:s.field_count],
-			type     = s.types[:s.field_count],
-			tag      = ([^]Struct_Tag)(s.tags)[:s.field_count],
-			offset   = s.offsets[:s.field_count],
-			is_using = s.usings[:s.field_count],
+			name   = s.names[:s.field_count],
+			type   = s.types[:s.field_count],
+			tag    = ([^]Struct_Tag)(s.tags)[:s.field_count],
+			offset = s.offsets[:s.field_count],
+			flags  = s.field_flags[:s.field_count],
 		)
 	}
 	return nil

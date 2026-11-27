@@ -109,10 +109,17 @@ copy_from_string16 :: #force_inline proc "contextless" (dst: $T/[]$E/u16, src: $
 }
 
 // `copy` is a built-in procedure that copies elements from a source slice/string `src` to a destination slice `dst`.
-// The source and destination may overlap. Copy returns the number of elements copied, which will be the minimum
-// of len(src) and len(dst).
+// Either may be an #soa slice. The source and destination may overlap, unless one is an #soa slice and the other is not.
+// Copy returns the number of elements copied, which will be the minimum of len(src) and len(dst).
 @builtin
-copy :: proc{copy_slice, copy_from_string, copy_from_string16}
+copy :: proc{
+	copy_slice,
+	copy_from_string,
+	copy_from_string16,
+	copy_soa,
+	copy_soa_from_slice,
+	copy_slice_from_soa,
+}
 
 
 
@@ -212,6 +219,7 @@ unordered_remove :: proc{
 	unordered_remove_fixed_capacity_dynamic_array,
 
 	unordered_remove_soa,
+	unordered_remove_soa_fixed_capacity,
 }
 
 
@@ -221,6 +229,7 @@ ordered_remove :: proc{
 	ordered_remove_fixed_capacity_dynamic_array,
 
 	ordered_remove_soa,
+	ordered_remove_soa_fixed_capacity,
 }
 
 @builtin
@@ -272,6 +281,7 @@ pop :: proc{
 	pop_fixed_capacity_dynamic_array,
 
 	pop_soa,
+	pop_soa_fixed_capacity,
 }
 
 // `pop_safe_dynamic_array` trys to remove and return the end value of dynamic array `array` and reduces the length of `array` by 1.
@@ -306,6 +316,7 @@ pop_safe :: proc{
 	pop_safe_fixed_capacity_dynamic_array,
 
 	pop_safe_soa,
+	pop_safe_soa_fixed_capacity,
 }
 
 
@@ -347,6 +358,7 @@ pop_front :: proc{
 	pop_front_fixed_capacity_dynamic_array,
 
 	pop_front_soa,
+	pop_front_soa_fixed_capacity,
 }
 
 
@@ -388,6 +400,7 @@ pop_front_safe :: proc {
 	pop_front_safe_fixed_capacity_dynamic_array,
 
 	pop_front_safe_soa,
+	pop_front_safe_soa_fixed_capacity,
 }
 
 
@@ -400,6 +413,7 @@ clear :: proc{
 	clear_fixed_capacity_dynamic_array,
 
 	clear_soa_dynamic_array,
+	clear_soa_fixed_capacity,
 }
 
 // `reserve` will try to reserve memory of a passed dynamic array or map to the requested element count (setting the `cap`).
@@ -425,6 +439,7 @@ resize :: proc{
 	resize_fixed_capacity_dynamic_array,
 
 	resize_soa,
+	resize_soa_fixed_capacity,
 }
 
 @builtin
@@ -433,12 +448,14 @@ non_zero_resize :: proc{
 	non_zero_resize_fixed_capacity_dynamic_array,
 
 	non_zero_resize_soa,
+	non_zero_resize_soa_fixed_capacity,
 }
 
 // Shrinks the capacity of a dynamic array or map down to the current length, or the given capacity.
 @builtin
 shrink :: proc{
 	shrink_dynamic_array,
+	shrink_soa,
 	shrink_map where MAP_ENABLED,
 }
 
@@ -954,11 +971,20 @@ _append_elems :: #force_no_inline proc(#no_alias array: ^Raw_Dynamic_Array, size
 		return 0, nil
 	}
 
+	args := args
 	if array.cap < array.len+arg_len {
 		cap := 2 * array.cap + max(DEFAULT_DYNAMIC_ARRAY_CAPACITY, arg_len)
 
+		// `args` may be a part of the array, which growing moves
+		data     := uintptr(array.data)
+		offset   := uintptr(args) - data
+		in_array := data <= uintptr(args) && uintptr(args) < data + uintptr(array.len*size_of_elem)
+
 		// do not 'or_return' here as it could be a partial success
 		err = _reserve_dynamic_array(array, size_of_elem, align_of_elem, cap, should_zero, loc)
+		if in_array {
+			args = rawptr(uintptr(array.data) + offset)
+		}
 	}
 	arg_len := arg_len
 	arg_len = min(array.cap-array.len, arg_len)
@@ -1110,6 +1136,10 @@ append :: proc{
 
 	append_soa_elem,
 	append_soa_elems,
+	append_soa_slice,
+	append_soa_fixed_capacity_elem,
+	append_soa_fixed_capacity_elems,
+	append_soa_fixed_capacity_slice,
 }
 
 @builtin
@@ -1124,8 +1154,21 @@ non_zero_append :: proc{
 
 	non_zero_append_soa_elem,
 	non_zero_append_soa_elems,
+	append_soa_slice,
+	append_soa_fixed_capacity_elem,
+	append_soa_fixed_capacity_elems,
+	append_soa_fixed_capacity_slice,
 }
 
+
+// Reserves room for `length` elements, growing the capacity as `append` does, so growing a few elements at a time stays cheap
+@(private)
+_grow_dynamic_array :: proc(#no_alias array: ^$T/[dynamic]$E, length: int, loc := #caller_location) -> Allocator_Error {
+	if length <= cap(array) {
+		return nil
+	}
+	return reserve(array, max(length, 2*cap(array), DEFAULT_DYNAMIC_ARRAY_CAPACITY), loc)
+}
 
 // `append_nothing` appends an empty value to a dynamic array. It returns `1, nil` if successful, and `0, err` when it was not possible,
 // whatever `err` happens to be.
@@ -1135,6 +1178,7 @@ append_nothing_dynamic_array :: proc(#no_alias array: ^$T/[dynamic]$E, loc := #c
 		return 0, nil
 	}
 	prev_len := len(array)
+	_grow_dynamic_array(array, len(array)+1, loc) or_return
 	resize(array, len(array)+1, loc) or_return
 	return len(array)-prev_len, nil
 }
@@ -1158,6 +1202,8 @@ append_nothing_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[d
 append_nothing :: proc{
 	append_nothing_dynamic_array,
 	append_nothing_fixed_capacity_dynamic_array,
+	append_nothing_soa,
+	append_nothing_soa_fixed_capacity,
 }
 
 
@@ -1174,6 +1220,7 @@ inject_at_elem :: proc(#no_alias array: ^$T/[dynamic]$E, #any_int index: int, #n
 	m :: 1
 	new_size := _checked_size_add(n, m) or_return
 
+	_grow_dynamic_array(array, new_size, loc) or_return
 	resize(array, new_size, loc) or_return
 	when size_of(E) != 0 {
 		copy(array[index + m:], array[index:])
@@ -1200,14 +1247,51 @@ inject_at_elems :: proc(#no_alias array: ^$T/[dynamic]$E, #any_int index: int, #
 	n := max(len(array), index)
 	m := len(args)
 	new_size := _checked_size_add(n, m) or_return
+	from := _slice_index_in(array[:], args)
 
+	_grow_dynamic_array(array, new_size, loc) or_return
 	resize(array, new_size, loc) or_return
 	when size_of(E) != 0 {
 		copy(array[index + m:], array[index:])
-		copy(array[index:], args)
+		_copy_injected(array[:], args, index, from)
 	}
 	ok = true
 	return
+}
+
+// The index in `s` of the first element of `part` when `part` is a part of `s`, otherwise -1
+@(private, require_results)
+_slice_index_in :: proc "contextless" (s, part: $S/[]$E) -> int {
+	when size_of(E) == 0 {
+		return -1
+	} else {
+		start := uintptr(raw_data(s))
+		at    := uintptr(raw_data(part))
+		if !(start <= at && at < start + uintptr(len(s)*size_of(E))) {
+			return -1
+		}
+		return int(at - start) / size_of(E)
+	}
+}
+
+// Copies `elems` into `s` at `index`, once the elements from `index` have moved along by `len(elems)`.
+// `from` is where `elems` was in `s` before that move, or -1 when it is not a part of `s`.
+@(private)
+_copy_injected :: proc "contextless" (s, elems: $S, index, from: int) {
+	m := len(elems)
+	switch {
+	case from < 0:
+		copy(s[index:], elems)
+	case from+m <= index:
+		copy(s[index:], s[from:][:m])
+	case from >= index:
+		copy(s[index:], s[from+m:][:m])
+	case:
+		// `elems` straddles `index`, so only its end moved
+		k := index - from
+		copy(s[index:],   s[from:][:k])
+		copy(s[index+k:], s[index+m:][:m-k])
+	}
 }
 
 // `inject_at_elem_string` injects a string into a dynamic array at a specified index and moves the previous elements after that index "across"
@@ -1228,6 +1312,7 @@ inject_at_elem_string :: proc(#no_alias array: ^$T/[dynamic]$E/u8, #any_int inde
 	m := len(arg)
 	new_size := _checked_size_add(n, m) or_return
 
+	_grow_dynamic_array(array, new_size, loc) or_return
 	resize(array, new_size, loc) or_return
 	copy(array[index+m:], array[index:])
 	copy(array[index:], arg)
@@ -1247,10 +1332,10 @@ inject_at_elem_fixed_capacity_dynamic_array :: proc(array: ^$T/[dynamic; $N]$E, 
 	}
 	n := max(len(array), index)
 	m :: 1
-	if index > N - m {
+	new_size := n + m
+	if new_size > N {
 		return false
 	}
-	new_size := n + m
 
 	resize(array, new_size) or_return
 	when size_of(E) != 0 {
@@ -1275,15 +1360,16 @@ inject_at_elems_fixed_capacity_dynamic_array :: proc(array: ^$T/[dynamic; $N]$E,
 
 	n := max(len(array), index)
 	m := len(args)
-	if index > N {
+	new_size := n + m
+	if new_size > N {
 		return false
 	}
-	new_size := n + m
+	from := _slice_index_in(array[:], args)
 
 	resize(array, new_size) or_return
 	when size_of(E) != 0 {
 		copy(array[index + m:], array[index:])
-		copy(array[index:], args)
+		_copy_injected(array[:], args, index, from)
 	}
 	return true
 }
@@ -1303,10 +1389,10 @@ inject_at_elem_string_fixed_capacity_dynamic_array :: proc(array: ^$T/[dynamic; 
 
 	n := max(len(array), index)
 	m := len(arg)
-	if index > N {
+	new_size := n + m
+	if new_size > N {
 		return false
 	}
-	new_size := n + m
 
 	resize(array, new_size) or_return
 	copy(array[index+m:], array[index:])
@@ -1328,6 +1414,10 @@ inject_at :: proc{
 
 	inject_at_elem_soa,
 	inject_at_elems_soa,
+	inject_at_slice_soa,
+	inject_at_elem_soa_fixed_capacity,
+	inject_at_elems_soa_fixed_capacity,
+	inject_at_slice_soa_fixed_capacity,
 }
 
 
@@ -1344,6 +1434,7 @@ assign_at_elem :: proc(#no_alias array: ^$T/[dynamic]$E, #any_int index: int, ar
 		ok = true
 	} else {
 		new_size := _checked_size_add(index, 1) or_return
+		_grow_dynamic_array(array, new_size, loc) or_return
 		resize(array, new_size, loc) or_return
 		array[index] = arg
 		ok = true
@@ -1366,6 +1457,7 @@ assign_at_elems :: proc(#no_alias array: ^$T/[dynamic]$E, #any_int index: int, #
 		copy(array[index:], args)
 		ok = true
 	} else {
+		_grow_dynamic_array(array, new_size, loc) or_return
 		resize(array, new_size, loc) or_return
 		copy(array[index:], args)
 		ok = true
@@ -1387,6 +1479,7 @@ assign_at_elem_string :: proc(#no_alias array: ^$T/[dynamic]$E/u8, #any_int inde
 		copy(array[index:], arg)
 		ok = true
 	} else {
+		_grow_dynamic_array(array, new_size, loc) or_return
 		resize(array, new_size, loc) or_return
 		copy(array[index:], arg)
 		ok = true

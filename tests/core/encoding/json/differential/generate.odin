@@ -359,7 +359,7 @@ random_entries :: proc(g: ^Gen, value_type: ^reflect.Type_Info, key_type: ^refle
 // Collects the keys a struct accepts, descending into `using _` fields like the unmarshaller.
 struct_entries :: proc(g: ^Gen, entries: ^[dynamic]Entry, ti: ^reflect.Type_Info) {
 	for field in reflect.struct_fields_zipped(ti.id) {
-		if field.is_using && field.name == "_" {
+		if .Using in field.flags && field.name == "_" {
 			struct_entries(g, entries, field.type)
 			continue
 		}
@@ -401,7 +401,7 @@ resolve_key :: proc(ti: ^reflect.Type_Info, key: string) -> ^reflect.Type_Info {
 	}
 	resolve_using :: proc(ti: ^reflect.Type_Info, key: string) -> ^reflect.Type_Info {
 		for f in reflect.struct_fields_zipped(ti.id) {
-			if f.is_using && f.name == "_" {
+			if .Using in f.flags && f.name == "_" {
 				if t := resolve_using(f.type, key); t != nil {
 					return t
 				}

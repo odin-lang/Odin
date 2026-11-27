@@ -442,9 +442,7 @@ gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_
 	lbValue count = {};
 	Type *expr_type = nullptr;
 	if (is_soa_elem) {
-		Type *soa = base_type(type_deref(soa_elem->addr.type));
-		GB_ASSERT(soa->kind == Type_Struct && soa->Struct.soa_kind != StructSoa_None);
-		expr_type = base_type(soa->Struct.soa_elem);
+		expr_type = base_type(lb_soa_variable_elem_type(*soa_elem));
 	} else {
 		expr_type = base_type(type_deref(expr.type));
 	}
@@ -539,7 +537,7 @@ gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_
 	case Type_Array: {
 		if (val_type != nullptr) {
 			if (is_soa_elem) {
-				lbValue ptr = lb_soa_array_component_elem_ptr(p, soa_elem->addr, idx, soa_elem->soa.index, expr_type->Array.count);
+				lbValue ptr = lb_soa_array_component_elem_ptr(p, *soa_elem, idx, expr_type->Array.count);
 				lbAddr component = lb_addr_soa_field_elem(ptr);
 				val = lb_emit_load(p, component.addr);
 			} else {
@@ -1209,6 +1207,21 @@ gb_internal void lb_build_range_enum(lbProcedure *p, Type *enum_type, Type *val_
 	if (done_) *done_ = done;
 }
 
+// The body of a range statement whose values are stored, and its jump back to `loop`, ending in its `done` block
+gb_internal void lb_build_range_stmt_body(lbProcedure *p, AstRangeStmt *rs, lbBlock *loop, lbBlock *done) {
+	lb_push_target_list(p, rs->label, done, loop, nullptr);
+
+	lb_build_stmt(p, rs->body);
+
+	lb_close_scope(p, lbDeferExit_Default, nullptr, rs->body);
+	lb_pop_target_list(p);
+	if (p->debug_info != nullptr) {
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, rs->body));
+	}
+	lb_emit_jump(p, loop);
+	lb_start_block(p, done);
+}
+
 gb_internal void lb_build_range_tuple(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
 	Ast *expr = unparen_expr(rs->expr);
 
@@ -1255,65 +1268,113 @@ gb_internal void lb_build_range_tuple(lbProcedure *p, AstRangeStmt *rs, Scope *s
 		}
 	}
 
-	lb_push_target_list(p, rs->label, done, loop, nullptr);
-
-	lb_build_stmt(p, rs->body);
-
-	lb_close_scope(p, lbDeferExit_Default, nullptr, rs->body);
-	lb_pop_target_list(p);
-	if (p->debug_info != nullptr) {
-		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, rs->body));
-	}
-	lb_emit_jump(p, loop);
-	lb_start_block(p, done);
+	lb_build_range_stmt_body(p, rs, loop, done);
 }
 
-gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
-	Ast *expr = unparen_expr(rs->expr);
-	TypeAndValue tav = type_and_value_of_expr(expr);
+// The check that all the memory a range loop's body writes is apart from the bytes of the array's header it reads,
+// and the blocks of the loop over a snapshot of the header and of the usual loop it chooses between, see `escape_range_snapshots`
+struct lbRangeSnapshot {
+	lbValue  lo;
+	lbValue  hi;
+	lbValue  apart;  // nullptr while nothing is checked
+	lbBlock *reload; // the usual loop's, when something is checked
+	lbBlock *after;
+};
 
+// Checks the `size` bytes at `ptr` are apart from the header
+gb_internal void lb_range_snapshot_check(lbProcedure *p, lbRangeSnapshot *s, lbValue ptr, lbValue size) {
+	lbValue lo = lb_emit_conv(p, ptr, t_uintptr);
+	lbValue hi = lb_emit_arith(p, Token_Add, lo, size, t_uintptr);
+	LLVMValueRef apart = LLVMBuildOr(p->builder, lb_emit_comp(p, Token_LtEq, hi, s->lo).value, lb_emit_comp(p, Token_LtEq, s->hi, lo).value, "");
+	if (s->apart.value != nullptr) {
+		apart = LLVMBuildAnd(p->builder, s->apart.value, apart, "");
+	}
+	s->apart = {apart, t_llvm_bool};
+}
+
+// Checks the outer locals and globals the body writes too, then starts the loop over the snapshot when all is apart from the header,
+// branching to the usual loop otherwise
+gb_internal void lb_range_snapshot_begin(lbProcedure *p, lbRangeSnapshot *s, AstRangeSnapshot *snapshot) {
+	for (Entity *e : snapshot->outer) {
+		lbValue ptr = lb_addr_get_ptr(p, lb_build_addr_from_entity(p, e, nullptr));
+		lb_range_snapshot_check(p, s, ptr, lb_const_int(p->module, t_uintptr, type_size_of(e->type)));
+	}
+	if (s->apart.value == nullptr) {
+		return;
+	}
+	lbBlock *fast = lb_create_block(p, "for.snapshot");
+	s->reload = lb_create_block(p, "for.reload");
+	s->after  = lb_create_block(p, "for.after");
+	lb_emit_if(p, s->apart, fast, s->reload);
+	lb_start_block(p, fast);
+}
+
+// Ends the loop over the snapshot, and starts the usual loop with the body built again in the range statement's scope,
+// unless nothing was checked
+gb_internal bool lb_range_snapshot_reload(lbProcedure *p, lbRangeSnapshot *s, Scope *scope) {
+	if (s->reload == nullptr) {
+		return false;
+	}
+	lb_emit_jump(p, s->after);
+	lb_open_scope(p, scope);
+	lb_start_block(p, s->reload);
+	return true;
+}
+
+// A range loop over `array`, a `[dynamic]T` or `[dynamic; N]T`, over a slice of its elements made before the loop,
+// see `escape_range_snapshots`. It falls back to the usual loop when what the body writes may hold the header.
+gb_internal void lb_build_range_stmt_snapshot(lbProcedure *p, AstRangeStmt *rs, Scope *scope, lbValue array,
+                                              Ast *val0, Ast *val1, Type *val0_type, Type *val1_type) {
+	lbModule *m = p->module;
+	Type *et = base_type(type_deref(array.type));
+	bool inline_elems = et->kind == Type_FixedCapacityDynamicArray;
+	Type *elem_type   = inline_elems ? et->FixedCapacityDynamicArray.elem : et->DynamicArray.elem;
+
+	lbValue len_ptr = lb_emit_struct_ep(p, array, 1);
+	lbValue data    = lb_emit_struct_ep(p, array, 0);
+	data = inline_elems ? lb_emit_array_epi(p, data, 0) : lb_emit_load(p, data);
+	lbValue len = lb_emit_load(p, len_ptr);
+	lbAddr slice = lb_add_local_generated(p, alloc_type_slice(elem_type), false);
+	lb_fill_slice(p, slice, data, len);
+
+	// NOTE(bill): the loop reads the data and the length, or only the length of inline elements, which they never hold
+	lbRangeSnapshot s = {};
+	s.lo = lb_emit_conv(p, inline_elems ? len_ptr : array, t_uintptr);
+	s.hi = lb_emit_arith(p, Token_Add, lb_emit_conv(p, len_ptr, t_uintptr), lb_const_int(m, t_uintptr, type_size_of(t_int)), t_uintptr);
+	if (rs->snapshot->writes_elems && !inline_elems) {
+		lbValue size = lb_emit_arith(p, Token_Mul, lb_emit_conv(p, len, t_uintptr), lb_const_int(m, t_uintptr, type_size_of(elem_type)), t_uintptr);
+		lb_range_snapshot_check(p, &s, data, size);
+	}
+	lb_range_snapshot_begin(p, &s, rs->snapshot);
+
+	lbValue val = {};
+	lbValue key = {};
+	lbBlock *loop = nullptr;
+	lbBlock *done = nullptr;
+	lb_build_range_indexed(p, lb_addr_load(p, slice), val0_type, lb_emit_struct_ep(p, slice.addr, 1), &val, &key, &loop, &done, rs->reverse);
+	if (val0_type) lb_store_range_stmt_val(p, val0, val);
+	if (val1_type) lb_store_range_stmt_val(p, val1, key);
+	lb_build_range_stmt_body(p, rs, loop, done);
+	if (lb_range_snapshot_reload(p, &s, scope)) {
+		lb_build_range_indexed(p, array, val0_type, len_ptr, &val, &key, &loop, &done, rs->reverse);
+		if (val0_type) lb_store_range_stmt_val(p, val0, val);
+		if (val1_type) lb_store_range_stmt_val(p, val1, key);
+		lb_build_range_stmt_body(p, rs, loop, done);
+		lb_emit_jump(p, s.after);
+		lb_start_block(p, s.after);
+	}
+}
+
+// The loop of a range statement over the `count` elements of an #soa array, reached through the columns of the header at `container`
+gb_internal void lb_build_range_soa_loop(lbProcedure *p, AstRangeStmt *rs, lbValue container, lbValue count,
+                                         Ast *val0, Ast *val1, Type *val0_type, Type *val1_type) {
 	lbBlock *loop = nullptr;
 	lbBlock *body = nullptr;
 	lbBlock *done = nullptr;
 
-	bool is_reverse = rs->reverse;
-
-	lb_open_scope(p, scope);
-
-	if (rs->init != nullptr) {
-		lb_build_stmt(p, rs->init);
-	}
-
-	Ast *val0 = rs->vals.count > 0 ? lb_strip_and_prefix(rs->vals[0]) : nullptr;
-	Ast *val1 = rs->vals.count > 1 ? lb_strip_and_prefix(rs->vals[1]) : nullptr;
-	Type *val_types[2] = {};
-	if (val0 != nullptr && !is_blank_ident(val0)) {
-		val_types[0] = type_of_expr(val0);
-	}
-	if (val1 != nullptr && !is_blank_ident(val1)) {
-		val_types[1] = type_of_expr(val1);
-	}
-
-
-
-	lbAddr array = lb_build_addr(p, expr);
-	if (is_type_pointer(lb_addr_type(array))) {
-		array = lb_addr(lb_addr_load(p, array));
-	}
-	lbValue count = lb_soa_struct_len(p, lb_addr_load(p, array));
-
-
 	lbAddr index = lb_add_local_generated(p, t_int, false);
 
-	if (rs->label != nullptr && p->debug_info != nullptr) {
-		lbBlock *label = lb_create_block(p, "for.soa.label");
-		lb_emit_jump(p, label);
-		lb_start_block(p, label);
-
-		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, rs->label));
-		lb_add_debug_label(p, rs->label, label);
-	}
-	if (!is_reverse) {
+	if (!rs->reverse) {
 		/*
 			for x, i in array {
 				...
@@ -1379,35 +1440,88 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 	lb_start_block(p, body);
 
 
-	if (val_types[0]) {
+	if (val0_type) {
 		Entity *e = entity_of_node(val0);
 		if (e != nullptr) {
-			lbAddr soa_val = lb_addr_soa_variable(array.addr, lb_addr_load(p, index), nullptr);
+			lbAddr soa_val = lb_addr_soa_variable(container, lb_addr_load(p, index), nullptr);
 			map_set(&p->module->soa_values, e, soa_val);
 			if (p->debug_info != nullptr && rs->vals[0]->kind == Ast_Ident) {
 				// NOTE(bill): the element has no memory of its own meaning a debugger is given a copy made each iteration
-				lbAddr copy = lb_add_local_generated(p, val_types[0], false);
+				lbAddr copy = lb_add_local_generated(p, val0_type, false);
 				lb_addr_store(p, copy, lb_addr_load(p, soa_val));
-				lb_add_debug_local_variable(p, copy.addr.value, val_types[0], e->token);
+				lb_add_debug_local_variable(p, copy.addr.value, val0_type, e->token);
 			}
 		}
 	}
-	if (val_types[1]) {
+	if (val1_type) {
 		lb_store_range_stmt_val(p, val1, lb_addr_load(p, index));
 	}
 
-	lb_push_target_list(p, rs->label, done, loop, nullptr);
+	lb_build_range_stmt_body(p, rs, loop, done);
+}
 
-	lb_build_stmt(p, rs->body);
+gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
+	Ast *expr = unparen_expr(rs->expr);
 
-	lb_close_scope(p, lbDeferExit_Default, nullptr, rs->body);
-	lb_pop_target_list(p);
-	if (p->debug_info != nullptr) {
-		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, rs->body));
+	lb_open_scope(p, scope);
+
+	if (rs->init != nullptr) {
+		lb_build_stmt(p, rs->init);
 	}
-	lb_emit_jump(p, loop);
-	lb_start_block(p, done);
 
+	Ast *val0 = rs->vals.count > 0 ? lb_strip_and_prefix(rs->vals[0]) : nullptr;
+	Ast *val1 = rs->vals.count > 1 ? lb_strip_and_prefix(rs->vals[1]) : nullptr;
+	Type *val0_type = nullptr;
+	Type *val1_type = nullptr;
+	if (val0 != nullptr && !is_blank_ident(val0)) {
+		val0_type = type_of_expr(val0);
+	}
+	if (val1 != nullptr && !is_blank_ident(val1)) {
+		val1_type = type_of_expr(val1);
+	}
+
+	lbAddr array = lb_build_addr(p, expr);
+	if (is_type_pointer(lb_addr_type(array))) {
+		array = lb_addr(lb_addr_load(p, array));
+	}
+	lbValue count = lb_soa_struct_len(p, lb_addr_get_ptr(p, array));
+
+	if (rs->label != nullptr && p->debug_info != nullptr) {
+		lbBlock *label = lb_create_block(p, "for.soa.label");
+		lb_emit_jump(p, label);
+		lb_start_block(p, label);
+
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, rs->label));
+		lb_add_debug_label(p, rs->label, label);
+	}
+	if (rs->snapshot == nullptr) {
+		lb_build_range_soa_loop(p, rs, array.addr, count, val0, val1, val0_type, val1_type);
+		return;
+	}
+
+	// NOTE(bill): the loop reads the columns of the header for each field of an element, and the length once before it
+	lbModule *m = p->module;
+	i32 columns = cast(i32)soa_field_count(lb_addr_type(array));
+	lbAddr copy = lb_add_local_generated(p, lb_addr_type(array), false);
+	lb_addr_store(p, copy, lb_addr_load(p, array));
+
+	lbRangeSnapshot s = {};
+	s.lo = lb_emit_conv(p, array.addr, t_uintptr);
+	s.hi = lb_emit_conv(p, lb_emit_struct_ep(p, array.addr, columns), t_uintptr);
+	lbValue len = lb_emit_conv(p, count, t_uintptr);
+	for (i32 i : rs->snapshot->columns) {
+		lbValue column = lb_emit_load(p, lb_emit_struct_ep(p, copy.addr, i));
+		lbValue size   = lb_emit_arith(p, Token_Mul, len, lb_const_int(m, t_uintptr, type_size_of(type_deref(column.type, true))), t_uintptr);
+		lb_range_snapshot_check(p, &s, column, size);
+	}
+	lb_range_snapshot_begin(p, &s, rs->snapshot);
+
+	lb_build_range_soa_loop(p, rs, copy.addr, count, val0, val1, val0_type, val1_type);
+	if (lb_range_snapshot_reload(p, &s, scope)) {
+		lb_build_range_soa_loop(p, rs, array.addr, count, val0, val1, val0_type, val1_type);
+		lb_emit_jump(p, s.after);
+		lb_start_block(p, s.after);
+	}
 }
 
 gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
@@ -1538,23 +1652,17 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			lb_build_range_indexed(p, array, val0_type, count_ptr.addr, &val, &key, &loop, &done, rs->reverse);
 			break;
 		}
-		case Type_FixedCapacityDynamicArray: {
-			lbValue array = lb_range_addr_get_ptr(p, lb_build_addr(p, expr));
-			if (is_type_pointer(type_deref(array.type))) {
-				array = lb_emit_load(p, array);
-			}
-			lbValue count_ptr = lb_emit_struct_ep(p, array, 1);
-			lb_build_range_indexed(p, array, val0_type, count_ptr, &val, &key, &loop, &done, rs->reverse);
-			break;
-		}
+		case Type_FixedCapacityDynamicArray:
 		case Type_DynamicArray: {
-			lbValue count_ptr = {};
 			lbValue array = lb_range_addr_get_ptr(p, lb_build_addr(p, expr));
 			if (is_type_pointer(type_deref(array.type))) {
 				array = lb_emit_load(p, array);
 			}
-			count_ptr = lb_emit_struct_ep(p, array, 1);
-			lb_build_range_indexed(p, array, val0_type, count_ptr, &val, &key, &loop, &done, rs->reverse);
+			if (rs->snapshot != nullptr) {
+				lb_build_range_stmt_snapshot(p, rs, scope, array, val0, val1, val0_type, val1_type);
+				return;
+			}
+			lb_build_range_indexed(p, array, val0_type, lb_emit_struct_ep(p, array, 1), &val, &key, &loop, &done, rs->reverse);
 			break;
 		}
 		case Type_Slice: {
@@ -1647,25 +1755,9 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 	}
 
 
-	if (is_map) {
-		if (val0_type) lb_store_range_stmt_val(p, val0, key);
-		if (val1_type) lb_store_range_stmt_val(p, val1, val);
-	} else {
-		if (val0_type) lb_store_range_stmt_val(p, val0, val);
-		if (val1_type) lb_store_range_stmt_val(p, val1, key);
-	}
-
-	lb_push_target_list(p, rs->label, done, loop, nullptr);
-
-	lb_build_stmt(p, rs->body);
-
-	lb_close_scope(p, lbDeferExit_Default, nullptr, rs->body);
-	lb_pop_target_list(p);
-	if (p->debug_info != nullptr) {
-		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, rs->body));
-	}
-	lb_emit_jump(p, loop);
-	lb_start_block(p, done);
+	if (val0_type) lb_store_range_stmt_val(p, val0, is_map ? key : val);
+	if (val1_type) lb_store_range_stmt_val(p, val1, is_map ? val : key);
+	lb_build_range_stmt_body(p, rs, loop, done);
 }
 
 gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *scope) {

@@ -9,6 +9,42 @@ import "core:mem"
 import "core:strings"
 import "core:testing"
 
+// Each element of an #soa array is formatted as it is on its own
+@(test)
+test_fmt_soa :: proc(t: ^testing.T) {
+	P      :: struct {x: f32, s: string}
+	Tagged :: struct {name: [4]u8 `fmt:"s,len"`, len: int}
+	Empty  :: struct {}
+
+	fixed := #soa[2]P{{1, "a"}, {2, "b"}}
+	check(t, `[P{x = 1, s = "a"}, P{x = 2, s = "b"}]`, "%v", fixed)
+	check(t, `{P{x = 1, s = "a"}, P{x = 2, s = "b"}}`, "%w", fixed)
+	check(t, "[\n\tP{\n\t\tx = 1,\n\t\ts = \"a\",\n\t},\n\tP{\n\t\tx = 2,\n\t\ts = \"b\",\n\t},\n]", "%#v", fixed)
+	check(t, `[P{x = 2, s = "b"}]`, "%v", fixed[1:])
+
+	dynamic_array := make(#soa[dynamic]P, 0, 4)
+	defer delete(dynamic_array)
+	append(&dynamic_array, P{3, "c"})
+	check(t, `[P{x = 3, s = "c"}]`, "%v", dynamic_array)
+
+	fixed_capacity := #soa[dynamic; 4]P{{4, "d"}}
+	check(t, `[P{x = 4, s = "d"}]`, "%v", fixed_capacity)
+
+	lanes := #soa[2][3]f32{{1, 2, 3}, {4, 5, 6}}
+	check(t, "[[1, 2, 3], [4, 5, 6]]", "%v", lanes)
+
+	tagged := #soa[1]Tagged{{name = {'a', 'b', 0, 0}, len = 2}}
+	check(t, "[Tagged{name = ab, len = 2}]", "%v", tagged)
+
+	empty: #soa[2]Empty
+	check(t, "[Empty{}, Empty{}]", "%v", empty)
+
+	nothing: #soa[]P
+	check(t, "[]", "%v", nothing)
+	check(t, "#soa[dynamic; 4]P", "%T", fixed_capacity)
+	check(t, "%!x(#soa[]P=[])", "%x", nothing)
+}
+
 @(test)
 test_fmt_memory :: proc(t: ^testing.T) {
 	check(t, "5b",        "%m",    5)

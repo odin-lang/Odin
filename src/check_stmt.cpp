@@ -2085,7 +2085,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 
 			case Type_Struct:
 				if (t->Struct.soa_kind != StructSoa_None) {
-					if (t->Struct.soa_kind == StructSoa_Fixed) {
+					if (soa_has_inline_fields(t)) {
 						is_possibly_addressable = operand.mode == Addressing_Variable || is_ptr;
 					} else {
 						is_possibly_addressable = true;
