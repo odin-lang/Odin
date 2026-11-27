@@ -2,9 +2,10 @@
 
 # Examples
 
-Two minimal command-line tools list an archive, test it, unpack one member, create an archive from files and directory trees and update one:
-- [`core:archive/example`](example/): `mini`, through `core:archive`, for zip
+Three minimal command-line tools list an archive, test it, unpack one member, create an archive from files and directory trees and update one:
+- [`core:archive/example`](example/): `mini`, through `core:archive`, for zip and 7z alike
 - [`core:archive/zip/example`](zip/example/): `ozip`, with each member's compression ratio
+- [`core:archive/sevenz/example`](sevenz/example/): `o7`, with the solid block each member is in
 
 Build one with `odin build core/archive/example -out:mini`.
 
@@ -12,10 +13,11 @@ Build one with `odin build core/archive/example -out:mini`.
 
 Each format's README lists what it reads and writes, with examples:
 - [`core:archive/zip`](zip/README.md) reads, writes and updates zip archives, with ZIP64 and WinZip AES ([API](https://pkg.odin-lang.org/core/archive/zip/))
+- [`core:archive/sevenz`](sevenz/README.md) reads, writes and updates 7z archives, with solid blocks, filters and 7-Zip AES-256 ([API](https://pkg.odin-lang.org/core/archive/sevenz/))
 
 # Crash-safe updates
 
-The shared machinery behind zip's updates, so an update never leaves a broken archive behind:
+The shared machinery behind zip's and 7z's updates, so an update never leaves a broken archive behind:
 - Whole-file locks: readers at a path take a shared lock and writers an exclusive one. Neither blocks; contention gives `archive.General_Error.Busy`. js and wasi have no locks.
 - A sidecar journal (`<archive>-journal`) for in-place appends: it records the old length and the bytes about to be overwritten, so a reopen after a crash gives the last committed state.
 - Rewrites go to `<archive>-temp`, which then replaces the original and is synced to disk.

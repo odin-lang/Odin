@@ -5,6 +5,7 @@ package all
 // This is useful for knowing what exists and producing documentation with `odin doc`
 
 @(require) import "core:archive"
+@(require) import "core:archive/sevenz"
 @(require) import "core:archive/zip"
 
 @(require) import "core:bufio"
