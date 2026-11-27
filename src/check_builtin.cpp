@@ -5221,6 +5221,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			if (et->Struct.fields.count != fields.count) {
 				goto soa_zip_end;
 			}
+			for (Entity *f : et->Struct.fields) {
+				// NOTE(bill): a slice of a `#soa_split` field's values cannot be its separate columns
+				if (is_soa_split_field(f)) {
+					goto soa_zip_end;
+				}
+			}
 			if (!fail && first_is_field_value) {
 				for_array(i, names) {
 					Selection sel = lookup_field(et, string_interner_insert(names[i]), false);

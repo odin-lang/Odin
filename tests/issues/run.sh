@@ -136,6 +136,7 @@ fi
 $ODIN test ../../core/runtime $COMMON -define:ODIN_TEST_NAMES=test_core_runtime.test_copy_soa_blocks
 
 if [[ $($ODIN check ../test_issue_soa_split_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "'#soa_split' cannot be applied") -eq 7 ]] &&
+   [[ $($ODIN check ../test_issue_soa_split_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 8 ]] &&
    [[ $($ODIN check ../test_issue_soa_split_address $COMMON_CHECK 2>&1 >/dev/null | grep -c "which is a '#soa_split' field of an #soa element") -eq 8 ]] &&
    [[ $($ODIN check ../test_issue_soa_split_address $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 10 ]]; then
 	echo "SUCCESSFUL 1/1"

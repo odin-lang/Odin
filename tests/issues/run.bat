@@ -55,6 +55,7 @@ set ODIN_FULL=%CD%\..\..\..\odin.exe
 %ODIN% check "..\test_issue_soa_conversion_errors" %COMMON% 2>&1 | find /c "'copy' copies the elements" | findstr /x "2" || exit /b
 %ODIN% test "..\..\core\runtime" %COMMON% -microarch:native -define:ODIN_TEST_NAMES=test_core_runtime.test_copy_soa_blocks || exit /b
 %ODIN% check "..\test_issue_soa_split_errors" %COMMON% 2>&1 | find /c "'#soa_split' cannot be applied" | findstr /x "7" || exit /b
+%ODIN% check "..\test_issue_soa_split_errors" %COMMON% 2>&1 | find /c "Error:" | findstr /x "8" || exit /b
 %ODIN% check "..\test_issue_soa_split_address" %COMMON% 2>&1 | find /c "which is a '#soa_split' field of an #soa element" | findstr /x "8" || exit /b
 %ODIN% check "..\test_issue_soa_split_address" %COMMON% 2>&1 | find /c "Error:" | findstr /x "10" || exit /b
 %ODIN% check "..\test_issue_array_conversion_parens" %COMMON% 2>&1 | find /c "needs parentheses" | findstr /x "3" || exit /b

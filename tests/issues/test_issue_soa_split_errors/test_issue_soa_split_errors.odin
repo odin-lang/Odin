@@ -1,4 +1,5 @@
-// `#soa_split` takes a struct or an array of length 4 or below, and not inside a `struct #raw_union`
+// `#soa_split` takes a struct or an array of length 4 or below, and not inside a `struct #raw_union`.
+// `soa_zip` cannot make the columns of a `#soa_split` field.
 package test_issue_soa_split_errors
 
 V :: struct {
@@ -38,5 +39,10 @@ main :: proc() {
 	c: Poly(V)
 	d: Poly(f32)
 	e: Good
-	_, _, _, _, _ = a, b, c, d, e
+
+	// `soa_zip` cannot make a slice of a `#soa_split` field's values into its columns
+	vs: []V
+	ls: [][4]f32
+	f: #soa[]Good = soa_zip(v = vs, l = ls)
+	_, _, _, _, _, _ = a, b, c, d, e, f
 }
