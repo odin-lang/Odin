@@ -24,6 +24,11 @@ Format_Procs :: struct {
 	open_member:      proc(a: ^Archive, handle: Handle, options: Read_Options) -> (r: io.Reader, err: Error),
 }
 
+_Dynamic_Output :: struct {
+	output: ^[dynamic]u8,
+	err:    runtime.Allocator_Error,
+}
+
 _register :: proc "contextless" (format: Format, procs: Format_Procs) {
 	assert_contextless(format != .Unknown)
 	assert_contextless(!_registered[format])
@@ -117,4 +122,36 @@ _entry_password :: proc(entry: Maybe(string), password: string, deterministic: b
 	result = entry.? or_else password
 	_check_password(result, deterministic) or_return
 	return
+}
+
+_dynamic_output_writer :: proc(d: ^_Dynamic_Output, output: ^[dynamic]u8) -> (w: io.Writer) {
+	d^ = {output = output}
+	clear(output)
+	return {procedure = _dynamic_output_proc, data = d}
+}
+
+_dynamic_output_finish :: proc(d: ^_Dynamic_Output, err: Error) -> Error {
+	err := err
+	if d.err != nil {
+		err = d.err
+	}
+	if err != nil {
+		clear(d.output)
+	}
+	return err
+}
+
+@(private="file")
+_dynamic_output_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []u8, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	d := (^_Dynamic_Output)(stream_data)
+	#partial switch mode {
+	case .Write:
+		if _, d.err = append(d.output, ..p); d.err != nil {
+			return 0, .Short_Write
+		}
+		return i64(len(p)), nil
+	case .Query:
+		return io.query_utility({.Write, .Query})
+	}
+	return 0, .Unsupported
 }

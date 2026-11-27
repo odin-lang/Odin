@@ -1,11 +1,13 @@
 package test_core_archive_sevenz
 
+import "base:runtime"
 import "core:archive"
 import "core:archive/sevenz"
 import "core:bytes"
 import "core:compress"
 import "core:hash"
 import "core:io"
+import "core:mem"
 import "core:os"
 import "core:path/filepath"
 import "core:strings"
@@ -605,6 +607,80 @@ test_generic :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_extract_to_dynamic :: proc(t: ^testing.T) {
+	r: sevenz.Reader
+	if !testing.expect_value(t, sevenz.open(&r, asset("solid-2f.7z")), nil) {
+		return
+	}
+	defer sevenz.close(&r)
+	fi, handle, ok, _ := sevenz.find(&r, "TEXT.TXT")
+	if !testing.expect(t, ok, "find TEXT.TXT") {
+		return
+	}
+
+	buf: [dynamic]u8
+	defer delete(buf)
+	append(&buf, "stale")
+	testing.expect_value(t, sevenz.extract(&r, handle, &buf), nil)
+	testing.expect(t, i64(len(buf)) == fi.size && hash.crc32(buf[:]) == TEXT_CRC, "extract replaces the buffer")
+	testing.expect_value(t, sevenz.extract(&r, archive.Handle{index = -1}, &buf), archive.Error(archive.General_Error.Not_Found))
+	testing.expect_value(t, len(buf), 0)
+
+	backing: [16]u8
+	arena: mem.Arena
+	mem.arena_init(&arena, backing[:])
+	small: [dynamic]u8
+	small.allocator = mem.arena_allocator(&arena)
+	testing.expect_value(t, sevenz.extract(&r, handle, &small), archive.Error(runtime.Allocator_Error.Out_Of_Memory))
+	testing.expect_value(t, len(small), 0)
+
+	it := sevenz.iterator_create(&r)
+	defer sevenz.iterator_destroy(&it)
+	for f in sevenz.iterate(&it) {
+		if f.path == "LICENSE" {
+			append(&buf, "stale")
+			testing.expect_value(t, sevenz.extract_current(&it, &buf), nil)
+			testing.expect_value(t, hash.crc32(buf[:]), 0xb047bfa7)
+		}
+	}
+
+	enc: sevenz.Reader
+	if testing.expect_value(t, sevenz.open(&enc, asset("aes.7z")), nil) {
+		defer sevenz.close(&enc)
+		_, enc_handle, enc_ok, _ := sevenz.find(&enc, "TEXT.TXT")
+		if testing.expect(t, enc_ok, "find TEXT.TXT in aes.7z") {
+			append(&buf, "stale")
+			testing.expect_value(t, sevenz.extract(&enc, enc_handle, &buf, {password = "odin"}), archive.Error(archive.General_Error.Wrong_Password))
+			testing.expect_value(t, len(buf), 0)
+			testing.expect_value(t, sevenz.extract(&enc, enc_handle, &buf, {password = PASSWORD}), nil)
+			testing.expect_value(t, hash.crc32(buf[:]), TEXT_CRC)
+		}
+	}
+
+	a, open_err := archive.open(asset("solid-2f.7z"))
+	if !testing.expect_value(t, open_err, nil) {
+		return
+	}
+	defer archive.close(&a)
+	_, generic_handle, found, _ := archive.find(&a, "TEXT.TXT")
+	testing.expect(t, found, "generic find TEXT.TXT")
+	append(&buf, "stale")
+	testing.expect_value(t, archive.extract(&a, generic_handle, &buf), nil)
+	testing.expect_value(t, hash.crc32(buf[:]), TEXT_CRC)
+	testing.expect_value(t, archive.extract(&a, generic_handle, &small), archive.Error(runtime.Allocator_Error.Out_Of_Memory))
+	testing.expect_value(t, len(small), 0)
+	git := archive.iterator_create(&a)
+	defer archive.iterator_destroy(&git)
+	for f in archive.iterate(&git) {
+		if f.path == "LICENSE" {
+			append(&buf, "stale")
+			testing.expect_value(t, archive.extract_current(&git, &buf), nil)
+			testing.expect_value(t, hash.crc32(buf[:]), 0xb047bfa7)
+		}
+	}
+}
+
+@(test)
 test_handles :: proc(t: ^testing.T) {
 	r: sevenz.Reader
 	if !testing.expect_value(t, sevenz.open(&r, asset("lzma.7z")), nil) {
@@ -774,9 +850,8 @@ known_crc :: proc(path: string) -> (crc: u32, ok: bool) {
 }
 
 extract_to_bytes :: proc(it: ^sevenz.Iterator) -> (data: [dynamic]u8, err: archive.Error) {
-	sink := strings.builder_make()
-	err = sevenz.extract_current(it, strings.to_writer(&sink))
-	return sink.buf, err
+	err = sevenz.extract_current(it, &data)
+	return
 }
 
 asset :: proc(name: string) -> string {

@@ -265,7 +265,7 @@ test_data_before_folder_crc :: proc(t: ^testing.T) {
 	for _ in sevenz.iterate(&it) {
 		got, iter_err := extract_to_bytes(&it)
 		testing.expect_value(t, iter_err, SevenZ_Error.CRC_Mismatch)
-		testing.expect_value(t, len(got), 1000)
+		testing.expect_value(t, len(got), 0)
 		delete(got)
 	}
 }

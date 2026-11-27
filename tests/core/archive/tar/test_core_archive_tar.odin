@@ -801,6 +801,77 @@ test_iterator_rewind :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_extract_to_dynamic :: proc(t: ^testing.T) {
+	data: [dynamic]u8
+	defer delete(data)
+	build_member(&data, "a.txt", 10)
+	build_member(&data, "big.txt", 1000)
+	resize(&data, len(data) + 1024)
+	want: [1000]u8
+	for &b, i in want {
+		b = u8('a' + i % 26)
+	}
+
+	r: tar.Reader
+	if !testing.expect_value(t, tar.open_from_bytes(&r, data[:]), nil) {
+		return
+	}
+	defer tar.close(&r)
+	_, handle, ok, _ := tar.find(&r, "big.txt")
+	if !testing.expect(t, ok, "find big.txt") {
+		return
+	}
+
+	buf: [dynamic]u8
+	defer delete(buf)
+	append(&buf, "stale")
+	testing.expect_value(t, tar.extract(&r, handle, &buf), nil)
+	testing.expect(t, bytes.equal(buf[:], want[:]), "extract replaces the buffer")
+	testing.expect_value(t, tar.extract(&r, archive.Handle{index = -1}, &buf), archive.Error(archive.General_Error.Not_Found))
+	testing.expect_value(t, len(buf), 0)
+
+	backing: [16]u8
+	arena: mem.Arena
+	mem.arena_init(&arena, backing[:])
+	small: [dynamic]u8
+	small.allocator = mem.arena_allocator(&arena)
+	testing.expect_value(t, tar.extract(&r, handle, &small), archive.Error(runtime.Allocator_Error.Out_Of_Memory))
+	testing.expect_value(t, len(small), 0)
+
+	it := tar.iterator_create(&r)
+	defer tar.iterator_destroy(&it)
+	for f in tar.iterate(&it) {
+		if f.path == "big.txt" {
+			append(&buf, "stale")
+			testing.expect_value(t, tar.extract_current(&it, &buf), nil)
+			testing.expect(t, bytes.equal(buf[:], want[:]), "extract_current replaces the buffer")
+		}
+	}
+
+	a, open_err := archive.open_from_bytes(data[:])
+	if !testing.expect_value(t, open_err, nil) {
+		return
+	}
+	defer archive.close(&a)
+	_, generic_handle, found, _ := archive.find(&a, "big.txt")
+	testing.expect(t, found, "generic find big.txt")
+	append(&buf, "stale")
+	testing.expect_value(t, archive.extract(&a, generic_handle, &buf), nil)
+	testing.expect(t, bytes.equal(buf[:], want[:]), "generic extract replaces the buffer")
+	testing.expect_value(t, archive.extract(&a, generic_handle, &small), archive.Error(runtime.Allocator_Error.Out_Of_Memory))
+	testing.expect_value(t, len(small), 0)
+	git := archive.iterator_create(&a)
+	defer archive.iterator_destroy(&git)
+	for f in archive.iterate(&git) {
+		if f.path == "a.txt" {
+			append(&buf, "stale")
+			testing.expect_value(t, archive.extract_current(&git, &buf), nil)
+			testing.expect(t, bytes.equal(buf[:], want[:10]), "generic extract_current replaces the buffer")
+		}
+	}
+}
+
+@(test)
 test_pax_records :: proc(t: ^testing.T) {
 	data: [dynamic]u8
 	defer delete(data)

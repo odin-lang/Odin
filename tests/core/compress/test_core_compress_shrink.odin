@@ -222,8 +222,8 @@ shrink_test_output_limit :: proc(t: ^testing.T) {
 		append(&output, "prefix")
 		limit_err := pkzip_legacy.unshrink(&output, data, 11)
 		testing.expect_value(t, limit_err, compress.General_Error.Size_Mismatch)
-		testing.expect(t, len(output) <= 17)
-		testing.expect_value(t, string(output[:6]), "prefix")
+		testing.expect(t, len(output) <= 11)
+		testing.expect(t, bytes.equal(output[:], full[:len(output)]))
 	}
 
 	{

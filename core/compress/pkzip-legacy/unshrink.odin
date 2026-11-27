@@ -23,8 +23,7 @@ unshrink_from_context :: proc(z: ^compress.Context, expected_output_size := -1, 
 		return nil
 	}
 
-	start := len(z.output)
-	defer z.bytes_written = i64(len(z.output) - start)
+	defer z.bytes_written = i64(len(z.output))
 
 	p: Output_Progress
 	progress_begin(&p, z, expected, options)
@@ -53,15 +52,15 @@ unshrink_from_context :: proc(z: ^compress.Context, expected_output_size := -1, 
 		if previous > 255 {
 			return PKZIP_Legacy_Error.Invalid_First_Code
 		}
-		out_literal(z, &o, start, expected, u8(previous)) or_return
+		out_literal(z, &o, expected, u8(previous)) or_return
 	}
 	first_byte      := u8(previous)
-	previous_at     := start
+	previous_at     := 0
 	previous_length := 1
 
-	for available && o.at - start < expected {
-		if o.at - start >= p.mark {
-			progress_report(&p, z, o.at - start, b.count) or_return
+	for available && o.at < expected {
+		if o.at >= p.mark {
+			progress_report(&p, z, o.at, b.count) or_return
 		}
 		code: int
 		code, available = unshrink_read_code_bits(z, &p.pulled, &b, s, &code_size, &next_free) or_return
@@ -114,9 +113,9 @@ unshrink_from_context :: proc(z: ^compress.Context, expected_output_size := -1, 
 		}
 
 		if cached {
-			out_match(z, &o, start, expected, at - c.position[code], length) or_return
+			out_match(z, &o, expected, at - c.position[code], length) or_return
 		} else {
-			out_bytes(z, &o, start, expected, s.stack[sp:]) or_return
+			out_bytes(z, &o, expected, s.stack[sp:]) or_return
 		}
 		if code > 255 {
 			c.length[code]   = u16(length)
@@ -127,11 +126,11 @@ unshrink_from_context :: proc(z: ^compress.Context, expected_output_size := -1, 
 		previous_length = length
 	}
 
-	if o.at - start != expected {
+	if o.at != expected {
 		return General_Error.Stream_Too_Short
 	}
-	if o.at - start >= p.mark {
-		return progress_report(&p, z, o.at - start, b.count)
+	if o.at >= p.mark {
+		return progress_report(&p, z, o.at, b.count)
 	}
 	return nil
 }

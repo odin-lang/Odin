@@ -13,6 +13,12 @@ import "core:slice"
 import "core:strings"
 import "core:time"
 
+// Extracts the current member's data to a writer or into a buffer
+extract_current :: proc{extract_current_to_writer, extract_current_to_dynamic}
+
+// Extracts a member's data to a writer or into a buffer
+extract :: proc{extract_to_writer, extract_to_dynamic}
+
 /*
 Opens a tar archive held in memory, plain or compressed with gzip, bzip2, LZ4, LZMA or XZ
 
@@ -262,8 +268,27 @@ Returns:
 - err: `General_Error.No_Current_Member` if `iterate` hasn't returned a member, or the member's
   error, or `nil`
 */
-extract_current :: proc(it: ^Iterator, w: io.Writer) -> (err: Error) {
+extract_current_to_writer :: proc(it: ^Iterator, w: io.Writer) -> (err: Error) {
 	return _extract(it.reader, w)
+}
+
+/*
+Reads the current member's data into a buffer; a sparse file's holes are filled with zeros
+
+The data is read once: what this or `open_current`'s reader has read is gone.
+
+Inputs:
+- it: The iterator, on the member `iterate` returned last
+- output: Replaced by the member's data, grown with its own allocator; emptied on an error
+
+Returns:
+- err: `General_Error.No_Current_Member` if `iterate` hasn't returned a member, an allocator
+  error, the member's error, or `nil`
+*/
+extract_current_to_dynamic :: proc(it: ^Iterator, output: ^[dynamic]u8) -> (err: Error) {
+	d: archive._Dynamic_Output
+	err = extract_current_to_writer(it, archive._dynamic_output_writer(&d, output))
+	return archive._dynamic_output_finish(&d, err)
 }
 
 /*
@@ -419,9 +444,29 @@ Returns:
 - err: `General_Error.Not_Found` for a handle past the last member, `General_Error.Not_Seekable`
   if a stream needs a rewind it can't do, the member's error, or `nil`
 */
-extract :: proc(r: ^Reader, handle: archive.Handle, w: io.Writer) -> (err: Error) {
+extract_to_writer :: proc(r: ^Reader, handle: archive.Handle, w: io.Writer) -> (err: Error) {
 	_seek_member(r, handle.index) or_return
 	return _extract(r, w)
+}
+
+/*
+Reads a member's data into a buffer, moving the reader's position to it
+
+Going back to an earlier member rewinds the reader.
+
+Inputs:
+- r: An open reader
+- handle: The member, from `File_Info.handle` or `find`
+- output: Replaced by the member's data, grown with its own allocator; emptied on an error
+
+Returns:
+- err: `General_Error.Not_Found` for a handle past the last member, `General_Error.Not_Seekable`
+  if a stream needs a rewind it can't do, an allocator error, the member's error, or `nil`
+*/
+extract_to_dynamic :: proc(r: ^Reader, handle: archive.Handle, output: ^[dynamic]u8) -> (err: Error) {
+	d: archive._Dynamic_Output
+	err = extract_to_writer(r, handle, archive._dynamic_output_writer(&d, output))
+	return archive._dynamic_output_finish(&d, err)
 }
 
 /*

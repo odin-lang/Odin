@@ -1,11 +1,13 @@
 package test_core_archive_zip
 
+import "base:runtime"
 import "core:archive"
 import "core:archive/zip"
 import "core:bytes"
 import "core:compress"
 import "core:hash"
 import "core:io"
+import "core:mem"
 import "core:os"
 import "core:path/filepath"
 import "core:strings"
@@ -443,6 +445,84 @@ test_generic :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_extract_to_dynamic :: proc(t: ^testing.T) {
+	r: zip.Reader
+	if !testing.expect_value(t, zip.open(&r, asset("archives/7z-deflate64.zip")), nil) {
+		return
+	}
+	defer zip.close(&r)
+	fi, handle, ok, _ := zip.find(&r, "tree/TEXT.TXT")
+	if !testing.expect(t, ok, "find tree/TEXT.TXT") {
+		return
+	}
+
+	buf: [dynamic]u8
+	defer delete(buf)
+	append(&buf, "stale")
+	testing.expect_value(t, zip.extract(&r, handle, &buf), nil)
+	testing.expect(t, i64(len(buf)) == fi.size && hash.crc32(buf[:]) == TEXT_CRC, "extract replaces the buffer")
+	testing.expect_value(t, zip.extract(&r, archive.Handle{index = -1}, &buf), archive.Error(archive.General_Error.Not_Found))
+	testing.expect_value(t, len(buf), 0)
+
+	backing: [16]u8
+	arena: mem.Arena
+	mem.arena_init(&arena, backing[:])
+	small: [dynamic]u8
+	small.allocator = mem.arena_allocator(&arena)
+	testing.expect_value(t, zip.extract(&r, handle, &small), archive.Error(runtime.Allocator_Error.Out_Of_Memory))
+	testing.expect_value(t, len(small), 0)
+
+	it := zip.iterator_create(&r)
+	defer zip.iterator_destroy(&it)
+	for f in zip.iterate(&it) {
+		if f.path == "tree/sub/deep/LICENSE" {
+			append(&buf, "stale")
+			testing.expect_value(t, zip.extract_current(&it, &buf), nil)
+			testing.expect_value(t, hash.crc32(buf[:]), LICENSE_CRC)
+		}
+	}
+
+	enc: zip.Reader
+	if testing.expect_value(t, zip.open(&enc, asset("archives/7z-aes128.zip")), nil) {
+		defer zip.close(&enc)
+		eit := zip.iterator_create(&enc)
+		defer zip.iterator_destroy(&eit)
+		for f in zip.iterate(&eit) {
+			if f.type != .Regular || f.size == 0 {
+				continue
+			}
+			append(&buf, "stale")
+			wrong_err := zip.extract(&enc, f.handle, &buf, {password = "wrong"})
+			testing.expectf(t, wrong_err != nil && len(buf) == 0, "%s: wrong password %v kept %d bytes", f.path, wrong_err, len(buf))
+			testing.expect_value(t, zip.extract(&enc, f.handle, &buf, {password = PASSWORD}), nil)
+			testing.expectf(t, i64(len(buf)) == f.size, "%s: %d bytes", f.path, len(buf))
+		}
+	}
+
+	a, open_err := archive.open(asset("archives/7z-deflate64.zip"))
+	if !testing.expect_value(t, open_err, nil) {
+		return
+	}
+	defer archive.close(&a)
+	_, generic_handle, found, _ := archive.find(&a, "tree/TEXT.TXT")
+	testing.expect(t, found, "generic find tree/TEXT.TXT")
+	append(&buf, "stale")
+	testing.expect_value(t, archive.extract(&a, generic_handle, &buf), nil)
+	testing.expect_value(t, hash.crc32(buf[:]), TEXT_CRC)
+	testing.expect_value(t, archive.extract(&a, generic_handle, &small), archive.Error(runtime.Allocator_Error.Out_Of_Memory))
+	testing.expect_value(t, len(small), 0)
+	git := archive.iterator_create(&a)
+	defer archive.iterator_destroy(&git)
+	for f in archive.iterate(&git) {
+		if f.path == "tree/sub/deep/LICENSE" {
+			append(&buf, "stale")
+			testing.expect_value(t, archive.extract_current(&git, &buf), nil)
+			testing.expect_value(t, hash.crc32(buf[:]), LICENSE_CRC)
+		}
+	}
+}
+
+@(test)
 test_generic_sfx :: proc(t: ^testing.T) {
 	for name in ([?]string{"archives/pkzip110-sfx.exe", "archives/pkzip204-sfx.exe"}) {
 		data, read_err := os.read_entire_file(asset(name), context.allocator)
@@ -732,9 +812,8 @@ known_crc :: proc(path: string) -> (crc: u32, ok: bool) {
 }
 
 extract_to_bytes :: proc(it: ^zip.Iterator, options := archive.Read_Options{}) -> (data: [dynamic]u8, err: zip.Error) {
-	sink := strings.builder_make()
-	err = zip.extract_current(it, strings.to_writer(&sink), options)
-	return sink.buf, err
+	err = zip.extract_current(it, &data, options)
+	return
 }
 
 asset :: proc(name: string) -> string {

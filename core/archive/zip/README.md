@@ -25,7 +25,7 @@ read_texts :: proc(path: string) -> (err: zip.Error) {
 - ZipCrypto and WinZip AES (AE-1 and AE-2; 128, 192 and 256-bit keys), with the password in `archive.Read_Options`
 - ZIP64 and data descriptors
 - UTF-8, Info-ZIP Unicode and code page 437 names; Unix and DOS attributes, symlinks, NTFS and Unix timestamps
-- `extract_current` writes a member to an `io.Writer` and `open_current` streams it through an `io.Reader`; `find` looks one up by path for `extract` or `open_member`
+- `extract_current` writes a member to an `io.Writer` or into a `[dynamic]u8`, and `open_current` streams it through an `io.Reader`; `find` looks one up by path for `extract` or `open_member`
 - Extraction checks the CRC-32, and a WinZip AES member's MAC. Packed data the decoder didn't read fails with `Zip_Error.Size_Mismatch`
 - Several threads can read one archive at once
 

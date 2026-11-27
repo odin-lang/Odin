@@ -140,8 +140,8 @@ implode_test_handcrafted :: proc(t: ^testing.T) {
 			defer delete(output)
 			append(&output, "PREFIX")
 			err := pkzip_legacy.explode(&output, data, options, len(expected))
-			testing.expectf(t, err == nil, "%v (prefix): %v", options, err)
-			testing.expectf(t, string(output[6:]) == expected, "%v (prefix): %q", options, string(output[6:]))
+			testing.expectf(t, err == nil, "%v (reused): %v", options, err)
+			testing.expectf(t, string(output[:]) == expected, "%v (reused): %q", options, string(output[:]))
 		}
 
 		{
