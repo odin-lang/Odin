@@ -17,9 +17,11 @@ platform_memory_alloc :: proc "contextless" (to_commit, to_reserve: uint) -> (bl
 	
 	data := reserve(total_to_reserved) or_return
 
-	commit_err := commit(raw_data(data), to_commit)
-	assert_contextless(commit_err == nil)
-	
+	if commit_err := commit(raw_data(data), to_commit); commit_err != nil {
+		release(raw_data(data), total_to_reserved)
+		return nil, commit_err
+	}
+
 	block = (^Platform_Memory_Block)(raw_data(data))
 	block.committed = to_commit
 	block.reserved  = to_reserve

@@ -3,10 +3,47 @@ package test_core_fmt
 
 import "base:runtime"
 import "core:fmt"
+import "core:log"
 import "core:math"
 import "core:mem"
 import "core:strings"
 import "core:testing"
+
+// Each element of an #soa array is formatted as it is on its own
+@(test)
+test_fmt_soa :: proc(t: ^testing.T) {
+	P      :: struct {x: f32, s: string}
+	Tagged :: struct {name: [4]u8 `fmt:"s,len"`, len: int}
+	Empty  :: struct {}
+
+	fixed := #soa[2]P{{1, "a"}, {2, "b"}}
+	check(t, `[P{x = 1, s = "a"}, P{x = 2, s = "b"}]`, "%v", fixed)
+	check(t, `{P{x = 1, s = "a"}, P{x = 2, s = "b"}}`, "%w", fixed)
+	check(t, "[\n\tP{\n\t\tx = 1,\n\t\ts = \"a\",\n\t},\n\tP{\n\t\tx = 2,\n\t\ts = \"b\",\n\t},\n]", "%#v", fixed)
+	check(t, `[P{x = 2, s = "b"}]`, "%v", fixed[1:])
+
+	dynamic_array := make(#soa[dynamic]P, 0, 4)
+	defer delete(dynamic_array)
+	append(&dynamic_array, P{3, "c"})
+	check(t, `[P{x = 3, s = "c"}]`, "%v", dynamic_array)
+
+	fixed_capacity := #soa[dynamic; 4]P{{4, "d"}}
+	check(t, `[P{x = 4, s = "d"}]`, "%v", fixed_capacity)
+
+	lanes := #soa[2][3]f32{{1, 2, 3}, {4, 5, 6}}
+	check(t, "[[1, 2, 3], [4, 5, 6]]", "%v", lanes)
+
+	tagged := #soa[1]Tagged{{name = {'a', 'b', 0, 0}, len = 2}}
+	check(t, "[Tagged{name = ab, len = 2}]", "%v", tagged)
+
+	empty: #soa[2]Empty
+	check(t, "[Empty{}, Empty{}]", "%v", empty)
+
+	nothing: #soa[]P
+	check(t, "[]", "%v", nothing)
+	check(t, "#soa[dynamic; 4]P", "%T", fixed_capacity)
+	check(t, "%!x(#soa[]P=[])", "%x", nothing)
+}
 
 @(test)
 test_fmt_memory :: proc(t: ^testing.T) {
@@ -51,7 +88,7 @@ test_fmt_complex_quaternion :: proc(t: ^testing.T) {
 	cptr^ = {0, neg_zero}
 	check(t, "0-0i",      "%v", c)
 	cptr^ = {nan, nan}
-	check(t, "NaNNaNi",   "%v", c)
+	check(t, "NaN+NaNi",   "%v", c)
 	cptr^ = {pos_inf, pos_inf}
 	check(t, "+Inf+Infi", "%v", c)
 	cptr^ = {neg_inf, neg_inf}
@@ -63,7 +100,7 @@ test_fmt_complex_quaternion :: proc(t: ^testing.T) {
 	cptr^ = {1, 1}
 	check(t, "+1+1i",     "%+v", c)
 	cptr^ = {nan, nan}
-	check(t, "NaNNaNi",   "%+v", c)
+	check(t, "NaN+NaNi",   "%+v", c)
 	cptr^ = {pos_inf, pos_inf}
 	check(t, "+Inf+Infi", "%+v", c)
 	cptr^ = {neg_inf, neg_inf}
@@ -89,7 +126,7 @@ test_fmt_complex_quaternion :: proc(t: ^testing.T) {
 	qptr^ = {pos_inf, pos_inf, pos_inf, -1}
 	check(t, "-1+Infi+Infj+Infk", "%v", q)
 	qptr^ = {nan, nan, nan, -1}
-	check(t, "-1NaNiNaNjNaNk",    "%v", q)
+	check(t, "-1+NaNi+NaNj+NaNk",    "%v", q)
 }
 
 @(test)
@@ -465,6 +502,11 @@ test_fmt_zero_flag :: proc(t: ^testing.T) {
 	check(t, "+001.50", "%+07.2f", 1.5)
 	check(t, "  1.50",  "{:6.2f}", 1.5)
 	check(t, "001.50",  "{:06.2f}", 1.5)
+	check(t, "   +Inf", "%07.2f",  math.inf_f64(1))
+	check(t, "   -Inf", "%+07.2f", math.inf_f64(-1))
+	check(t, "    NaN", "%07.2f",  math.nan_f64())
+	check(t, "    +Inf", "%08e",   math.inf_f32(1))
+	check(t, "NaN    ", "%-07.2f", math.nan_f64())
 
 	// a '#' prefix stays next to the digits
 	check(t, "    0xff",   "%#8x",  255)
@@ -529,4 +571,90 @@ check_count :: proc(t: ^testing.T, format: string, args: ..any, loc := #caller_l
 check :: proc(t: ^testing.T, exp: string, format: string, args: ..any, loc := #caller_location) {
 	got := fmt.tprintf(format, ..args)
 	testing.expectf(t, got == exp, "(%q, %v): %q != %q", format, args, got, exp, loc = loc)
+}
+
+@(private="file")
+Test_Tuple :: struct {
+	q: quaternion256,
+	expected_normal: string,
+	expected_with_plus: string,
+}
+
+@(test)
+test_quaternion_with_padding :: proc(t: ^testing.T) {
+	quaternions := []Test_Tuple {
+		{ +1+1i+1j+1k, "  1.000+  1.000i+  1.000j+  1.000k", " +1.000  +1.000i  +1.000j  +1.000k" },
+		{ +1+1i+1j-1k, "  1.000+  1.000i+  1.000j  -1.000k", " +1.000  +1.000i  +1.000j  -1.000k" },
+		{ +1+1i-1j+1k, "  1.000+  1.000i  -1.000j+  1.000k", " +1.000  +1.000i  -1.000j  +1.000k" },
+		{ +1+1i-1j-1k, "  1.000+  1.000i  -1.000j  -1.000k", " +1.000  +1.000i  -1.000j  -1.000k" },
+		{ +1-1i+1j+1k, "  1.000  -1.000i+  1.000j+  1.000k", " +1.000  -1.000i  +1.000j  +1.000k" },
+		{ +1-1i+1j-1k, "  1.000  -1.000i+  1.000j  -1.000k", " +1.000  -1.000i  +1.000j  -1.000k" },
+		{ +1-1i-1j+1k, "  1.000  -1.000i  -1.000j+  1.000k", " +1.000  -1.000i  -1.000j  +1.000k" },
+		{ +1-1i-1j-1k, "  1.000  -1.000i  -1.000j  -1.000k", " +1.000  -1.000i  -1.000j  -1.000k" },
+		{ -1+1i+1j+1k, " -1.000+  1.000i+  1.000j+  1.000k", " -1.000  +1.000i  +1.000j  +1.000k" },
+		{ -1+1i+1j-1k, " -1.000+  1.000i+  1.000j  -1.000k", " -1.000  +1.000i  +1.000j  -1.000k" },
+		{ -1+1i-1j+1k, " -1.000+  1.000i  -1.000j+  1.000k", " -1.000  +1.000i  -1.000j  +1.000k" },
+		{ -1+1i-1j-1k, " -1.000+  1.000i  -1.000j  -1.000k", " -1.000  +1.000i  -1.000j  -1.000k" },
+		{ -1-1i+1j+1k, " -1.000  -1.000i+  1.000j+  1.000k", " -1.000  -1.000i  +1.000j  +1.000k" },
+		{ -1-1i+1j-1k, " -1.000  -1.000i+  1.000j  -1.000k", " -1.000  -1.000i  +1.000j  -1.000k" },
+		{ -1-1i-1j+1k, " -1.000  -1.000i  -1.000j+  1.000k", " -1.000  -1.000i  -1.000j  +1.000k" },
+		{ -1-1i-1j-1k, " -1.000  -1.000i  -1.000j  -1.000k", " -1.000  -1.000i  -1.000j  -1.000k" },
+		{ quaternion(real = math.INF_F64,    imag =  math.INF_F64,   jmag =  math.INF_F64,   kmag =  math.INF_F64),   "   +Inf    +Infi    +Infj    +Infk",                         "   +Inf    +Infi    +Infj    +Infk" },
+		{ quaternion(real = -math.INF_F64,   imag = -math.INF_F64,   jmag = -math.INF_F64,   kmag = -math.INF_F64),   "   -Inf    -Infi    -Infj    -Infk",                         "   -Inf    -Infi    -Infj    -Infk" },
+		{ quaternion(real = math.nan_f64(),  imag =  math.nan_f64(), jmag =  math.nan_f64(), kmag =  math.nan_f64()), "    NaN+    NaNi+    NaNj+    NaNk",                         "    NaN+    NaNi+    NaNj+    NaNk" },
+		{ quaternion(real = 0,               imag =  0,              jmag =  0,              kmag =  0),              "  0.000+  0.000i+  0.000j+  0.000k",                         " +0.000  +0.000i  +0.000j  +0.000k" },
+		{ quaternion(real = -0.0,            imag = -0.0,            jmag = -0.0,            kmag = -0.0),            " -0.000  -0.000i  -0.000j  -0.000k",                         " -0.000  -0.000i  -0.000j  -0.000k" },
+		{ quaternion(real = 99999999.9,      imag =  99999999.9,     jmag =  99999999.9,     kmag =  99999999.9),     "99999999.900+99999999.900i+99999999.900j+99999999.900k",     "+99999999.900 +99999999.900i +99999999.900j +99999999.900k" },
+		{ quaternion(real = -99999999.9,     imag = -99999999.9,     jmag = -99999999.9,     kmag = -99999999.9),     "-99999999.900 -99999999.900i -99999999.900j -99999999.900k", "-99999999.900 -99999999.900i -99999999.900j -99999999.900k" },
+	}
+	for tuple in quaternions {
+		{
+			candidate := fmt.tprintf("% 7f", tuple.q)
+			testing.expect_value(t, candidate, tuple.expected_normal)
+		}
+		{
+			candidate := fmt.tprintf("% +7f", tuple.q)
+			testing.expect_value(t, candidate, tuple.expected_with_plus)
+		}
+		log.debugf("% 7f", tuple.q)
+	}
+}
+
+@(test)
+test_complex_quaternion_padding_flags :: proc(t: ^testing.T) {
+	q := quaternion256(1+1i-1j+1k)
+	check(t, "   1.000+   1.000i   -1.000j+   1.000k", "% 8f", q)
+	check(t, "1.000  +1.000  i -1.000 j+1.000  k",     "%-7f", q)
+	check(t, "001.000+001.000i -01.000j+001.000k",     "%07f", q)
+	check(t, "  1.000  -1.000i",                       "%7f",  complex128(1-1i))
+	inf, nan := math.inf_f64(1), math.nan_f64()
+	check(t, "   +Inf+    NaNi    -Infj+001.000k",     "%07f", quaternion(real = inf, imag = nan, jmag = -inf, kmag = 1))
+}
+
+@(test)
+test_complex128_hex :: proc(t: ^testing.T) {
+	// This is an edge case because normally, fmt_float would disable the `+` sign.
+	testing.expect_value(t, fmt.tprintf("%+h", complex128(+1+1i)), "0h3ff0000000000000+0h3ff0000000000000i")
+}
+
+@(test)
+test_quaternion256_hex :: proc(t: ^testing.T) {
+	// This is an edge case because normally, fmt_float would disable the `+` sign.
+	testing.expect_value(t, fmt.tprintf("%+h", quaternion256(+1+1i-1j+1k)), "0h3ff0000000000000+0h3ff0000000000000i+0hbff0000000000000j+0h3ff0000000000000k")
+}
+
+@(test)
+test_complex_quaternion_hex_lower_precision_hex :: proc(t: ^testing.T) {
+	testing.expect_value(t, fmt.tprintf("%h", complex32(1+1i)), "0h3c00+0h3c00i")
+	testing.expect_value(t, fmt.tprintf("%h", complex64(1+1i)), "0h3f800000+0h3f800000i")
+	testing.expect_value(t, fmt.tprintf("%h", quaternion64(1+1i-1j+1k)), "0h3c00+0h3c00i+0hbc00j+0h3c00k")
+	testing.expect_value(t, fmt.tprintf("%h", quaternion128(1+1i-1j+1k)), "0h3f800000+0h3f800000i+0hbf800000j+0h3f800000k")
+}
+
+@(test)
+test_complex_quaternion_hex_nan :: proc(t: ^testing.T) {
+	nan: f64 = 0h7ff8000000000001
+	testing.expect_value(t, fmt.tprintf("%h", complex(1, nan)), "0h3ff0000000000000+0h7ff8000000000001i")
+	testing.expect_value(t, fmt.tprintf("%H", complex(1, nan)), "0h3FF0000000000000+0h7FF8000000000001i")
+	testing.expect_value(t, fmt.tprintf("%h", quaternion(real = 1, imag = 0, jmag = nan, kmag = -1)), "0h3ff0000000000000+0h0000000000000000i+0h7ff8000000000001j+0hbff0000000000000k")
 }

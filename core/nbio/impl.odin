@@ -274,7 +274,7 @@ bufs_init :: proc(bufs: ^Bufs, orig: ^[][]byte, allocator: runtime.Allocator) ->
 }
 
 bufs_delete :: proc(bufs: ^Bufs, orig: [][]byte, allocator: runtime.Allocator) {
-	if len(orig) > 1 {
+	if len(orig) > 1 && raw_data(bufs.working.big) != nil {
 		backing := raw_data(orig)[:len(orig)*2]
 		delete(backing, allocator)
 	}

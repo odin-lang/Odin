@@ -92,7 +92,7 @@ fmt_token :: proc(n: Norm_Token) -> string {
 fmt_error :: proc(n: Norm_Error) -> string {
 	switch n.kind {
 	case .None:        return "nil"
-	case .Error:       return fmt.tprintf("Error.%v", json.Error(n.code))
+	case .Error:       return fmt.tprintf("Error.%v", ref.Error(n.code))
 	case .Data:        return fmt.tprintf("Unmarshal_Data_Error.%v", json.Unmarshal_Data_Error(n.code))
 	case .Unsupported: return fmt.tprintf("Unsupported_Type_Error{{id=%v, token=%s}}", n.id, fmt_token(n.token))
 	case .Unknown_Field: return fmt.tprintf("Unknown_Field_Error{{id=%v, token=%s}}", n.id, fmt_token(n.token))

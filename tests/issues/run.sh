@@ -79,6 +79,81 @@ fi
 
 $ODIN check ../test_issue_7429 $COMMON_CHECK
 $ODIN check ../test_issue_7260 -no-entry-point $COMMON_CHECK
+$ODIN check ../test_issue_soa_no_rtti -target:freestanding_amd64_sysv -no-rtti -no-entry-point $COMMON_CHECK
+
+if [[ $($ODIN check ../test_issue_soa_field_unroll $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_soa_of_soa $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 8 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_soa_column_not_addressable $COMMON_CHECK 2>&1 >/dev/null | grep -c "value is not addressable") -eq 3 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_soa_column_escape $COMMON_CHECK 2>&1 >/dev/null | grep -c "It is unsafe to return") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_soa_slice_escape $COMMON_CHECK 2>&1 >/dev/null | grep -c "It is unsafe to return") -eq 9 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_soa_dynamic_literal $COMMON_CHECK 2>&1 >/dev/null | grep -c "cannot be a compound literal") -eq 4 ]] &&
+   [[ $($ODIN check ../test_issue_soa_dynamic_literal $COMMON_CHECK 2>&1 >/dev/null | grep -c "Suggestion: Write a fixed set of elements") -eq 4 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_soa_conversion_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 5 ]] &&
+   [[ $($ODIN check ../test_issue_soa_conversion_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "an #soa array and an array convert only") -eq 3 ]] &&
+   [[ $($ODIN check ../test_issue_soa_conversion_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "'copy' copies the elements") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+$ODIN test ../../core/runtime $COMMON -define:ODIN_TEST_NAMES=test_core_runtime.test_copy_soa_blocks
+$ODIN test ../test_range_snapshot $COMMON -o:speed
+
+if [[ $($ODIN check ../test_issue_soa_split_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "'#soa_split' cannot be applied") -eq 7 ]] &&
+   [[ $($ODIN check ../test_issue_soa_split_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 8 ]] &&
+   [[ $($ODIN check ../test_issue_soa_split_address $COMMON_CHECK 2>&1 >/dev/null | grep -c "which is a '#soa_split' field of an #soa element") -eq 8 ]] &&
+   [[ $($ODIN check ../test_issue_soa_split_address $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 10 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_array_conversion_parens $COMMON_CHECK 2>&1 >/dev/null | grep -c "needs parentheses") -eq 3 ]] &&
+   [[ $($ODIN check ../test_issue_array_conversion_parens $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 $ODIN check ../test_issue_7336 -no-entry-point $COMMON_CHECK
 
 if [[ $($ODIN check ../test_issue_ambiguous_union_literal $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
@@ -103,6 +178,13 @@ else
 fi
 
 if [[ $($ODIN check ../test_issue_global_when_shadowing -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "within a global 'when' shadows") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_nesting_limit $COMMON_CHECK 2>&1 >/dev/null | grep -c "nested too deeply") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
@@ -202,6 +284,14 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_poly_recursion_limit $COMMON_CHECK 2>&1 >/dev/null | grep -c "Polymorphic instantiations are nested too deeply") -eq 1 &&
+      $($ODIN check ../test_issue_poly_recursion_limit_record $COMMON_CHECK 2>&1 >/dev/null | grep -c "Polymorphic instantiations are nested too deeply") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_fixed_point_scale $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
@@ -267,6 +357,15 @@ fi
 ESCAPE_OUT=$($ODIN check ../test_issue_escape_cleared_stores -no-entry-point $COMMON_CHECK 2>&1 >/dev/null)
 if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 28 &&
       $(grep -c "local variable 'y'" <<< "$ESCAPE_OUT") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+ESCAPE_OUT=$($ODIN check ../test_issue_escape_deferred_procs -no-entry-point $COMMON_CHECK 2>&1 >/dev/null)
+if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 8 &&
+      $(grep -c "deferred by" <<< "$ESCAPE_OUT") -eq 7 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"

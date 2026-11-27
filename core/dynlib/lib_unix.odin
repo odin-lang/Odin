@@ -17,7 +17,10 @@ _load_library :: proc(path: string, global_symbols: bool, allocator: runtime.All
 		flags += posix.RTLD_LOCAL
 	}
 
-	cpath := strings.clone_to_cstring(path, allocator)
+	cpath, cpath_err := strings.clone_to_cstring(path, allocator)
+	if cpath_err != nil {
+		return nil, false
+	}
 	defer delete(cpath, allocator)
 
 	lib := posix.dlopen(cpath, flags)
@@ -29,7 +32,10 @@ _unload_library :: proc(library: Library) -> bool {
 }
 
 _symbol_address :: proc(library: Library, symbol: string, allocator: runtime.Allocator) -> (ptr: rawptr, found: bool) {
-	csymbol := strings.clone_to_cstring(symbol, allocator)
+	csymbol, csymbol_err := strings.clone_to_cstring(symbol, allocator)
+	if csymbol_err != nil {
+		return nil, false
+	}
 	defer delete(csymbol, allocator)
 
 	ptr   = posix.dlsym(posix.Symbol_Table(library), csymbol)

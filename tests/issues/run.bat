@@ -42,6 +42,25 @@ set ODIN_FULL=%CD%\..\..\..\odin.exe
 %ODIN% check "..\test_issue_6874" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_6979" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_7012" -no-entry-point %COMMON% || exit /b
+%ODIN% check "..\test_issue_soa_no_rtti" -target:freestanding_amd64_sysv -no-rtti -no-entry-point %COMMON% || exit /b
+%ODIN% check "..\test_issue_soa_field_unroll" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_soa_of_soa" %COMMON% 2>&1 | find /c "Error:" | findstr /x "8" || exit /b
+%ODIN% check "..\test_issue_soa_column_not_addressable" %COMMON% 2>&1 | find /c "value is not addressable" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_soa_column_escape" %COMMON% 2>&1 | find /c "It is unsafe to return" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_soa_slice_escape" %COMMON% 2>&1 | find /c "It is unsafe to return" | findstr /x "9" || exit /b
+%ODIN% check "..\test_issue_soa_dynamic_literal" %COMMON% 2>&1 | find /c "cannot be a compound literal" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_soa_dynamic_literal" %COMMON% 2>&1 | find /c "Suggestion: Write a fixed set of elements" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_soa_conversion_errors" %COMMON% 2>&1 | find /c "Error:" | findstr /x "5" || exit /b
+%ODIN% check "..\test_issue_soa_conversion_errors" %COMMON% 2>&1 | find /c "an #soa array and an array convert only" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_soa_conversion_errors" %COMMON% 2>&1 | find /c "'copy' copies the elements" | findstr /x "2" || exit /b
+%ODIN% test "..\..\core\runtime" %COMMON% -microarch:native -define:ODIN_TEST_NAMES=test_core_runtime.test_copy_soa_blocks || exit /b
+%ODIN% test "..\test_range_snapshot" %COMMON% -o:speed || exit /b
+%ODIN% check "..\test_issue_soa_split_errors" %COMMON% 2>&1 | find /c "'#soa_split' cannot be applied" | findstr /x "7" || exit /b
+%ODIN% check "..\test_issue_soa_split_errors" %COMMON% 2>&1 | find /c "Error:" | findstr /x "8" || exit /b
+%ODIN% check "..\test_issue_soa_split_address" %COMMON% 2>&1 | find /c "which is a '#soa_split' field of an #soa element" | findstr /x "8" || exit /b
+%ODIN% check "..\test_issue_soa_split_address" %COMMON% 2>&1 | find /c "Error:" | findstr /x "10" || exit /b
+%ODIN% check "..\test_issue_array_conversion_parens" %COMMON% 2>&1 | find /c "needs parentheses" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_array_conversion_parens" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_7199" %COMMON% 2>&1 | find /c "..19988 chars.." | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_7260" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_7304" %COMMON% 2>&1 | find /c "9223372036854775808 is not representable by int" | findstr /x "1" || exit /b
@@ -55,6 +74,7 @@ set ODIN_FULL=%CD%\..\..\..\odin.exe
 %ODIN% check "..\test_issue_global_when_cycle" -no-entry-point %COMMON% 2>&1 | find /c "Contradictory global" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_global_when_cycle_ambiguous" -no-entry-point %COMMON% 2>&1 | find /c "Ambiguous global" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_global_when_shadowing" -no-entry-point %COMMON% 2>&1 | find /c "within a global" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_nesting_limit" %COMMON% 2>&1 | find /c "nested too deeply" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_ellipsis_type_call" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "10" || exit /b
 %ODIN% check "..\test_issue_foreign_redeclaration" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_foreign_import_attributes" -no-entry-point %COMMON% || exit /b
@@ -63,6 +83,8 @@ set ODIN_FULL=%CD%\..\..\..\odin.exe
 %ODIN% check "..\test_issue_inferred_default_overflow" -no-entry-point %COMMON% 2>&1 | find /c "Error: Cannot convert numeric value" | findstr /x "6" || exit /b
 %ODIN% check "..\test_issue_fixed_point_scale" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_poly_proc_value" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_poly_recursion_limit" %COMMON% 2>&1 | find /c "Polymorphic instantiations are nested too deeply" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_poly_recursion_limit_record" %COMMON% 2>&1 | find /c "Polymorphic instantiations are nested too deeply" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_poly_variadic_errors" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_poly_variadic_errors" %COMMON% 2>&1 | find /c "Cannot infer the polymorphic type '$E' of the variadic parameter 'args'" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_atomic_orderings" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "13" || exit /b
@@ -79,6 +101,8 @@ set ODIN_FULL=%CD%\..\..\..\odin.exe
 %ODIN% check "..\test_issue_escape_nested_calls" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "6" || exit /b
 %ODIN% check "..\test_issue_escape_cleared_stores" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "28" || exit /b
 %ODIN% check "..\test_issue_escape_cleared_stores" -no-entry-point %COMMON% 2>&1 | find /c "local variable 'y'" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_escape_deferred_procs" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "8" || exit /b
+%ODIN% check "..\test_issue_escape_deferred_procs" -no-entry-point %COMMON% 2>&1 | find /c "deferred by" | findstr /x "7" || exit /b
 %ODIN% test "..\test_issue_type_info_variant_shim" %COMMON% -ignore-warnings || exit /b
 %ODIN% check "..\test_issue_type_info_variant_shim" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "11" || exit /b
 %ODIN% check "..\test_issue_type_info_variant_shim_duplicate" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b

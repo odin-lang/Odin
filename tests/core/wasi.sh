@@ -3,7 +3,7 @@ set -eu
 
 cd "$(dirname "$0")/../.."
 ROOT="$(pwd -P)"
-FLAGS="-build-mode:test -target:wasi_wasm32 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:ODIN_TEST_RANDOM_SEED=$(date +%s)"
+FLAGS="-build-mode:test -target:wasi_wasm32 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true"
 
 NORMAL_PACKAGES="
 	bytes
@@ -28,15 +28,20 @@ NORMAL_PACKAGES="
 	encoding/uuid
 	encoding/varint
 	encoding/xml
+	flags
 	fmt
 	hash
 	io
 	math/big
 	math/big_cutoffs
+	math/bits
 	math/fixed
 	math/linalg/hlsl
 	math/noise
 	mem
+	odin
+	os
+	path/filepath
 	reflect
 	runtime
 	slice
@@ -44,10 +49,12 @@ NORMAL_PACKAGES="
 	strconv
 	strings
 	terminal/ansi
+	text/edit
 	text/i18n
 	text/match
 	text/regex
 	text/scanner
+	time
 	unicode
 "
 
@@ -67,7 +74,7 @@ FAILED=""
 
 run_package() {
 	echo "tests/core/$1"
-	if ./odin build "tests/core/$1" $FLAGS $2 -out:"$TEMP/test.wasm" && wasmtime run --dir "$ROOT::$ROOT" --dir "$TEMP::/tmp" --dir "$TEMP::." "$TEMP/test.wasm"; then
+	if ./odin build "tests/core/$1" $FLAGS $2 -out:"$TEMP/test.wasm" && wasmtime run --dir "$ROOT::$ROOT" --dir /usr/share/zoneinfo::/usr/share/zoneinfo --dir "$TEMP::/tmp" --dir "$TEMP::." "$TEMP/test.wasm"; then
 		return 0
 	fi
 	FAILED="$FAILED $1"

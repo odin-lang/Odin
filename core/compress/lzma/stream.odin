@@ -193,6 +193,9 @@ stream_init :: proc(r: ^Reader, z: ^compress.Context, kind: Stream_Kind, props: 
 	r.options   = options
 	r.allocator = allocator
 	r.total_in  = -1
+	defer if err != nil {
+		reader_destroy(r)
+	}
 	check_options(options) or_return
 	if options.progress != nil {
 		r.total_in = i64(compress.input_size(z))

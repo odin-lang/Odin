@@ -71,8 +71,29 @@ write_node :: proc(w: io.Writer, node: Node) {
 		}
 
 	case ^Node_Alternation:
-		io.write_rune(w, '《')
-		write_node(w, specific.left)
+		lower: [dynamic]^Node_Alternation
+		defer delete(lower)
+		bottom := specific.left
+		for {
+			link, is_alternation := bottom.(^Node_Alternation)
+			if !is_alternation {
+				break
+			}
+			if _, err := append(&lower, link); err != nil {
+				break
+			}
+			bottom = link.left
+		}
+
+		for _ in 0 ..= len(lower) {
+			io.write_rune(w, '《')
+		}
+		write_node(w, bottom)
+		#reverse for link in lower {
+			io.write_byte(w, '|')
+			write_node(w, link.right)
+			io.write_rune(w, '》')
+		}
 		io.write_byte(w, '|')
 		write_node(w, specific.right)
 		io.write_rune(w, '》')

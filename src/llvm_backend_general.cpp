@@ -169,6 +169,7 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 
 	map_init(&m->map_info_map, 0);
 	map_init(&m->map_cell_info_map, 0);
+	map_init(&m->soa_field_sizes_map, 0);
 	map_init(&m->exact_value_compound_literal_addr_map, 1024);
 
 	array_init(&m->pad_types, heap_allocator());
@@ -937,6 +938,8 @@ gb_internal lbAddr lb_addr_soa_variable(lbValue addr, lbValue index, Ast *index_
 	lbAddr v = {lbAddr_SoaVariable, addr};
 	v.soa.index = index;
 	v.soa.index_expr = index_expr;
+	v.soa.column = 0;
+	v.soa.elem = nullptr;
 	return v;
 }
 
@@ -950,10 +953,19 @@ gb_internal lbAddr lb_addr_soa_variable_from_soa_ptr(lbProcedure *p, lbValue soa
 	return lb_addr_soa_variable(lb_emit_struct_ev(p, soa_ptr, 0), lb_emit_struct_ev(p, soa_ptr, 1), nullptr);
 }
 
+// The type of the value an lbAddr_SoaVariable denotes
+gb_internal Type *lb_soa_variable_elem_type(lbAddr const &addr) {
+	GB_ASSERT(addr.kind == lbAddr_SoaVariable);
+	if (addr.soa.elem != nullptr) {
+		return addr.soa.elem;
+	}
+	return base_type(type_deref(addr.addr.type))->Struct.soa_elem;
+}
+
 // pointer to the index element of the field_index component
 //
 // the returned pointer type depends on the soa kind (because the field types do):
-// ^T for StructSoa_Fixed (field is [N]T array), but [^]T for the slice and dynamic
+// ^T for the kinds with inline fields (field is [N]T array), but [^]T for the slice and dynamic
 // kinds (field is the [^]T this offsets);
 // loads and stores work with either, but an lbAddr must not hold the multipointer,
 // so use lb_addr_soa_field_elem to build an lbAddr from this
@@ -962,7 +974,7 @@ gb_internal lbValue lb_soa_field_elem_ptr(lbProcedure *p, lbValue soa_ptr, i32 f
 	GB_ASSERT_MSG(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None, "%s", type_to_string(t));
 
 	lbValue field = lb_emit_struct_ep(p, soa_ptr, field_index);
-	if (t->Struct.soa_kind == StructSoa_Fixed) {
+	if (soa_has_inline_fields(t)) {
 		return lb_emit_array_ep(p, field, index);
 	}
 	return lb_emit_ptr_offset(p, lb_emit_load(p, field), index);
@@ -972,19 +984,18 @@ gb_internal lbValue lb_soa_field_elem_ptr(lbProcedure *p, lbValue soa_ptr, i32 f
 // this is array-element #soa only, unlike lb_soa_field_elem_ptr which serves any soa kind
 //
 // Note: the caller bounds checks component_index if needed
-gb_internal lbValue lb_soa_array_component_elem_ptr(lbProcedure *p, lbValue soa_ptr, lbValue component_index, lbValue elem_index, i64 component_count) {
-	Type *t = base_type(type_deref(soa_ptr.type));
-	GB_ASSERT_MSG(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None, "%s", type_to_string(t));
-	GB_ASSERT_MSG(base_type(t->Struct.soa_elem)->kind == Type_Array,
+gb_internal lbValue lb_soa_array_component_elem_ptr(lbProcedure *p, lbAddr const &soa_addr, lbValue component_index, i64 component_count) {
+	Type *elem = base_type(lb_soa_variable_elem_type(soa_addr));
+	GB_ASSERT_MSG(elem->kind == Type_Array,
 	              "indexing a component at runtime needs uniformly typed fields, got element %s",
-	              type_to_string(t->Struct.soa_elem));
+	              type_to_string(elem));
 	if (component_count == 0) {
 		// a [0]T element has no components, nor does its soa struct have a field to get a ptr to;
 		// emit a typed nil so that code is well formed;
 		// callers either check bounds (driect indexing) or skip the code (e.g. range loop over array element),
 		// so this is never dereferenced when bounds checks are on;
 		// with bounds checks off the access is out of bounds by definition
-		return lb_const_nil(p->module, alloc_type_pointer(base_type(t->Struct.soa_elem)->Array.elem));
+		return lb_const_nil(p->module, alloc_type_pointer(elem->Array.elem));
 	}
 	// do chain select between the component pointers;
 	// an element array holds at most 4 components, so this is at most 3 compares and 3 selects (branchless),
@@ -994,13 +1005,68 @@ gb_internal lbValue lb_soa_array_component_elem_ptr(lbProcedure *p, lbValue soa_
 	//
 	// lb_emit_select evaluates both arms, so every candidate address is
 	// formed; only the selected one is dereferenced
-	lbValue ptr = lb_soa_field_elem_ptr(p, soa_ptr, 0, elem_index);
+	lbValue ptr = lb_soa_field_elem_ptr(p, soa_addr.addr, soa_addr.soa.column, soa_addr.soa.index);
 	for (i64 component = 1; component < component_count; component++) {
-		lbValue candidate = lb_soa_field_elem_ptr(p, soa_ptr, cast(i32)component, elem_index);
+		lbValue candidate = lb_soa_field_elem_ptr(p, soa_addr.addr, soa_addr.soa.column + cast(i32)component, soa_addr.soa.index);
 		lbValue is_component = lb_emit_comp(p, Token_CmpEq, component_index, lb_const_int(p->module, t_int, component));
 		ptr = lb_emit_select(p, is_component, candidate, ptr);
 	}
 	return ptr;
+}
+
+// Pointer to the field (or lane) of the element at `elem_ptr` that #soa column `column` stores
+gb_internal lbValue lb_emit_soa_column_elem_ep(lbProcedure *p, lbValue elem_ptr, i32 column) {
+	for (;;) {
+		Type *t = base_type(type_deref(elem_ptr.type));
+		if (t->kind == Type_Array) {
+			return lb_emit_array_epi(p, elem_ptr, column);
+		}
+		i32 i = soa_split_column_field(t, &column);
+		elem_ptr = lb_emit_struct_ep(p, elem_ptr, i);
+		if (!is_soa_split_field(t->Struct.fields[i])) {
+			return elem_ptr;
+		}
+	}
+}
+
+// Loads element `index` of the columns from `column` on into `dst`, a pointer to their split value
+gb_internal void lb_soa_load_columns(lbProcedure *p, lbValue dst, lbValue soa_ptr, i32 column, lbValue index) {
+	Type *t = base_type(type_deref(dst.type));
+	isize count = t->kind == Type_Array ? cast(isize)t->Array.count : t->Struct.fields.count;
+	for (isize i = 0; i < count; i++) {
+		lbValue dst_field = lb_emit_struct_ep(p, dst, cast(i32)i);
+		if (t->kind == Type_Struct && is_soa_split_field(t->Struct.fields[i])) {
+			lb_soa_load_columns(p, dst_field, soa_ptr, column, index);
+			column += soa_split_column_count(t->Struct.fields[i]->type);
+			continue;
+		}
+		lbValue src = lb_emit_load(p, lb_soa_field_elem_ptr(p, soa_ptr, column, index));
+		lb_emit_store(p, dst_field, src);
+		column += 1;
+	}
+}
+
+// Stores the split `value` into element `index` of the columns from `column` on
+gb_internal void lb_soa_store_columns(lbProcedure *p, lbValue soa_ptr, i32 column, lbValue index, lbValue value) {
+	Type *soa = base_type(type_deref(soa_ptr.type));
+	Type *t = base_type(value.type);
+	isize count = t->kind == Type_Array ? cast(isize)t->Array.count : t->Struct.fields.count;
+	for (isize i = 0; i < count; i++) {
+		if (t->kind == Type_Struct && is_soa_split_field(t->Struct.fields[i])) {
+			lb_soa_store_columns(p, soa_ptr, column, index, lb_emit_struct_ev(p, value, cast(i32)i));
+			column += soa_split_column_count(t->Struct.fields[i]->type);
+			continue;
+		}
+		lbValue dst = lb_emit_struct_ep(p, soa_ptr, column);
+		lbValue src = lb_emit_struct_ev(p, value, cast(i32)i);
+		if (soa_has_inline_fields(soa)) {
+			dst = lb_emit_array_ep(p, dst, index);
+		} else {
+			dst = lb_emit_ptr_offset(p, lb_emit_load(p, dst), index);
+		}
+		lb_emit_store(p, dst, src);
+		column += 1;
+	}
 }
 
 // lbAddr over an lb_soa_field_elem_ptr pointer, retyped ^T when it came as [^]T
@@ -1747,9 +1813,7 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		Type *t = type_deref(addr.addr.type);
 		t = base_type(t);
 		GB_ASSERT(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None);
-		Type *elem_type = t->Struct.soa_elem;
-		value = lb_emit_conv(p, value, elem_type);
-		elem_type = base_type(elem_type);
+		value = lb_emit_conv(p, value, lb_soa_variable_elem_type(addr));
 
 		lbValue index = addr.soa.index;
 		if (!lb_is_const(index) || t->Struct.soa_kind != StructSoa_Fixed) {
@@ -1761,28 +1825,7 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 			}
 		}
 
-		isize field_count = 0;
-
-		switch (elem_type->kind) {
-		case Type_Struct:
-			field_count = elem_type->Struct.fields.count;
-			break;
-		case Type_Array:
-			field_count = cast(isize)elem_type->Array.count;
-			break;
-		}
-		for (isize i = 0; i < field_count; i++) {
-			lbValue dst = lb_emit_struct_ep(p, addr.addr, cast(i32)i);
-			lbValue src = lb_emit_struct_ev(p, value, cast(i32)i);
-			if (t->Struct.soa_kind == StructSoa_Fixed) {
-				dst = lb_emit_array_ep(p, dst, index);
-				lb_emit_store(p, dst, src);
-			} else {
-				lbValue field = lb_emit_load(p, dst);
-				dst = lb_emit_ptr_offset(p, field, index);
-				lb_emit_store(p, dst, src);
-			}
-		}
+		lb_soa_store_columns(p, addr.addr, addr.soa.column, index, value);
 		return;
 	} else if (addr.kind == lbAddr_Swizzle) {
 		GB_ASSERT(addr.swizzle.count <= 4);
@@ -2402,55 +2445,41 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		Type *t = type_deref(addr.addr.type);
 		t = base_type(t);
 		GB_ASSERT(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None);
-		Type *elem = t->Struct.soa_elem;
+		Type *elem = lb_soa_variable_elem_type(addr);
 
 		lbValue len = {};
 		if (t->Struct.soa_kind == StructSoa_Fixed) {
 			len = lb_const_int(p->module, t_int, t->Struct.soa_count);
 		} else {
-			lbValue v = lb_emit_load(p, addr.addr);
-			len = lb_soa_struct_len(p, v);
+			len = lb_soa_struct_len(p, addr.addr);
+		}
+
+		bool bounds_check = addr.soa.index_expr != nullptr && (!lb_is_const(addr.soa.index) || t->Struct.soa_kind != StructSoa_Fixed);
+
+		if (is_type_array(elem) && is_type_numeric(base_type(elem)->Array.elem)) {
+			// NOTE(bill): each lane of an array of numbers is a column, and the value is built from them directly: arithmetic
+			// on a load of a local holding it would be done as a vector, which a loop over the elements cannot vectorize.
+			// Numbers have no padding the local would have zeroed.
+			if (bounds_check) {
+				lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), addr.soa.index, len);
+			}
+			lbValue res = {};
+			res.type  = elem;
+			res.value = LLVMConstNull(lb_type(p->module, elem));
+			for (i64 i = 0; i < base_type(elem)->Array.count; i++) {
+				lbValue lane = lb_emit_load(p, lb_soa_field_elem_ptr(p, addr.addr, addr.soa.column + cast(i32)i, addr.soa.index));
+				res.value = LLVMBuildInsertValue(p->builder, res.value, lane.value, cast(unsigned)i, "");
+			}
+			return res;
 		}
 
 		lbAddr res = lb_add_local_generated(p, elem, true);
 
-		if (addr.soa.index_expr != nullptr && (!lb_is_const(addr.soa.index) || t->Struct.soa_kind != StructSoa_Fixed)) {
+		if (bounds_check) {
 			lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), addr.soa.index, len);
 		}
 
-		if (t->Struct.soa_kind == StructSoa_Fixed) {
-			for_array(i, t->Struct.fields) {
-				Entity *field = t->Struct.fields[i];
-				Type *base_type = field->type;
-				GB_ASSERT(base_type->kind == Type_Array);
-
-				lbValue dst = lb_emit_struct_ep(p, res.addr, cast(i32)i);
-				lbValue src_ptr = lb_emit_struct_ep(p, addr.addr, cast(i32)i);
-				src_ptr = lb_emit_array_ep(p, src_ptr, addr.soa.index);
-				lbValue src = lb_emit_load(p, src_ptr);
-				lb_emit_store(p, dst, src);
-			}
-		} else {
-			isize field_count = t->Struct.fields.count;
-			if (t->Struct.soa_kind == StructSoa_Slice) {
-				field_count -= 1;
-			} else if (t->Struct.soa_kind == StructSoa_Dynamic) {
-				field_count -= 3;
-			}
-			for (isize i = 0; i < field_count; i++) {
-				Entity *field = t->Struct.fields[i];
-				Type *base_type = field->type;
-				GB_ASSERT(base_type->kind == Type_MultiPointer);
-
-				lbValue dst = lb_emit_struct_ep(p, res.addr, cast(i32)i);
-				lbValue src_ptr = lb_emit_struct_ep(p, addr.addr, cast(i32)i);
-				lbValue src = lb_emit_load(p, src_ptr);
-				src = lb_emit_ptr_offset(p, src, addr.soa.index);
-				src = lb_emit_load(p, src);
-				lb_emit_store(p, dst, src);
-			}
-		}
-
+		lb_soa_load_columns(p, res.addr, addr.addr, addr.soa.column, addr.soa.index);
 		return lb_addr_load(p, res);
 	} else if (addr.kind == lbAddr_Swizzle) {
 		Type *array_type = base_type(addr.swizzle.type);

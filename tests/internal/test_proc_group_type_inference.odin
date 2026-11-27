@@ -202,6 +202,26 @@ test_proc_group_polymorphic_precedence :: proc(t: ^testing.T) {
 }
 
 @test
+test_proc_group_type_and_value_parameters :: proc(t: ^testing.T) {
+	{
+		proc_type  :: proc($T: typeid) -> int { return 1 }
+		proc_value :: proc(x: $T)      -> int { return 2 }
+		group :: proc{proc_type, proc_value}
+
+		testing.expect_value(t, group(int), 1)
+		testing.expect_value(t, group(7),   2)
+	}
+	{
+		proc_type  :: proc($T: typeid/[]$E) -> int { return 1 }
+		proc_value :: proc(x: $T/[]$E)      -> int { return 2 }
+		group :: proc{proc_type, proc_value}
+
+		testing.expect_value(t, group([]int),       1)
+		testing.expect_value(t, group([]int{1, 2}), 2)
+	}
+}
+
+@test
 test_type_inference_on_literals_for_various_types :: proc(t: ^testing.T) {
 	proc_nil :: proc() { }
 

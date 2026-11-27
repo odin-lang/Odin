@@ -530,14 +530,25 @@ For example, `join_path({"/home", "foo", "bar.txt"})` will result in `"/home/foo
 */
 @(require_results)
 join_path :: proc(elems: []string, allocator: runtime.Allocator) -> (joined: string, err: runtime.Allocator_Error) {
-	for e, i in elems {
-		if e != "" {
-			temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
-			p := strings.join(elems[i:], Path_Separator_String, temp_allocator) or_return
-			return clean_path(p, allocator)
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+
+	b := strings.builder_make(temp_allocator) or_return
+	for elem in elems {
+		e := elem
+		if len(b.buf) > 0 && is_path_separator(b.buf[len(b.buf)-1]) {
+			for len(e) > 0 && is_path_separator(e[0]) {
+				e = e[1:]
+			}
+		} else if len(b.buf) > 0 && e != "" {
+			strings.write_byte(&b, Path_Separator) or_return
 		}
+		strings.write_string(&b, e) or_return
 	}
-	return "", nil
+
+	if len(b.buf) == 0 {
+		return "", nil
+	}
+	return clean_path(strings.to_string(b), allocator)
 }
 
 /*
@@ -640,7 +651,14 @@ split_path_list :: proc(path: string, allocator: runtime.Allocator) -> (list: []
 	}
 
 	start, quote = 0, false
-	list = make([]string, count + 1, allocator) or_return
+	l := make([]string, count + 1, allocator) or_return
+	cloned := 0
+	defer if err != nil {
+		for s in l[:cloned] {
+			delete(s, allocator)
+		}
+		delete(l, allocator)
+	}
 	index := 0
 	for i := 0; i < len(path); i += 1 {
 		c := path[i]
@@ -648,23 +666,31 @@ split_path_list :: proc(path: string, allocator: runtime.Allocator) -> (list: []
 		case c == '"':
 			quote = !quote
 		case c == Path_List_Separator && !quote:
-			list[index] = path[start:i]
+			l[index] = path[start:i]
 			index += 1
 			start = i + 1
 		}
 	}
 	assert(index == count)
-	list[index] = path[start:]
+	l[index] = path[start:]
 
-	for s0, i in list {
-		s, new := strings.replace_all(s0, `"`, ``, allocator)
-		if !new {
-			s = strings.clone(s, allocator) or_return
+	for s0, i in l {
+		s: string
+		if strings.index_byte(s0, '"') < 0 {
+			s = strings.clone(s0, allocator) or_return
+		} else {
+			new: bool
+			s, new = strings.replace_all(s0, `"`, ``, allocator)
+			if !new {
+				err = runtime.Allocator_Error.Out_Of_Memory
+				return
+			}
 		}
-		list[i] = s
+		l[i] = s
+		cloned = i + 1
 	}
 
-	return list, nil
+	return l, nil
 }
 
 /*
@@ -747,8 +773,13 @@ glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []str
 
 	if !has_meta(pattern) {
 		// TODO(bill): os.lstat on here to check for error
-		m := make([]string, 1)
-		m[0] = strings.clone(pattern)
+		m := make([]string, 1) or_return
+		cloned, clone_err := strings.clone(pattern)
+		if clone_err != nil {
+			delete(m)
+			return nil, clone_err
+		}
+		m[0] = cloned
 		return m[:], nil
 	}
 
@@ -774,9 +805,13 @@ glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []str
 
 	dmatches := make([dynamic]string, 0, 0)
 	for d in m {
-		dmatches, err = _glob(d, file, &dmatches)
+		_, err = _glob(d, file, &dmatches)
 		if err != nil {
-			break
+			for s in dmatches {
+				delete(s)
+			}
+			delete(dmatches)
+			return nil, err
 		}
 	}
 	if len(dmatches) > 0 {
@@ -944,10 +979,21 @@ get_escape :: proc(chunk: string) -> (r: rune, next_chunk: string, err: Error) {
 _glob :: proc(dir, pattern: string, matches: ^[dynamic]string, allocator := context.allocator) -> (m: [dynamic]string, e: Error) {
 	context.allocator = allocator
 
-	if matches != nil {
-		m = matches^
-	} else {
-		m = make([dynamic]string, 0, 0)
+	local := make([dynamic]string, 0, 0)
+	out := matches
+	if out == nil {
+		out = &local
+	}
+	start := len(out)
+	defer if e != nil {
+		for s in out[start:] {
+			delete(s)
+		}
+		if matches != nil {
+			resize(out, start)
+		} else {
+			delete(local)
+		}
 	}
 
 
@@ -958,10 +1004,14 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string, allocator := cont
 	defer file_info_delete(file_info, allocator)
 
 	if file_info.type != .Directory {
-		return
+		return out^, nil
 	}
 
-	fis, _ := read_dir(d, -1, allocator)
+	fis, read_err := read_dir(d, -1, allocator)
+	if _, is_alloc_err := read_err.(runtime.Allocator_Error); is_alloc_err {
+		e = read_err
+		return
+	}
 	slice.sort_by(fis, proc(a, b: File_Info) -> bool {
 		return a.name < b.name
 	})
@@ -971,10 +1021,14 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string, allocator := cont
 		matched := match(pattern, fi.name) or_return
 		if matched {
 			matched_path := join_path({dir, fi.name}, allocator) or_return
-			append(&m, matched_path)
+			if _, append_err := append(out, matched_path); append_err != nil {
+				delete(matched_path)
+				e = append_err
+				return
+			}
 		}
 	}
-	return
+	return out^, nil
 }
 
 @(private)

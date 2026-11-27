@@ -325,7 +325,7 @@ test_builder_partial_write_counts :: proc(t: ^testing.T) {
 	sn, serr := io.write_string(strings.to_writer(&b), "abcdef")
 	testing.expect_value(t, strings.to_string(b), "abcd")
 	testing.expect_value(t, sn, 4)
-	testing.expect_value(t, serr, io.Error.EOF)
+	testing.expect_value(t, serr, io.Error.Short_Write)
 }
 
 @test

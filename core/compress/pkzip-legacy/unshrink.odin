@@ -43,10 +43,7 @@ unshrink_from_context :: proc(z: ^compress.Context, expected_output_size := -1, 
 	next_free := SHRINK_FIRST_FREE_CODE
 
 	b := Bits{z.code_buffer, z.num_bits}
-	defer {
-		z.code_buffer = b.buffer
-		z.num_bits    = b.count
-	}
+	defer bits_hand_back(z, &b)
 
 	o := out_load(z)
 	defer out_store(z, &o)

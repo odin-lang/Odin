@@ -9,11 +9,19 @@ _pipe :: proc() -> (r, w: ^File, err: Error) {
 	if errno != .NONE {
 		return nil, nil,_get_platform_error(errno)
 	}
-
-	r = _new_file(uintptr(fds[0]), "", file_allocator()) or_return
-	w = _new_file(uintptr(fds[1]), "", file_allocator()) or_return
-
-	return
+	rf, r_err := _new_file(uintptr(fds[0]), "", file_allocator())
+	if r_err != nil {
+		linux.close(fds[0])
+		linux.close(fds[1])
+		return nil, nil, r_err
+	}
+	wf, w_err := _new_file(uintptr(fds[1]), "", file_allocator())
+	if w_err != nil {
+		close(rf)
+		linux.close(fds[1])
+		return nil, nil, w_err
+	}
+	return rf, wf, nil
 }
 
 @(require_results)
@@ -29,6 +37,9 @@ _pipe_has_data :: proc(r: ^File) -> (ok: bool, err: Error) {
 		},
 	}
 	n, errno := linux.poll(poll_fds, 0)
+	for errno == .EINTR {
+		n, errno = linux.poll(poll_fds, 0)
+	}
 	if n != 1 || errno != nil {
 		return false, _get_platform_error(errno)
 	}

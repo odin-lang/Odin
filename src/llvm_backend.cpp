@@ -1202,6 +1202,32 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	return {p->value, p->type};
 }
 
+// A read-only table of the element size of each field of an #soa type, for intrinsics.type_soa_field_sizes
+gb_internal lbValue lb_gen_soa_field_sizes_ptr(lbModule *m, Type *type) {
+	lbAddr *found = map_get(&m->soa_field_sizes_map, type);
+	if (found) {
+		return found->addr;
+	}
+
+	Type *soa = base_type(type);
+	isize count = soa_field_count(soa);
+	Type *table_type = alloc_type_array(t_int, count);
+
+	LLVMValueRef *sizes = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+	for (isize i = 0; i < count; i++) {
+		Type *column = base_type(soa->Struct.fields[i]->type);
+		Type *field_type = column->kind == Type_Array ? column->Array.elem : column->MultiPointer.elem;
+		sizes[i] = lb_const_int(m, t_int, type_size_of(field_type)).value;
+	}
+	lbValue table = {llvm_const_array(m, lb_type(m, t_int), sizes, count), table_type};
+
+	lbAddr addr = lb_add_global_generated_with_name(m, table_type, table, lb_internal_gen_name_from_type("ggv$soa_field_sizes", type));
+	lb_make_global_private_const(addr);
+
+	map_set(&m->soa_field_sizes_map, type, addr);
+	return addr.addr;
+}
+
 gb_internal lbValue lb_gen_map_cell_info_ptr(lbModule *m, Type *type) {
 	lbAddr *found = map_get(&m->map_cell_info_map, type);
 	if (found) {
@@ -3863,9 +3889,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				isize types;
 				isize names;
 				isize offsets;
-				isize usings;
+				isize field_flags;
 				isize tags;
-				isize empty_usings;
+				isize empty_field_flags;
 				isize empty_tags;
 				isize enum_indices;
 			};
@@ -3892,10 +3918,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 					c.types   += n;
 					c.names   += n;
 					c.offsets += n;
-					if (lb_type_info_struct_has_usings(t)) {
-						c.usings += n;
+					if (lb_type_info_struct_has_field_flags(t)) {
+						c.field_flags += n;
 					} else {
-						c.empty_usings = gb_max(c.empty_usings, n);
+						c.empty_field_flags = gb_max(c.empty_field_flags, n);
 					}
 					if (lb_type_info_has_tags(t)) {
 						c.tags += n;
@@ -3941,16 +3967,16 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			for (lbModule *tm : gen->type_info_modules) {
 				MemberCounts const &c = counts[tm->type_info_part];
 				lbTypeInfoMembers *members = permanent_alloc_item<lbTypeInfoMembers>();
-				members->types   = global_type_info_make(tm, LB_TYPE_INFO_TYPES_NAME,   t_type_info_ptr, c.types);
-				members->names   = global_type_info_make(tm, LB_TYPE_INFO_NAMES_NAME,   t_string,        c.names);
-				members->offsets = global_type_info_make(tm, LB_TYPE_INFO_OFFSETS_NAME, t_uintptr,       c.offsets);
-				members->usings  = global_type_info_make(tm, LB_TYPE_INFO_USINGS_NAME,  t_bool,          c.empty_usings + c.usings);
-				members->tags    = global_type_info_make(tm, LB_TYPE_INFO_TAGS_NAME,    t_string,        c.empty_tags   + c.tags);
+				members->types       = global_type_info_make(tm, LB_TYPE_INFO_TYPES_NAME,       t_type_info_ptr, c.types);
+				members->names       = global_type_info_make(tm, LB_TYPE_INFO_NAMES_NAME,       t_string,        c.names);
+				members->offsets     = global_type_info_make(tm, LB_TYPE_INFO_OFFSETS_NAME,     t_uintptr,       c.offsets);
+				members->field_flags = global_type_info_make(tm, LB_TYPE_INFO_FIELD_FLAGS_NAME, t_u8,            c.empty_field_flags + c.field_flags);
+				members->tags        = global_type_info_make(tm, LB_TYPE_INFO_TAGS_NAME,        t_string,        c.empty_tags        + c.tags);
 
-				members->empty_usings_count = c.empty_usings;
-				members->empty_tags_count   = c.empty_tags;
-				members->usings_index       = c.empty_usings;
-				members->tags_index         = c.empty_tags;
+				members->empty_field_flags_count = c.empty_field_flags;
+				members->empty_tags_count        = c.empty_tags;
+				members->field_flags_index       = c.empty_field_flags;
+				members->tags_index              = c.empty_tags;
 
 				if (c.enum_indices > 0) {
 					members->enum_indices       = global_type_info_make(tm, LB_TYPE_INFO_ENUM_INDICES_NAME, t_type_info_enum_value, c.enum_indices);

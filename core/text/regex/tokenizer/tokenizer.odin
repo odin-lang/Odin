@@ -146,7 +146,7 @@ scan_repeat :: proc(t: ^Tokenizer) -> (str: string, ok: bool) {
 
 	for {
 		advance_rune(t)
-		if t.ch == -1 {
+		if t.ch == -1 || t.error_state != nil {
 			return "", false
 		}
 		if t.ch == '}' {
@@ -170,6 +170,9 @@ scan_non_greedy :: proc(t: ^Tokenizer) -> bool {
 scan_comment :: proc(t: ^Tokenizer) {
 	for {
 		advance_rune(t)
+		if t.error_state != nil {
+			return
+		}
 		switch t.ch {
 		case -1:
 			return

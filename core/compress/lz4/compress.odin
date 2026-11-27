@@ -141,6 +141,9 @@ frame_writer_init :: proc(fw: ^Frame_Writer, w: io.Writer, level := Level.Defaul
 	fw.options       = options
 	fw.block_max     = LZ4_BLOCK_MAX_BYTES[frame_options.block_max_size]
 	defer fw.err = err
+	defer if err != nil {
+		frame_writer_destroy(fw)
+	}
 
 	if options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 || input_size < -1 {
 		return General_Error.Incompatible_Options
@@ -827,6 +830,10 @@ lz4_compress_optimal :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, 
 	if alloc_err != nil {
 		return lz4_compress_chain(s, output, data, start, end, low, depth, nice, true, CHECKED, check)
 	}
+	chain_buffer, chain_err := make([]i32, node_count, context.temp_allocator)
+	if chain_err != nil {
+		return lz4_compress_chain(s, output, data, start, end, low, depth, nice, true, CHECKED, check)
+	}
 
 	Match :: struct {
 		length: int,
@@ -910,7 +917,7 @@ lz4_compress_optimal :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, 
 		for k := path_end; k > 0; k = int(nodes[k].previous) {
 			steps += 1
 		}
-		chain := make([]i32, steps, context.temp_allocator)
+		chain := chain_buffer[:steps]
 		{
 			i := steps
 			for k := path_end; k > 0; k = int(nodes[k].previous) {

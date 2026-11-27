@@ -492,12 +492,15 @@ Sink :: struct {
 	changed:     bool,
 	grows:       bool,
 	grow_offset: int,
+	alloc_err:   runtime.Allocator_Error,
 }
 
 @(private="file")
 emit :: #force_inline proc(s: ^Sink, text: string) {
 	if s.sb != nil {
-		write_string(s.sb, text)
+		if _, werr := write_string(s.sb, text); werr != nil && s.alloc_err == nil {
+			s.alloc_err = werr
+		}
 	} else if s.buf != nil {
 		copy(s.buf[s.w:], text)
 	}

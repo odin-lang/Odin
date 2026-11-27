@@ -136,6 +136,10 @@ wasm_allocator_proc :: proc(a: rawptr, mode: Allocator_Mode, size, alignment: in
 		return ([^]byte)(ptr)[:size], nil
 
 	case .Resize:
+		if size == 0 {
+			free(a, old_memory, loc)
+			return nil, nil
+		}
 		ptr := aligned_realloc(a, old_memory, uint(alignment), uint(size), loc)
 		if ptr == nil {
 			return nil, .Out_Of_Memory
@@ -151,6 +155,10 @@ wasm_allocator_proc :: proc(a: rawptr, mode: Allocator_Mode, size, alignment: in
 		return bytes, nil
 
 	case .Resize_Non_Zeroed:
+		if size == 0 {
+			free(a, old_memory, loc)
+			return nil, nil
+		}
 		ptr := aligned_realloc(a, old_memory, uint(alignment), uint(size), loc)
 		if ptr == nil {
 			return nil, .Out_Of_Memory
@@ -483,6 +491,9 @@ claim_more_memory :: proc(a: ^WASM_Allocator, num_bytes: uint) -> bool {
 	PAGE_SIZE :: 64 * 1024
 
 	page_alloc :: proc(page_count: int) -> []byte {
+		if page_count > 1 << 16 {
+			return nil
+		}
 		prev_page_count := intrinsics.wasm_memory_grow(0, uintptr(page_count))
 		if prev_page_count < 0 { return nil }
 
@@ -510,7 +521,7 @@ claim_more_memory :: proc(a: ^WASM_Allocator, num_bytes: uint) -> bool {
 		} else {
 			// Otherwise, we have to "waste" the previous spill.
 			// Now this is probably uncommon, and will only happen if another code path
-			// is also requesting pages.
+			// is also requesting pages, or if the joined spill would not fit in an `int`.
 			a.spill = allocated
 		}
 

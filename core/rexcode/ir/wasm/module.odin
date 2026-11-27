@@ -3,6 +3,7 @@
 
 package rexcode_wasm
 
+import "base:runtime"
 import "core:rexcode/ir"
 
 // =============================================================================
@@ -225,4 +226,13 @@ module_name :: proc "contextless" (m: Module) -> (string, bool) {
 		}
 	}
 	return "", false
+}
+
+@(private)
+custom_section_name_destroy :: proc(cname: Custom_Section_Name, allocator: runtime.Allocator) {
+	delete(cname.functions, allocator)
+	for l in cname.locals {
+		delete(l.locals, allocator)
+	}
+	delete(cname.locals, allocator)
 }

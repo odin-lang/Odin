@@ -13,6 +13,7 @@ Failing_Allocator :: struct {
 	backing: runtime.Allocator,
 	left:    int,
 	once:    bool,
+	err:     runtime.Allocator_Error,
 }
 
 failing_allocator_proc :: proc(data: rawptr, mode: runtime.Allocator_Mode, size, alignment: int, old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, runtime.Allocator_Error) {
@@ -22,6 +23,9 @@ failing_allocator_proc :: proc(data: rawptr, mode: runtime.Allocator_Mode, size,
 		if f.left <= 0 {
 			if f.once {
 				f.left = max(int)
+			}
+			if f.err != nil {
+				return nil, f.err
 			}
 			return nil, .Out_Of_Memory
 		}

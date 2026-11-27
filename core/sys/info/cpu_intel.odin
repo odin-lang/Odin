@@ -29,6 +29,7 @@ CPU_Feature :: enum u64 {
 	ssse3,     // Supplemental streaming SIMD extension 3
 	sse41,     // Streaming SIMD extension 4 and 4.1
 	sse42,     // Streaming SIMD extension 4 and 4.2
+	vaes,      // Vector AES (VAES) - AES NI on 256/512-bit vectors
 
 	avx512bf16,         // Vector Neural Network Instructions supporting bfloat16
 	avx512bitalg,       // Bit Algorithms
@@ -118,6 +119,7 @@ _init_cpu_features :: proc "contextless" () {
 	try_set(&_features, .sha, 29, ebx7)
 	if os_supports_avx {
 		try_set(&_features, .avx2, 5, ebx7)
+		try_set(&_features, .vaes, 9, ecx7)
 	}
 	if os_supports_avx512 {
 		try_set(&_features, .avx512f,    16, ebx7)

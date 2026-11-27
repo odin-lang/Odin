@@ -1,4 +1,4 @@
-#+build darwin, linux, freebsd, openbsd, netbsd
+#+build darwin, linux, freebsd, openbsd, netbsd, wasi
 #+private
 package timezone
 
@@ -9,7 +9,7 @@ import "core:path/filepath"
 
 local_tz_name :: proc(allocator := context.allocator) -> (name: string, success: bool) {
 	local_str, ok := os.lookup_env("TZ", allocator)
-	if !ok {
+	if !ok && ODIN_OS != .WASI {
 		orig_localtime_path := "/etc/localtime"
 		path, err := os.get_absolute_path(orig_localtime_path, allocator)
 		if err != nil {

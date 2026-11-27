@@ -700,6 +700,49 @@ unique_proc :: proc(s: $S/[]$T, eq: proc(T, T) -> bool) -> S #no_bounds_check {
 	return s[:i]
 }
 
+// 'retain' keeps the elements of a slice or #soa slice whose value in `keep` is true, in order, and drops the rest.
+// The procedures modify the slice in-place and return the modified slice.
+retain :: proc{
+	retain_slice,
+	retain_soa,
+}
+
+// 'retain_slice' keeps the elements of `s` whose value in `keep` is true, in order, and drops the rest.
+// `keep` must be as long as `s`.
+// The procedure modifies the slice in-place and returns the modified slice.
+@(require_results)
+retain_slice :: proc(s: $S/[]$T, keep: []bool, loc := #caller_location) -> S #no_bounds_check {
+	assert(len(keep) == len(s), "`keep` must be as long as `s`", loc)
+	i := 0
+	for k, j in keep {
+		if k {
+			if i != j {
+				s[i] = s[j]
+			}
+			i += 1
+		}
+	}
+	return s[:i]
+}
+
+// 'retain_soa' keeps the elements of the #soa slice `s` whose value in `keep` is true, in order, and drops the rest.
+// `keep` must be as long as `s`.
+// The procedure modifies the slice in-place and returns the modified slice.
+@(require_results)
+retain_soa :: proc(s: $S/#soa[]$T, keep: []bool, loc := #caller_location) -> S #no_bounds_check {
+	assert(len(keep) == len(s), "`keep` must be as long as `s`", loc)
+	i := 0
+	for k, j in keep {
+		if k {
+			if i != j {
+				s[i] = s[j]
+			}
+			i += 1
+		}
+	}
+	return s[:i]
+}
+
 
 @(require_results)
 min :: proc "contextless" (s: $S/[]$T) -> (res: T, ok: bool) where intrinsics.type_is_ordered(T) #optional_ok {

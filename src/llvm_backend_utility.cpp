@@ -434,6 +434,21 @@ gb_internal lbValue lb_soa_zip(lbProcedure *p, AstCallExpr *ce, TypeAndValue con
 	return lb_addr_load(p, res);
 }
 
+// The `#soa[]` view of type `view_type` of the columns of the #soa array `soa` points to, from `column` on
+gb_internal lbValue lb_soa_split_view(lbProcedure *p, lbValue soa, i32 column, Type *view_type) {
+	Type *t = base_type(type_deref(soa.type));
+	i32 count = cast(i32)soa_field_count(view_type);
+	lbAddr view = lb_add_local_generated(p, view_type, false);
+	for (i32 i = 0; i < count; i++) {
+		lbValue data = lb_emit_struct_ep(p, soa, column+i);
+		data = soa_has_inline_fields(t) ? lb_emit_array_epi(p, data, 0) : lb_emit_load(p, data);
+		lbValue dst = lb_emit_struct_ep(p, view.addr, i);
+		lb_emit_store(p, dst, lb_emit_conv(p, data, type_deref(dst.type)));
+	}
+	lb_emit_store(p, lb_emit_struct_ep(p, view.addr, count), lb_soa_struct_len(p, soa));
+	return lb_addr_load(p, view);
+}
+
 gb_internal lbValue lb_soa_unzip(lbProcedure *p, AstCallExpr *ce, TypeAndValue const &tv) {
 	GB_ASSERT(ce->args.count == 1);
 
@@ -444,17 +459,24 @@ gb_internal lbValue lb_soa_unzip(lbProcedure *p, AstCallExpr *ce, TypeAndValue c
 	lbValue len = lb_soa_struct_len(p, arg);
 
 	lbAddr res = lb_add_local_generated(p, tv.type, true);
-	if (is_type_tuple(tv.type)) {
-		lbValue rp = lb_addr_get_ptr(p, res);
-		for (i32 i = 0; i < cast(i32)(t->Struct.fields.count-1); i++) {
-			lbValue ptr = lb_emit_struct_ev(p, arg, i);
-			lbAddr dst = lb_addr(lb_emit_struct_ep(p, rp, i));
-			lb_fill_slice(p, dst, ptr, len);
+	lbValue rp = lb_addr_get_ptr(p, res);
+	lbValue soa = {};
+	bool is_tuple = is_type_tuple(tv.type);
+	i32 result_count = is_tuple ? cast(i32)tv.type->Tuple.variables.count : 1;
+	i32 column = 0;
+	for (i32 i = 0; i < result_count; i++) {
+		Type *result = is_tuple ? tv.type->Tuple.variables[i]->type : tv.type;
+		if (is_type_slice(result)) {
+			lbValue ptr = lb_emit_struct_ev(p, arg, column++);
+			lb_fill_slice(p, lb_addr(is_tuple ? lb_emit_struct_ep(p, rp, i) : rp), ptr, len);
+			continue;
 		}
-	} else {
-		GB_ASSERT(is_type_slice(tv.type));
-		lbValue ptr = lb_emit_struct_ev(p, arg, 0);
-		lb_fill_slice(p, res, ptr, len);
+		// NOTE(bill): the `#soa[]` view of a `#soa_split` field's columns
+		if (soa.value == nullptr) {
+			soa = lb_address_from_load_or_generate_local(p, arg);
+		}
+		lb_emit_store(p, is_tuple ? lb_emit_struct_ep(p, rp, i) : rp, lb_soa_split_view(p, soa, column, result));
+		column += cast(i32)soa_field_count(result);
 	}
 
 	return lb_addr_load(p, res);
@@ -1745,12 +1767,18 @@ gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection 
 			addr = lb_emit_load(p, addr);
 			soa_index = lb_emit_load(p, soa_index);
 
-			lbValue arr = lb_emit_struct_ep(p, addr, index);
-
 			Type *t = base_type(type_deref(addr.type));
 			GB_ASSERT(is_type_soa_struct(t));
 
-			if (t->Struct.soa_kind == StructSoa_Fixed) {
+			i32 column = 0;
+			isize next = i;
+			Type *split = soa_split_select(t->Struct.soa_elem, sel, &next, &column);
+			GB_ASSERT_MSG(split == nullptr, "a '#soa_split' field has no address");
+			i = next-1;
+
+			lbValue arr = lb_emit_struct_ep(p, addr, column);
+
+			if (soa_has_inline_fields(t)) {
 				e = lb_emit_array_ep(p, arr, soa_index);
 			} else {
 				e = lb_emit_ptr_offset(p, lb_emit_load(p, arr), soa_index);
@@ -2151,17 +2179,10 @@ gb_internal lbValue lb_soa_struct_len(lbProcedure *p, lbValue value) {
 	}
 
 	GB_ASSERT(t->Struct.soa_kind == StructSoa_Slice ||
-	          t->Struct.soa_kind == StructSoa_Dynamic);
+	          t->Struct.soa_kind == StructSoa_Dynamic ||
+	          t->Struct.soa_kind == StructSoa_FixedCapacityDynamic);
 
-	isize n = 0;
-	Type *elem = base_type(t->Struct.soa_elem);
-	if (elem->kind == Type_Struct) {
-		n = cast(isize)elem->Struct.fields.count;
-	} else if (elem->kind == Type_Array) {
-		n = cast(isize)elem->Array.count;
-	} else {
-		GB_PANIC("Unreachable");
-	}
+	isize n = soa_field_count(t);
 
 	if (is_ptr) {
 		lbValue v = lb_emit_struct_ep(p, value, cast(i32)n);
@@ -2179,21 +2200,13 @@ gb_internal lbValue lb_soa_struct_cap(lbProcedure *p, lbValue value) {
 		t = base_type(type_deref(t));
 	}
 
-	if (t->Struct.soa_kind == StructSoa_Fixed) {
+	if (soa_has_inline_fields(t)) {
 		return lb_const_int(p->module, t_int, t->Struct.soa_count);
 	}
 
 	GB_ASSERT(t->Struct.soa_kind == StructSoa_Dynamic);
 
-	isize n = 0;
-	Type *elem = base_type(t->Struct.soa_elem);
-	if (elem->kind == Type_Struct) {
-		n = cast(isize)elem->Struct.fields.count+1;
-	} else if (elem->kind == Type_Array) {
-		n = cast(isize)elem->Array.count+1;
-	} else {
-		GB_PANIC("Unreachable");
-	}
+	isize n = soa_field_count(t)+1;
 
 	if (is_ptr) {
 		lbValue v = lb_emit_struct_ep(p, value, cast(i32)n);

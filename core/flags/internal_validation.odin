@@ -13,10 +13,7 @@ package flags
 // This proc is used to assert that `T` meets the expectations of the library.
 @(optimization_mode="favor_size", disabled=ODIN_DISABLE_ASSERT)
 validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_location) {
-	positionals_assigned_so_far: bit_array.Bit_Array
-	defer bit_array.destroy(&positionals_assigned_so_far)
-
-	check_fields: for field in reflect.struct_fields_zipped(T) {
+	check_fields: for field, field_index in reflect.struct_fields_zipped(T) {
 		if style == .Unix {
 			#partial switch specific_type_info in field.type.variant {
 			case ^runtime.Type_Info_Map:
@@ -74,11 +71,16 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 			}
 
 			pos_value, pos_ok := strconv.parse_u64_of_base(pos_str, 10)
-			fmt.assertf(pos_ok, "%T.%s has `%s` defined as %q but cannot be parsed a base-10 integer >= 0.",
+			fmt.assertf(pos_ok && pos_value <= u64(max(int)), "%T.%s has `%s` defined as %q but cannot be parsed a base-10 integer >= 0.",
 				model_type, field.name, SUBTAG_POS, pos_str, loc = loc)
-			fmt.assertf(!bit_array.get(&positionals_assigned_so_far, pos_value), "%T.%s has `%s` set to #%i, but that position has already been assigned to another flag.",
-				model_type, field.name, SUBTAG_POS, pos_value, loc = loc)
-			bit_array.set(&positionals_assigned_so_far, pos_value)
+			for other_field, other_index in reflect.struct_fields_zipped(T) {
+				if other_index == field_index {
+					break
+				}
+				other_pos, other_has_pos := get_field_pos(other_field)
+				fmt.assertf(!other_has_pos || other_pos != int(pos_value), "%T.%s has `%s` set to #%i, but that position has already been assigned to another flag.",
+					model_type, field.name, SUBTAG_POS, pos_value, loc = loc)
+			}
 		}
 
 		required_min, required_max: int

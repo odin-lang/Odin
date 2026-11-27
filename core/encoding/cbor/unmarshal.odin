@@ -60,6 +60,10 @@ unmarshal_from_bytes :: proc(bytes: []byte, ptr: ^$T, flags := Decoder_Flags{}, 
 unmarshal_from_decoder :: proc(d: Decoder, ptr: ^$T, allocator := context.allocator, temp_allocator := context.temp_allocator, loc := #caller_location) -> (err: Unmarshal_Error) {
 	d := d
 
+	if d.max_pre_alloc <= 0 {
+		d.max_pre_alloc = DEFAULT_MAX_PRE_ALLOC
+	}
+
 	err = _unmarshal_any_ptr(d, ptr, nil, allocator, temp_allocator, loc)
 
 	// Normal EOF does not exist here, we try to read the exact amount that is said to be provided.

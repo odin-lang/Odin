@@ -165,9 +165,9 @@ Returns:
 - ok: Whether the index was valid. Returns `false` if the index is smaller than the bias.
 */
 get :: proc(ba: ^Bit_Array, #any_int index: int) -> (res: bool, ok: bool) #optional_ok {
-	idx := index - ba.bias
-
 	if ba == nil || int(index) < ba.bias { return false, false }
+
+	idx := index - ba.bias
 
 	leg_index := idx >> INDEX_SHIFT
 	bit_index := idx &  INDEX_MASK
@@ -215,10 +215,9 @@ Returns:
 - ok: Whether the set was successful, `false` on allocation failure or bad index
 */
 set :: proc(ba: ^Bit_Array, #any_int index: int, set_to: bool = true, allocator := context.allocator) -> (ok: bool) {
+	if ba == nil || int(index) < ba.bias { return false }
 
 	idx := index - ba.bias
-
-	if ba == nil || int(index) < ba.bias { return false }
 	context.allocator = allocator
 
 	leg_index := idx >> INDEX_SHIFT
@@ -303,15 +302,17 @@ create :: proc(max_index: int, min_index: int = 0, allocator := context.allocato
 	if size_in_bits < 0 { return {}, false }
 
 	res = new(Bit_Array, allocator)
-	ok  = init(res, max_index, min_index, allocator)
-	res.free_pointer = true
-
-	if !ok {
-		free(res, allocator)
-		res = nil
+	if res == nil {
+		return nil, false
 	}
 
-	return
+	if !init(res, max_index, min_index, allocator) {
+		free(res, allocator)
+		return nil, false
+	}
+
+	res.free_pointer = true
+	return res, true
 }
 
 /*
@@ -360,7 +361,7 @@ init :: proc(res: ^Bit_Array, max_index: int, min_index: int = 0, allocator := c
 
 	res.bits         = bits
 	res.bias         = min_index
-	res.length       = max_index - min_index
+	res.length       = size_in_bits if ok else 0
 	res.free_pointer = false
 	return
 }

@@ -1010,3 +1010,36 @@ test_sort_inconsistent_comparator :: proc(t: ^testing.T) {
 		testing.expectf(t, is_permutation_of_indices(items[:n]), "sort_by_cmp lost or duplicated items, n = %d", n)
 	}
 }
+
+@test
+test_retain :: proc(t: ^testing.T) {
+	values := []int{1, 2, 3, 4, 5}
+	kept := slice.retain(values, []bool{true, false, true, false, true})
+	testing.expect(t, slice.equal(kept, []int{1, 3, 5}))
+	testing.expect_value(t, len(slice.retain(values[:2], []bool{false, false})), 0)
+	testing.expect_value(t, len(slice.retain(values[:0], nil)), 0)
+
+	V :: struct {
+		a: f32,
+		b: u8,
+	}
+	soa := make(#soa[]V, 4)
+	defer delete(soa)
+	for i in 0..<4 {
+		soa[i] = {f32(i), u8(i)}
+	}
+	kept_soa := slice.retain(soa, []bool{false, true, true, false})
+	testing.expect_value(t, len(kept_soa), 2)
+	testing.expect_value(t, kept_soa[0], V{1, 1})
+	testing.expect_value(t, kept_soa[1], V{2, 2})
+	testing.expect_value(t, raw_data(kept_soa.a), raw_data(soa.a))
+}
+
+when !testing.INLINE {
+	@test
+	test_retain_mask_length :: proc(t: ^testing.T) {
+		values := []int{1, 2, 3}
+		testing.expect_assert(t, "`keep` must be as long as `s`")
+		_ = slice.retain(values, []bool{true})
+	}
+}

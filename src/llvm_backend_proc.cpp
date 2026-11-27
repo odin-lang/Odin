@@ -4038,6 +4038,12 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 
 	// "Intrinsics"
 
+	case BuiltinProc_type_soa_field_sizes: {
+		lbValue table = lb_gen_soa_field_sizes_ptr(p->module, type_of_expr(ce->args[0]));
+		table.type = tv.type;
+		return table;
+	}
+
 	case BuiltinProc_soa_copy_from_slice:
 		{
 			lbValue ptr    = lb_build_expr(p, ce->args[0]);
@@ -4050,14 +4056,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 
 			Type *elem = array_type->Struct.soa_elem;
 
-			i32 field_count = 0;
-			if (is_type_array(elem)) {
-				field_count = cast(i32)get_array_type_count(elem);
-			} else {
-				Type *bt = base_type(elem);
-				GB_ASSERT(bt->kind == Type_Struct);
-				field_count = cast(i32)bt->Struct.fields.count;
-			}
+			i32 field_count = cast(i32)soa_field_count(array_type);
 			if (field_count == 0) {
 				return {};
 			}
@@ -4093,7 +4092,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 					dst.type = alloc_type_multi_pointer_to_pointer(dst.type);
 
 					lbValue src_ptr = lb_emit_ptr_offset(p, arg_ptr, j);
-					src_ptr = lb_emit_struct_ep(p, src_ptr, field_index);
+					src_ptr = lb_emit_soa_column_elem_ep(p, src_ptr, field_index);
 
 					lbValue src = lb_emit_load(p, src_ptr);
 					lb_emit_store(p, dst, src);
@@ -4115,7 +4114,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 					lbValue src = lb_emit_ptr_offset(p, arg_ptr, loop_data.idx);
 
 					lbValue d = lb_emit_ptr_offset(p, dst, loop_data.idx);
-					lbValue s = lb_emit_struct_ep(p, src, field_index);
+					lbValue s = lb_emit_soa_column_elem_ep(p, src, field_index);
 
 					GB_ASSERT(are_types_identical(d.type, s.type));
 
@@ -4190,6 +4189,8 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("mrs $0, cntvct_el0"), str_lit("=r"), has_side_effects);
 				GB_ASSERT(the_asm != nullptr);
 				res.value = LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
+			} else if (build_context.metrics.os == TargetOs_wasi || build_context.metrics.os == TargetOs_js || build_context.metrics.os == TargetOs_orca) {
+				res.value = lb_emit_runtime_call(p, "_read_cycle_counter", {}).value;
 			#if LLVM_VERSION_MAJOR > 19 || (LLVM_VERSION_MAJOR == 19 && LLVM_VERSION_MINOR >= 1)
 			} else if (build_context.metrics.arch == TargetArch_riscv64 && build_context.metrics.os == TargetOs_linux) {
 				// Linux in it's infinite wisdom decided that `rdcycle` should not be

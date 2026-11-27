@@ -94,6 +94,7 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 	ws(&b, ".")
 	wi(&b, int(version.patchVersion))
 
+	build_start, build_end: int
 	{
 		build_buf: [12]u8
 		mib := []i32{unix.CTL_KERN, unix.KERN_OSVERSION}
@@ -102,9 +103,9 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 			build = string(cstring(raw_data(build_buf[:])))
 		}
 		ws(&b, " (build ")
-		build_start := len(b.buf)
+		build_start = len(b.buf)
 		ws(&b, build)
-		res.release = string(b.buf[build_start:][:len(build)])
+		build_end = len(b.buf)
 	}
 
 	{
@@ -122,6 +123,7 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 	}
 
 	res.full = strings.to_string(b)
+	res.release = res.full[build_start:build_end]
 	return res, true
 }
 

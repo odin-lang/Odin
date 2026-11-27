@@ -158,6 +158,49 @@ test_fix_allocation_failure :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+test_fix_split_empty_separator :: proc(t: ^testing.T) {
+	src   := "aé€b"
+	s     := transmute([]byte)src
+	runes := []string{"a", "é", "€", "b"}
+
+	for sep, k in ([][]byte{nil, s[:0]}) {
+		parts := bytes.split(s, sep)
+		expect_parts(t, parts, runes, "split", k)
+		delete(parts)
+
+		parts = bytes.split_after(s, sep)
+		expect_parts(t, parts, runes, "split_after", k)
+		delete(parts)
+
+		parts = bytes.split_n(s, sep, 2)
+		expect_parts(t, parts, {"a", "é€b"}, "split_n", k)
+		delete(parts)
+
+		parts = bytes.split(s[:0], sep)
+		expect_parts(t, parts, {}, "split of an empty slice", k)
+		delete(parts)
+
+		it := s
+		i := 0
+		for part in bytes.split_iterator(&it, sep) {
+			if !testing.expectf(t, i < len(runes), "split_iterator sep %d: more than %d parts", k, len(runes)) {
+				break
+			}
+			testing.expectf(t, string(part) == runes[i], "split_iterator sep %d part %d: %q, want %q", k, i, string(part), runes[i])
+			i += 1
+		}
+		testing.expectf(t, i == len(runes), "split_iterator sep %d: %d parts, want %d", k, i, len(runes))
+	}
+}
+
+expect_parts :: proc(t: ^testing.T, parts: [][]byte, want: []string, what: string, sep: int, loc := #caller_location) {
+	testing.expectf(t, len(parts) == len(want), "%s sep %d: %d parts, want %d", what, sep, len(parts), len(want), loc = loc)
+	for part, i in parts[:min(len(parts), len(want))] {
+		testing.expectf(t, string(part) == want[i], "%s sep %d part %d: %q, want %q", what, sep, i, string(part), want[i], loc = loc)
+	}
+}
+
 Failing_Allocator :: struct {
 	backing: runtime.Allocator,
 	left:    int,

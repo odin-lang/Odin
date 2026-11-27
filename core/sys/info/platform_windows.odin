@@ -115,13 +115,14 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 	}
 
 	// Grab DisplayVersion
-	res.release = format_display_version(&b)
+	release_start, release_end := format_display_version(&b)
 
 	// Grab build number and UBR
 	res.kernel.patch = format_build_number(&b, int(osvi.dwBuildNumber))
 
 	// Finish the string
 	res.full = strings.to_string(b)
+	res.release = res.full[release_start:release_end]
 
 	format_windows_product_type :: proc (b: ^strings.Builder, prod_type: sys.Windows_Product_Type) {
 		#partial switch prod_type {
@@ -215,7 +216,7 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 	}
 
 	// Grab Windows DisplayVersion (like 20H02)
-	format_display_version :: proc (b: ^strings.Builder) -> (version: string) {
+	format_display_version :: proc (b: ^strings.Builder) -> (start, end: int) {
 		scratch: [512]u8
 
 		if dv, ok := read_reg_string(
@@ -225,9 +226,9 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 			scratch[:],
 		); ok {
 			strings.write_string(b, " (version: ")
-			l := strings.builder_len(b^)
+			start = strings.builder_len(b^)
 			strings.write_string(b, dv)
-			version = strings.to_string(b^)[l:][:len(dv)]
+			end = strings.builder_len(b^)
 			strings.write_rune(b, ')')
 		}
 		return

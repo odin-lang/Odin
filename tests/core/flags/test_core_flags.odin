@@ -23,10 +23,15 @@ init_custom_type_setter :: proc "contextless" () {
 	// multi-threaded test runner, to prevent any data races that could be
 	// reported by using `-sanitize:thread`.
 	//
-	// Do mind that this means every test here acknowledges the `Custom_Data` type.
-	flags.register_type_setter(proc (data: rawptr, data_type: typeid, _, _: string) -> (string, bool, runtime.Allocator_Error) {
+	// Do mind that this means every test here acknowledges the `Custom_Data`
+	// and `Leak_Setter_CString` types.
+	flags.register_type_setter(proc (data: rawptr, data_type: typeid, value, _: string) -> (string, bool, runtime.Allocator_Error) {
 		if data_type == Custom_Data {
 			(cast(^Custom_Data)data).a = 32
+			return "", true, nil
+		}
+		if data_type == Leak_Setter_CString && value == "lit" {
+			(cast(^Leak_Setter_CString)data)^ = Leak_Setter_CString(leak_setter_literal)
 			return "", true, nil
 		}
 		return "", false, nil
@@ -1286,7 +1291,8 @@ test_if_map_cstrings_get_freed :: proc(t: ^testing.T) {
 	args := [?]string { "-m:hellope=world", "-m:hellope=bar", "-m:hellope=foo" }
 	result := flags.parse(&s, args[:])
 	defer {
-		for _, v in s.m {
+		for k, v in s.m {
+			delete(k)
 			delete(v)
 		}
 		delete(s.m)

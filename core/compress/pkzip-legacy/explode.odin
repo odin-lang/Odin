@@ -39,10 +39,7 @@ explode_from_context :: proc(z: ^compress.Context, implode_options: Implode_Opti
 	min_match     := 3 if literal_tree else 2
 
 	b := Bits{z.code_buffer, z.num_bits}
-	defer {
-		z.code_buffer = b.buffer
-		z.num_bits    = b.count
-	}
+	defer bits_hand_back(z, &b)
 
 	o := out_load(z)
 	defer out_store(z, &o)

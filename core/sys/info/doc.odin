@@ -54,7 +54,7 @@ Example:
 		OS:        Version{major = 10, minor = 0, patch = 0}
 		Kernel:    Version{major = 10, minor = 19045, patch = 6575}
 		CPU:       AMD Ryzen 9 5950X 16-Core Processor
-		           CPU_Features{aes, adx, avx, avx2, bmi1, bmi2, erms, fma, os_xsave, pclmulqdq, popcnt, rdrand, rdseed, sha, sse2, sse3, ssse3, sse41, sse42}
+		           CPU_Features{aes, adx, avx, avx2, bmi1, bmi2, erms, fma, os_xsave, pclmulqdq, popcnt, rdrand, rdseed, sha, sse2, sse3, ssse3, sse41, sse42, vaes}
 		CPU cores: 16c/32t
 		RAM:       32.1 GiB/63.9 GiB
 		SWAP:      21.6 GiB/73.4 GiB
@@ -73,7 +73,7 @@ Example:
 		OS:        Version{major = 24, minor = 4, patch = 3}
 		Kernel:    Version{major = 6, minor = 6, patch = 87}
 		CPU:       AMD Ryzen 9 5950X 16-Core Processor
-		           CPU_Features{aes, adx, avx, avx2, bmi1, bmi2, erms, fma, os_xsave, pclmulqdq, popcnt, rdrand, rdseed, sha, sse2, sse3, ssse3, sse41, sse42}
+		           CPU_Features{aes, adx, avx, avx2, bmi1, bmi2, erms, fma, os_xsave, pclmulqdq, popcnt, rdrand, rdseed, sha, sse2, sse3, ssse3, sse41, sse42, vaes}
 		CPU cores: 16c/32t
 		RAM:       29.2 GiB/31.3 GiB
 		SWAP:      8.0 GiB/8.0 GiB

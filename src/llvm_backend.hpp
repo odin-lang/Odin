@@ -62,6 +62,8 @@ struct lbAddr {
 		struct {
 			lbValue index;
 			Ast *index_expr;
+			i32 column; // the first column of a `#soa_split` field's value, e.g. `s[i].pos`
+			Type *elem; // the type of that value, or nullptr for the whole element
 		} soa;
 		struct {
 			lbValue index;
@@ -119,16 +121,16 @@ struct lbTypeInfoMembers {
 	lbAddr types;
 	lbAddr names;
 	lbAddr offsets;
-	lbAddr usings;
+	lbAddr field_flags;
 	lbAddr tags;
 
 	isize types_index;
 	isize names_index;
 	isize offsets_index;
-	isize usings_index;
+	isize field_flags_index;
 	isize tags_index;
 
-	isize empty_usings_count;
+	isize empty_field_flags_count;
 	isize empty_tags_count;
 
 	lbAddr enum_indices;
@@ -220,6 +222,7 @@ struct lbModule {
 	isize             objc_next_block_id;  // Used to name objective-c blocks. Tracked per module.
 
 	PtrMap<u64/*type hash*/, lbAddr> map_cell_info_map; // address of runtime.Map_Info
+	PtrMap<u64/*type hash*/, lbAddr> soa_field_sizes_map; // address of the table from intrinsics.type_soa_field_sizes
 	PtrMap<u64/*type hash*/, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info
 
 	PtrMap<Ast *, lbAddr> exact_value_compound_literal_addr_map; // Key: Ast_CompoundLit
@@ -637,6 +640,7 @@ gb_internal lbValue lb_generate_local_array(lbProcedure *p, Type *elem_type, i64
 gb_internal lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 count, String prefix, i64 id);
 gb_internal lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue const &map_ptr, lbValue key, lbValue *key_ptr_);
 gb_internal lbValue lb_gen_map_cell_info_ptr(lbModule *m, Type *type);
+gb_internal lbValue lb_gen_soa_field_sizes_ptr(lbModule *m, Type *type);
 gb_internal lbValue lb_gen_map_info_ptr(lbModule *m, Type *map_type);
 
 gb_internal lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map_ptr, lbValue const &key);
@@ -747,7 +751,7 @@ gb_internal u64 lb_get_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, Stri
 #define LB_TYPE_INFO_TYPES_NAME        "__$type_info_types_data"
 #define LB_TYPE_INFO_NAMES_NAME        "__$type_info_names_data"
 #define LB_TYPE_INFO_OFFSETS_NAME      "__$type_info_offsets_data"
-#define LB_TYPE_INFO_USINGS_NAME       "__$type_info_usings_data"
+#define LB_TYPE_INFO_FIELD_FLAGS_NAME  "__$type_info_field_flags_data"
 #define LB_TYPE_INFO_TAGS_NAME         "__$type_info_tags_data"
 #define LB_TYPE_INFO_ENUM_INDICES_NAME "__$type_info_enum_indices"
 

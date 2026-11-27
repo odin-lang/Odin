@@ -131,6 +131,9 @@ stream_init :: proc(r: ^Reader, z: ^compress.Context, props: Properties, expecte
 	d.input = Input{buf = z.window, z = z}
 	d.size  = -1
 	d.limit = max(i64)
+	defer if err != nil {
+		reader_destroy(r)
+	}
 
 	if options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
 		return General_Error.Incompatible_Options

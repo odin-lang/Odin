@@ -2710,6 +2710,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 					/*fallthrough*/
 				case StructSoa_Slice:
 				case StructSoa_Fixed:
+				case StructSoa_FixedCapacityDynamic:
 					add_type_info_type_internal(c, alloc_type_pointer(e->type));
 					break;
 				default:
@@ -3012,6 +3013,7 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 					add_min_dep_type_info(c, t_allocator);
 					/*fallthrough*/
 				case StructSoa_Slice:
+				case StructSoa_FixedCapacityDynamic:
 					add_min_dep_type_info(c, t_int);
 					add_min_dep_type_info(c, t_uint);
 					/*fallthrough*/
@@ -3513,6 +3515,8 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("__ashlti3"),
 		str_lit("__multi3"),
 		str_lit("__lshrti3"),
+		str_lit("__ashrti3"),
+		str_lit("__muloti4"),
 	);
 
 	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_rtti,
@@ -7107,7 +7111,8 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 	if (body_was_checked) {
 		pi->decl->proc->proc_info = pi;
 
-		if (analysis_in_use(AnalysisFlag_Escape) || analysis_in_use(AnalysisFlag_Atomic) || !build_context.no_bounds_check) {
+		if (analysis_in_use(AnalysisFlag_Escape) || analysis_in_use(AnalysisFlag_Atomic) || !build_context.no_bounds_check ||
+		    build_context.optimization_level >= OptimizationLevel_Size) {
 			per_thread_array_add(&c->info.checked_bodies_queue, pi);
 		}
 
@@ -8386,7 +8391,7 @@ gb_internal void check_parsed_files(Checker *c) {
 		check_atomics(c);
 	}
 
-	if (analysis_in_use(AnalysisFlag_Escape) || !build_context.no_bounds_check) {
+	if (analysis_in_use(AnalysisFlag_Escape) || !build_context.no_bounds_check || build_context.optimization_level >= OptimizationLevel_Size) {
 		TIME_SECTION("check escapes");
 		check_escapes(c);
 	}

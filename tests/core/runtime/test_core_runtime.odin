@@ -8,6 +8,7 @@ import "core:mem/virtual"
 import "base:runtime"
 import "core:slice"
 import "core:testing"
+@(require) import "core:time"
 
 // Tests that having space for the allocation, but not for the allocation and alignment
 // is handled correctly.
@@ -115,6 +116,54 @@ when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 			testing.expectf(t, grow_err == .Out_Of_Memory && grown == nil, "resize(64 -> %v) = %v bytes, %v", size, len(grown), grow_err)
 		}
 		runtime.mem_free(raw_data(data), a)
+	}
+}
+
+@(test)
+test_read_cycle_counter :: proc(t: ^testing.T) {
+	start := intrinsics.read_cycle_counter()
+	now   := start
+	for _ in 0..<1_000_000 {
+		now = intrinsics.read_cycle_counter()
+		if now != start {
+			break
+		}
+	}
+	testing.expectf(t, now > start, "read_cycle_counter stayed at %v", start)
+
+	when ODIN_OS == .WASI {
+		tick_start  := time.tick_now()
+		cycle_start := intrinsics.read_cycle_counter()
+		time.sleep(20 * time.Millisecond)
+		cycles := time.Duration(intrinsics.read_cycle_counter() - cycle_start)
+		ticks  := time.tick_since(tick_start)
+		testing.expectf(t, cycles >= 20 * time.Millisecond && abs(cycles - ticks) < 5 * time.Millisecond, "read_cycle_counter advanced %v over a %v sleep", cycles, ticks)
+
+		hz, hz_ok := time.tsc_frequency()
+		testing.expectf(t, hz_ok && hz == 1_000_000_000, "tsc_frequency returned %v, %v", hz, hz_ok)
+	}
+}
+
+@(test)
+test_overflow_mul_i128 :: proc(t: ^testing.T) {
+	Case :: struct {
+		a, b, product: i128,
+		overflow:      bool,
+	}
+	cases := [?]Case{
+		{0,                min(i128),     0,              false},
+		{-1,               -1,            1,              false},
+		{max(i128),        -1,            min(i128) + 1,  false},
+		{min(i128),        1,             min(i128),      false},
+		{min(i128),        -1,            min(i128),      true},
+		{max(i128),        2,             -2,             true},
+		{i128(1) << 63,    i128(1) << 63, i128(1) << 126, false},
+		{i128(1) << 64,    i128(1) << 63, min(i128),      true},
+		{-(i128(1) << 64), i128(1) << 63, min(i128),      false},
+	}
+	for c in cases {
+		product, overflow := intrinsics.overflow_mul(c.a, c.b)
+		testing.expectf(t, product == c.product && overflow == c.overflow, "overflow_mul(%v, %v) = %v, %v", c.a, c.b, product, overflow)
 	}
 }
 
@@ -271,6 +320,561 @@ test_soa_array_resize :: proc(t: ^testing.T) {
 	testing.expect_value(t, array[0], V{0, 0})
 	testing.expect_value(t, array[1], V{0, 0})
 	testing.expect_value(t, array[2], V{0, 0})
+}
+
+// Power-of-two capacities would start every column at the same offset modulo 4 KiB
+@(test)
+test_soa_columns_staggered :: proc(t: ^testing.T) {
+	V :: struct {a, b, c, d, e, f: f32}
+
+	check :: proc(t: ^testing.T, columns: []uintptr, loc := #caller_location) {
+		for i in 1..<len(columns) {
+			for j in 0..<i {
+				apart := (columns[i] - columns[j]) % 4096
+				testing.expectf(t, apart >= 128 && apart <= 4096-128, "columns %d and %d start %d bytes apart, modulo 4 KiB", j, i, apart, loc=loc)
+			}
+		}
+	}
+
+	array := make(#soa[dynamic]V, 0, 4096)
+	defer delete(array)
+	check(t, ([^]uintptr)(&array)[:6])
+
+	slice := make(#soa[]V, 1 << 16)
+	defer delete(slice)
+	check(t, ([^]uintptr)(&slice)[:6])
+}
+
+// Growing in place moves columns up and down, as the padding between them changes
+@(test)
+test_soa_reserve_in_place :: proc(t: ^testing.T) {
+	V :: struct {a: u8, b: f64, c: u16, d: f32}
+	N :: 3000
+
+	arena: virtual.Arena
+	testing.expect_value(t, virtual.arena_init_static(&arena), nil)
+	defer virtual.arena_destroy(&arena)
+
+	array := make(#soa[dynamic]V, virtual.arena_allocator(&arena))
+	for i in 0..<N {
+		reserve(&array, len(array) + 1 + i%5)
+		append(&array, V{u8(i), f64(i), u16(i), f32(i)})
+	}
+	resize(&array, N + 100)
+
+	for i in 0..<N {
+		if !testing.expect_value(t, array[i], V{u8(i), f64(i), u16(i), f32(i)}) {
+			return
+		}
+	}
+	for i in N..<N + 100 {
+		if !testing.expect_value(t, array[i], V{}) {
+			return
+		}
+	}
+}
+
+// Growing a few elements at a time grows the capacity as `append` does, not to the exact length
+@(test)
+test_grow_like_append :: proc(t: ^testing.T) {
+	V :: struct {x: int, y: u8}
+
+	soa: #soa[dynamic]V
+	defer delete(soa)
+	append_nothing_soa(&soa)
+	testing.expect_value(t, cap(soa), 8)
+	for len(soa) < 9 {
+		inject_at_soa(&soa, len(soa), V{})
+	}
+	testing.expect_value(t, cap(soa), 24)
+
+	array: [dynamic]V
+	defer delete(array)
+	append_nothing(&array)
+	testing.expect_value(t, cap(array), 8)
+	for len(array) < 9 {
+		assign_at(&array, len(array), V{})
+	}
+	testing.expect_value(t, cap(array), 16)
+}
+
+when !testing.INLINE {
+	// Through a pointer, indexing an #soa column is still bounds checked
+	@(test)
+	test_soa_column_index_through_slice_pointer :: proc(t: ^testing.T) {
+		V :: struct {x, y: f32}
+		fixed: #soa[4]V
+		slice := fixed[:]
+		p := &slice
+		n := len(slice)
+		testing.expect_assert(t, "4 is out of range 0..<4")
+		_ = p.x[n]
+	}
+
+	@(test)
+	test_soa_column_index_through_dynamic_pointer :: proc(t: ^testing.T) {
+		V :: struct {x, y: f32}
+		fixed: #soa[4]V
+		array := runtime.into_dynamic_soa(fixed[:])
+		p := &array
+		n := len(array)
+		testing.expect_assert(t, "0 is out of range 0..<0")
+		_ = p.x[n]
+	}
+
+	// A field of `#soa[dynamic; N]T` is indexed within its length, not its capacity
+	@(test)
+	test_soa_fixed_capacity_field_index :: proc(t: ^testing.T) {
+		V :: struct {x, y: f32}
+		array := #soa[dynamic; 8]V{{1, 2}, {3, 4}}
+		n := len(array)
+		testing.expect_assert(t, "2 is out of range 0..<2")
+		array.y[n] = 1
+	}
+
+	@(test)
+	test_soa_fixed_capacity_field_slice :: proc(t: ^testing.T) {
+		V :: struct {x, y: f32}
+		array := #soa[dynamic; 8]V{{1, 2}, {3, 4}}
+		testing.expect_value(t, len(array.x[:]), 2)
+		hi := 3
+		testing.expect_assert(t, "0:3 is out of range 0..<2")
+		_ = array.x[0:hi]
+	}
+
+	// A field of an #soa slice is sliced within the slice's length
+	@(test)
+	test_soa_slice_field_slice :: proc(t: ^testing.T) {
+		V :: struct {x, y: f32}
+		fixed: #soa[4]V
+		slice := fixed[:2]
+		testing.expect_value(t, len(slice.x[0:2]), 2)
+		hi := 3
+		testing.expect_assert(t, "0:3 is out of range 0..<2")
+		_ = slice.x[0:hi]
+	}
+}
+
+// `copy` copies between #soa slices, and between a slice and an #soa slice, up to the shorter length
+@(test)
+test_copy_soa :: proc(t: ^testing.T) {
+	V :: struct {
+		a: f32,
+		b: u8,
+		c: f64,
+	}
+
+	aos := []V{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}
+	soa := make(#soa[]V, 4)
+	defer delete(soa)
+
+	testing.expect_value(t, copy(soa, aos), 3)
+	testing.expect_value(t, soa[2], V{7, 8, 9})
+	testing.expect_value(t, soa[3], V{})
+
+	back: [2]V
+	testing.expect_value(t, copy(back[:], soa), 2)
+	testing.expect_value(t, back, [2]V{{1, 2, 3}, {4, 5, 6}})
+
+	other := make(#soa[]V, 2)
+	defer delete(other)
+	testing.expect_value(t, copy(other, soa[1:]), 2)
+	testing.expect_value(t, other[0], V{4, 5, 6})
+	testing.expect_value(t, other[1], V{7, 8, 9})
+
+	// Overlapping #soa slices are copied as if through a temporary
+	testing.expect_value(t, copy(soa[1:], soa[:3]), 3)
+	testing.expect_value(t, soa[1], V{1, 2, 3})
+	testing.expect_value(t, soa[3], V{7, 8, 9})
+
+	lanes: #soa[dynamic; 4][3]f32
+	resize(&lanes, 2)
+	testing.expect_value(t, copy(lanes[:], [][3]f32{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}), 2)
+	testing.expect_value(t, lanes[1], [3]f32{4, 5, 6})
+
+	empty: #soa[]V
+	testing.expect_value(t, copy(empty, aos), 0)
+	testing.expect_value(t, copy(aos, empty), 0)
+}
+
+// `shrink` moves the elements of an #soa dynamic array into a layout for the smaller capacity
+@(test)
+test_shrink_soa :: proc(t: ^testing.T) {
+	V :: struct {
+		a: f32,
+		b: u8,
+		c: f64,
+	}
+	v :: proc(i: int) -> V {
+		return {f32(i), u8(i), f64(i)}
+	}
+	expect_elements :: proc(t: ^testing.T, d: #soa[dynamic]V, loc := #caller_location) {
+		for i in 0..<len(d) {
+			if !testing.expect_value(t, d[i], v(i), loc=loc) {
+				return
+			}
+		}
+	}
+
+	d: #soa[dynamic]V
+	defer delete(d)
+	for i in 0..<3000 {
+		append(&d, v(i))
+	}
+	resize(&d, 1000)
+
+	did_shrink, err := shrink(&d)
+	testing.expect(t, did_shrink)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, cap(d), 1000)
+	expect_elements(t, d)
+
+	did_shrink, _ = shrink(&d, 2000)
+	testing.expect(t, !did_shrink)
+
+	did_shrink, _ = shrink(&d, 300)
+	testing.expect(t, did_shrink)
+	testing.expect_value(t, len(d), 300)
+	testing.expect_value(t, cap(d), 300)
+	expect_elements(t, d)
+
+	append(&d, v(300))
+	expect_elements(t, d)
+
+	did_shrink, _ = shrink(&d, 0)
+	testing.expect(t, did_shrink)
+	testing.expect_value(t, cap(d), 0)
+	append(&d, v(0))
+	expect_elements(t, d)
+}
+
+// Resizes always move, and the memory left behind is overwritten
+@(private="file")
+moving_allocator_proc :: proc(data: rawptr, mode: runtime.Allocator_Mode, size, alignment: int, old_memory: rawptr, old_size: int, loc := #caller_location) -> (bytes: []byte, err: runtime.Allocator_Error) {
+	parent := (^runtime.Allocator)(data)^
+	#partial switch mode {
+	case .Resize, .Resize_Non_Zeroed:
+		bytes = parent.procedure(parent.data, .Alloc, size, alignment, nil, 0, loc) or_return
+		if old_memory != nil {
+			mem.copy(raw_data(bytes), old_memory, min(size, old_size))
+			mem.set(old_memory, 0xcd, old_size)
+			parent.procedure(parent.data, .Free, 0, 0, old_memory, old_size, loc) or_return
+		}
+		return
+	}
+	return parent.procedure(parent.data, mode, size, alignment, old_memory, old_size, loc)
+}
+
+// The elements `append` and `inject_at` take may be a part of the array itself
+@(test)
+test_append_inject_from_itself :: proc(t: ^testing.T) {
+	parent := context.allocator
+	context.allocator = {moving_allocator_proc, &parent}
+
+	d := make([dynamic]int, 0, 3)
+	defer delete(d)
+	append(&d, 1, 2, 3)
+	append(&d, ..d[:])
+	testing.expect_value(t, len(d), 6)
+	testing.expect_value(t, d[5], 3)
+
+	clear(&d)
+	append(&d, 1, 2, 3, 4)
+	inject_at(&d, 0, ..d[2:4])
+	for v, i in ([?]int{3, 4, 1, 2, 3, 4}) {
+		testing.expect_value(t, d[i], v)
+	}
+
+	shrink(&d)
+	inject_at(&d, 1, ..d[:2])
+	for v, i in ([?]int{3, 3, 4, 4, 1, 2, 3, 4}) {
+		testing.expect_value(t, d[i], v)
+	}
+
+	f: [dynamic; 8]int
+	append(&f, 1, 2, 3, 4)
+	inject_at(&f, 1, ..f[2:4])
+	for v, i in ([?]int{1, 3, 4, 2, 3, 4}) {
+		testing.expect_value(t, f[i], v)
+	}
+}
+
+// `append` and `inject_at` take the elements of an #soa slice, which may be a part of the array itself
+@(test)
+test_append_inject_soa_slice :: proc(t: ^testing.T) {
+	V :: struct {
+		a: f32,
+		b: u8,
+	}
+	v :: proc(i: int) -> V {
+		return {f32(i), u8(i)}
+	}
+
+	other := make(#soa[]V, 3)
+	defer delete(other)
+	for i in 0..<3 {
+		other[i] = v(10 + i)
+	}
+
+	d := make(#soa[dynamic]V, 0, 3)
+	defer delete(d)
+	testing.expect_value(t, append(&d, other), 3)
+	testing.expect_value(t, d[2], v(12))
+
+	// Growing moves the array, and the elements being appended with it
+	testing.expect_value(t, append(&d, d[:]), 3)
+	testing.expect_value(t, len(d), 6)
+	testing.expect_value(t, d[5], v(12))
+
+	// [10 11 12 10 11 12] with [11 12 10] injected at 2, which it straddles
+	testing.expect(t, inject_at(&d, 2, d[1:4]))
+	want := [?]V{v(10), v(11), v(11), v(12), v(10), v(12), v(10), v(11), v(12)}
+	for w, i in want {
+		testing.expect_value(t, d[i], w)
+	}
+
+	c: #soa[dynamic; 4]V
+	testing.expect_value(t, append(&c, other), 3)
+	testing.expect_value(t, append(&c, c[:]), 1)
+	testing.expect_value(t, c[3], v(10))
+	testing.expect(t, !inject_at(&c, 0, other[:1]))
+
+	resize(&c, 2)
+	testing.expect(t, inject_at(&c, 0, c[1:2]))
+	testing.expect_value(t, len(c), 3)
+	testing.expect_value(t, c[0], v(11))
+	testing.expect_value(t, c[1], v(10))
+	testing.expect_value(t, c[2], v(11))
+}
+
+// Elements whose fields are all 4 or 8 bytes are copied in blocks, with the rest one at a time.
+// With AVX2 a block is 8 elements of 5 or more 4-byte fields, or 4 of 3 or more 8-byte fields: the issue tests run this with `-microarch:native`.
+// On arm64 with `-o:speed`, 3 or 4 fields use NEON's structured loads and stores.
+// Some blocks read or write past the elements they copy, into elements which must exist.
+// The slice copied from ends at an inaccessible page, and what lies past the slice copied to must stay as it is.
+@(test)
+test_copy_soa_blocks :: proc(t: ^testing.T) {
+	// `n` elements ending where an inaccessible page starts
+	guarded :: proc($E: typeid, n: int) -> (s: []E, region: []byte) {
+		page := mem.PAGE_SIZE
+		size := mem.align_forward_int(n*size_of(E), page)
+		region, _ = virtual.reserve_and_commit(uint(size + page))
+		virtual.protect(&region[size], uint(page), virtual.Protect_No_Access)
+		s = ([^]E)(&region[size - n*size_of(E)])[:n]
+		return
+	}
+
+	check :: proc(t: ^testing.T, $E: typeid, loc := #caller_location) {
+		past: E
+		for &b in ([^]u8)(&past)[:size_of(E)] {
+			b = 0xab
+		}
+
+		for n in 0..=25 {
+			n := n if n < 25 else 100
+
+			aos, region := guarded(E, n)
+			defer virtual.release(raw_data(region), len(region))
+			for &b, i in slice.to_bytes(aos) {
+				b = u8(i*7 + 3)
+			}
+
+			soa := make(#soa[]E, n+3)
+			defer delete(soa)
+			for i in n..<n+3 {
+				soa[i] = past
+			}
+			testing.expect_value(t, copy(soa, aos), n, loc=loc)
+			for i in 0..<n {
+				if !testing.expect_value(t, soa[i], aos[i], loc=loc) {
+					return
+				}
+			}
+			for i in n..<n+3 {
+				testing.expect_value(t, soa[i], past, loc=loc)
+			}
+
+			back := make([]E, n+3)
+			defer delete(back)
+			for i in n..<n+3 {
+				back[i] = past
+			}
+			testing.expect_value(t, copy(back, soa[:n]), n, loc=loc)
+			for i in 0..<n {
+				if !testing.expect_value(t, back[i], aos[i], loc=loc) {
+					return
+				}
+			}
+			for i in n..<n+3 {
+				testing.expect_value(t, back[i], past, loc=loc)
+			}
+		}
+	}
+
+	check(t, struct {a, b: u32})
+	check(t, struct {a, b, c: f32})
+	check(t, struct {a, b, c, d: i32})
+	check(t, struct {a, b, c, d, e: u32})
+	check(t, struct {a, b, c, d, e, f: f32})
+	check(t, struct {a, b, c, d, e, f, g: u32})
+	check(t, struct {a, b, c, d, e, f, g, h: u32})
+	check(t, struct {a, b, c, d, e, f, g, h, i: u32})
+	check(t, struct {a, b, c, d, e, f, g, h, i, j, k, l: u32})
+	check(t, struct {a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q: u32})
+	check(t, struct {a, b, c: f64})
+	check(t, struct {a, b, c, d: u64})
+	check(t, struct {a, b, c, d, e: u64})
+	check(t, struct {a, b, c, d, e, f: u64})
+	check(t, struct {a: f32, b: u8, c: f64})
+	check(t, [3]f32)
+	check(t, [2]u64)
+	check(t, [4]u64)
+}
+
+// With optimizations `append` copies its elements in blocks, in column loops, or one at a time, depending on their fields and count
+@(test)
+test_append_soa_elems_by_count :: proc(t: ^testing.T) {
+	check :: proc(t: ^testing.T, $E: typeid, loc := #caller_location) {
+		for n in ([?]int{1, 3, 4, 5, 7, 8, 9, 100}) {
+			aos := make([]E, n)
+			defer delete(aos)
+			for &b, i in slice.to_bytes(aos) {
+				b = u8(i*7 + 3)
+			}
+
+			d: #soa[dynamic]E
+			defer delete(d)
+			append(&d, E{}) // so the elements start at an offset
+			testing.expect_value(t, append(&d, ..aos), n, loc=loc)
+			testing.expect_value(t, len(d), n+1, loc=loc)
+			testing.expect_value(t, d[0], E{}, loc=loc)
+			for i in 0..<n {
+				if !testing.expect_value(t, d[i+1], aos[i], loc=loc) {
+					return
+				}
+			}
+		}
+	}
+
+	Six      :: struct {a, b, c, d, e, f: f32}
+	Wide     :: struct {a, b, c: f64}
+	Mixed    :: struct {a: f32, b: u8, c: f64}
+	Eighteen :: struct {a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r: u32}
+	Odd      :: struct {a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p: u32, q: u64} // over 16 fields, not uniform
+
+	check(t, Six)
+	check(t, Wide)
+	check(t, Mixed)
+	check(t, Eighteen)
+	check(t, Odd)
+	check(t, [3]f32)
+}
+
+// `#soa[dynamic; N]T` holds its elements inline like `#soa[N]T`, with a length like `[dynamic; N]T`
+@(test)
+test_soa_fixed_capacity_dynamic_array :: proc(t: ^testing.T) {
+	V :: struct {x: f32, y: u8}
+
+	a: #soa[dynamic; 4]V
+	testing.expect_value(t, len(a), 0)
+	testing.expect_value(t, cap(a), 4)
+	testing.expect_value(t, typeid_of(type_of(a.x)), typeid_of([]f32))
+
+	testing.expect_value(t, append(&a, V{1, 1}), 1)
+	testing.expect_value(t, append(&a, V{2, 2}, V{3, 3}, V{4, 4}, V{5, 5}), 3)
+	testing.expect_value(t, append(&a, V{6, 6}), 0)
+	testing.expect_value(t, len(a), 4)
+	testing.expect_value(t, a[3], V{4, 4})
+
+	testing.expect_value(t, pop(&a), V{4, 4})
+	testing.expect_value(t, pop_front(&a), V{1, 1})
+	testing.expect_value(t, len(a), 2)
+	testing.expect_value(t, a[0], V{2, 2})
+
+	testing.expect(t, inject_at(&a, 0, V{7, 7}))
+	testing.expect(t, !inject_at(&a, 0, V{8, 8}, V{9, 9}))
+	testing.expect_value(t, len(a), 3)
+	testing.expect_value(t, a[0], V{7, 7})
+	testing.expect_value(t, a[1], V{2, 2})
+
+	ordered_remove(&a, 0)
+	testing.expect_value(t, a[0], V{2, 2})
+	testing.expect_value(t, a[1], V{3, 3})
+	unordered_remove(&a, 0)
+	testing.expect_value(t, len(a), 1)
+	testing.expect_value(t, a[0], V{3, 3})
+
+	resize(&a, 3)
+	testing.expect_value(t, len(a), 3)
+	testing.expect_value(t, a[2], V{})
+	resize(&a, 10)
+	testing.expect_value(t, len(a), 4)
+
+	s := a[1:3]
+	testing.expect_value(t, len(s), 2)
+	s.x[0] = 2.5
+	testing.expect_value(t, a.x[1], 2.5)
+
+	sum: f32
+	for v in a {
+		sum += v.x
+	}
+	testing.expect_value(t, sum, 5.5)
+
+	clear(&a)
+	testing.expect_value(t, len(a), 0)
+
+	x := f32(3)
+	b := #soa[dynamic; 4]V{{1, 2}, {x, 4}}
+	testing.expect_value(t, len(b), 2)
+	testing.expect_value(t, b[0], V{1, 2})
+	testing.expect_value(t, b[1], V{3, 4})
+
+	c := #soa[dynamic; 4]V{2 = {5, 6}}
+	testing.expect_value(t, len(c), 3)
+	testing.expect_value(t, c[2], V{5, 6})
+
+	total :: proc(a: ^#soa[dynamic; $N]$T) -> (int, f32) {
+		sum: f32
+		for v in a {
+			sum += v.x
+		}
+		return N, sum
+	}
+	n, total_x := total(&b)
+	testing.expect_value(t, n, 4)
+	testing.expect_value(t, total_x, 4)
+}
+
+// Ranging over a field of `#soa[dynamic; N]T` stops at its length, as ranging over the array does
+@(test)
+test_soa_fixed_capacity_field_range :: proc(t: ^testing.T) {
+	V :: struct {x: f32, y: u8}
+	array := #soa[dynamic; 8]V{{1, 1}, {2, 2}, {3, 3}}
+
+	count := 0
+	for _ in array.x {
+		count += 1
+	}
+	testing.expect_value(t, count, 3)
+
+	last: f32
+	#reverse for v in array.x {
+		last = v
+	}
+	testing.expect_value(t, last, 1)
+
+	p := &array
+	for &v in p.y {
+		v += 10
+	}
+	testing.expect_value(t, array.y[2], 13)
+
+	count = 0
+	#unroll(2) for _ in array.x {
+		count += 1
+	}
+	testing.expect_value(t, count, 3)
 }
 
 @(test)
@@ -1260,6 +1864,142 @@ test_memory_compare_empty :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, runtime.memory_compare(nil, &data[0], 0), 0)
 	testing.expect_value(t, runtime.memory_compare(&data[0], nil, 0), 0)
+}
+
+// The first differing byte decides, even when a later one differs the other way: in the same vector,
+// the same eight-byte chunk, or the overlapping last chunk.
+@(test)
+test_memory_compare_first_difference :: proc(t: ^testing.T) {
+	data: [128]u8
+	cmp:  [128]u8
+
+	for n in 1..=100 {
+		for first in 0..<n {
+			for later in first+1..<n {
+				slice.fill(data[:n], 0x40)
+				slice.fill(cmp[:n], 0x40)
+				data[first], cmp[first] = 0x7F, 0x80
+				data[later], cmp[later] = 0xFF, 0x00
+				if !testing.expectf(t, runtime.memory_compare(&data[0], &cmp[0], n) == -1, "n = %d, first = %d, later = %d", n, first, later) ||
+				   !testing.expectf(t, runtime.memory_compare(&cmp[0], &data[0], n) == +1, "n = %d, first = %d, later = %d", n, first, later) {
+					return
+				}
+			}
+		}
+	}
+}
+
+// The first differing byte decides, whichever eight-byte chunk it falls in, and a string that is a prefix
+// of the other comes first.
+@(test)
+test_string_cmp :: proc(t: ^testing.T) {
+	reference :: proc(a, b: string) -> int {
+		for i in 0..<min(len(a), len(b)) {
+			if a[i] != b[i] {
+				return -1 if a[i] < b[i] else +1
+			}
+		}
+		return -1 if len(a) < len(b) else +1 if len(a) > len(b) else 0
+	}
+
+	data: [80]u8
+	cmp:  [80]u8
+	for i in 0..<len(data) {
+		data[i] = u8(i*7 + 0x41)
+		cmp[i]  = data[i]
+	}
+	for la in 0..=72 {
+		for lb in max(la-2, 0)..=min(la+2, 72) {
+			for diff in -1..<min(la, lb) {
+				if diff >= 0 {
+					cmp[diff] ~= 0x80
+				}
+				a, b := string(data[:la]), string(cmp[:lb])
+				ok := testing.expectf(t, runtime.string_cmp(a, b) == reference(a, b), "len %d and %d, first difference %d", la, lb, diff) &&
+				      testing.expectf(t, runtime.string_cmp(b, a) == reference(b, a), "len %d and %d, first difference %d", lb, la, diff)
+				if diff >= 0 {
+					cmp[diff] ~= 0x80
+				}
+				if !ok {
+					return
+				}
+			}
+		}
+	}
+}
+
+// UTF-16 code units order by value. Each pair below orders the other way by little-endian bytes, low byte first.
+@(test)
+test_string16_cmp :: proc(t: ^testing.T) {
+	reference :: proc(a, b: []u16) -> int {
+		for i in 0..<min(len(a), len(b)) {
+			if a[i] != b[i] {
+				return -1 if a[i] < b[i] else +1
+			}
+		}
+		return -1 if len(a) < len(b) else +1 if len(a) > len(b) else 0
+	}
+	pairs := [?][2]u16{{0x00FF, 0x0100}, {0x01FF, 0x0200}, {0x7FFF, 0x8000}, {0x0080, 0xD800}}
+
+	data: [16]u16
+	cmp:  [16]u16
+	zdata: [17]u16
+	zcmp:  [17]u16
+	for i in 0..<len(data) {
+		data[i] = u16(0x0041 + i)
+		cmp[i]  = data[i]
+	}
+	for pair in pairs {
+		for la in 0..=13 {
+			for lb in max(la-1, 0)..=min(la+1, 13) {
+				for diff in -1..<min(la, lb) {
+					if diff >= 0 {
+						data[diff], cmp[diff] = pair[0], pair[1]
+					}
+					a, b := string16(data[:la]), string16(cmp[:lb])
+					want := reference(data[:la], cmp[:lb])
+					copy(zdata[:], data[:la])
+					copy(zcmp[:], cmp[:lb])
+					zdata[la], zcmp[lb] = 0, 0
+					za, zb := cstring16(&zdata[0]), cstring16(&zcmp[0])
+					ok := testing.expectf(t, runtime.string16_cmp(a, b) == want, "string16 %x vs %x, len %d and %d, first difference %d", pair[0], pair[1], la, lb, diff) &&
+					      testing.expectf(t, runtime.string16_cmp(b, a) == -want, "string16 reversed, %x vs %x, len %d and %d, first difference %d", pair[0], pair[1], la, lb, diff) &&
+					      testing.expectf(t, runtime.cstring16_cmp(za, zb) == want, "cstring16 %x vs %x, len %d and %d, first difference %d", pair[0], pair[1], la, lb, diff) &&
+					      testing.expectf(t, runtime.cstring16_cmp(zb, za) == -want, "cstring16 reversed, %x vs %x, len %d and %d, first difference %d", pair[0], pair[1], la, lb, diff)
+					if diff >= 0 {
+						data[diff] = u16(0x0041 + diff)
+						cmp[diff]  = data[diff]
+					}
+					if !ok {
+						return
+					}
+				}
+			}
+		}
+	}
+}
+
+@(test)
+test_memory_prefix_length :: proc(t: ^testing.T) {
+	data: [256]u8
+	cmp:  [256]u8
+
+	for offset in 0..<64 {
+		subdata := data[offset:]
+		subcmp  := cmp[offset:]
+		for n in 0..=100 {
+			if !testing.expect_value(t, runtime.memory_prefix_length(&subdata[0], &subcmp[0], n), n) {
+				return
+			}
+			for idx in 0..<n {
+				subcmp[idx] = 0xFF
+				if !testing.expect_value(t, runtime.memory_prefix_length(&subdata[0], &subcmp[0], n), idx) {
+					return
+				}
+				subcmp[idx] = 0
+			}
+		}
+	}
 }
 
 @(test)
