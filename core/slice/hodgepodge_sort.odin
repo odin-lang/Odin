@@ -47,6 +47,24 @@ import "base:intrinsics"
 	and then merged as above (hodgepodge_large_element_sort).
 	At -o:size, element types of one size and alignment share one body (Sort_Shared_Item).
 
+	## Stability
+	For a comparator that is a strict weak order, equal items keep their input order.
+	No step moves an item past an equal one, and runs only merge with their neighbours.
+	Swaps exchange neighbours only when the first is greater, and insertion stops at the first item not greater.
+	Merges take the left side's item on a tie from either end, and the block merge orders its blocks the same way.
+	A split for a rotation keeps the right side's equal items behind the left side's.
+	Rotations keep the order within each part, and reversals only turn strictly descending runs.
+	Partitions, the SIMD lanes among them, keep both sides in input order, and equal items land on the same side.
+	Drop-merge records for each item it sets aside how many kept items came before it, and ties settle by that count.
+	The radix sort and its network only take integers in their own order, where equal keys are the same bits.
+
+	Three bounds hold by construction.
+	A Powersort power is the leading-zero count of a non-zero 64-bit word, and the stack's powers strictly increase [5]:
+	64 entries hold any stack.
+	The block merge only runs where a merge has at most HODGEPODGE_BLOCKS blocks, and its bit sets hold that many.
+	Positions scaled by n, in the samples and Powersort's midpoints, are computed in 64 and 128 bits:
+	a 32-bit int would wrap past about 8 million items.
+
 	## Provenance
 	The code that came from blitsort [2], with its parts of quadsort [1] and fluxsort [4], is in the public domain under
 	the Unlicense. The other sources gave ideas only: no code was taken from them.
@@ -1415,7 +1433,7 @@ hodgepodge_nearly_sorted :: proc(a: []$E, call: $P, $KIND: Sort_Kind) -> bool #n
 	n := len(a)
 	descents := 0
 	for t in 0..<256 {
-		i := t*(n-1)/256
+		i := int(i64(t)*i64(n-1)/256)
 		descents += int(hodgepodge_greater(a[i], a[i+1], call, KIND))
 	}
 	return descents < HODGEPODGE_DROP_DESCENTS
@@ -1428,7 +1446,7 @@ hodgepodge_sorted_at_scale :: proc(a: []$E, call: $P, $KIND: Sort_Kind) -> bool 
 	n := len(a)
 	descents := 0
 	for t in 1..<256 {
-		descents += int(hodgepodge_greater(a[(t-1)*(n-1)/256], a[t*(n-1)/256], call, KIND))
+		descents += int(hodgepodge_greater(a[int(i64(t-1)*i64(n-1)/256)], a[int(i64(t)*i64(n-1)/256)], call, KIND))
 	}
 	return descents < HODGEPODGE_FAR_DESCENTS
 }
@@ -1555,8 +1573,8 @@ hodgepodge_natural_run :: proc(a: []$E, start: int, call: $P, $KIND: Sort_Kind) 
 hodgepodge_power_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_check {
 	// The first bit in which the midpoints of runs [s1, s1+n1) and [s1+n1, s1+n1+n2) differ, as fractions of n.
 	power :: proc "contextless" (s1, n1, n2, n: int) -> int {
-		x := u64((u128(2*s1 + n1) << 63) / u128(n))
-		y := u64((u128(2*s1 + 2*n1 + n2) << 63) / u128(n))
+		x := u64(((2*u128(s1) + u128(n1)) << 63) / u128(n))
+		y := u64(((2*u128(s1) + 2*u128(n1) + u128(n2)) << 63) / u128(n))
 		return int(intrinsics.count_leading_zeros(x ~ y))
 	}
 
@@ -2049,7 +2067,7 @@ hodgepodge_radix_sort :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds
 	if shift > 0 && n > len(s) && n > FEW_FROM {
 		seen: [4]u64
 		for i in 0..<256 {
-			d := digit(a[i*n/256], top - 7)
+			d := digit(a[int(i64(i)*i64(n)/256)], top - 7)
 			seen[d >> 6] |= 1 << uint(d & 63)
 		}
 		used := 0
