@@ -3573,6 +3573,22 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 	return results;
 }
 
+// NOTE(bill): `&s[i]` is an #soa pointer, which holds the address of the #soa array `s` itself
+gb_internal EscapeValue escape_soa_array_addr(EscapeAnalysis *ea, Ast *index_expr) {
+	ast_node(ie, IndexExpr, index_expr);
+	escape_visit_exits(ea, ie->index);
+	Ast *soa = ie->expr;
+	if (is_type_pointer(soa->tav.type)) {
+		return escape_as_pointer(escape_expr(ea, soa));
+	}
+	if (soa->tav.mode == Addressing_Variable || soa->kind == Ast_Ident) {
+		return escape_addr(ea, soa);
+	}
+	EscapeValue v = escape_expr(ea, soa);
+	escape_store_obj(ea, {nullptr, soa}, {}, v, EscapeUpdate_Replace);
+	return escape_value_of(EscapeOrigin_Temp, {nullptr, soa}, {});
+}
+
 gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 	if (expr == nullptr) {
 		return escape_value();
@@ -3670,7 +3686,12 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 
 	case_ast_node(ue, UnaryExpr, expr);
 		if (ue->op.kind == Token_And) {
-			return escape_addr(ea, unparen_expr(ue->expr));
+			Ast *x = unparen_expr(ue->expr);
+			if (x->kind == Ast_IndexExpr && is_type_soa_pointer(tav.type)) {
+				ea->addr_site = x;
+				return escape_soa_array_addr(ea, x);
+			}
+			return escape_addr(ea, x);
 		}
 	case_end;
 
