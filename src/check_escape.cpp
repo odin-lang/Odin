@@ -5688,6 +5688,392 @@ gb_internal void escape_graph_place_calls(CheckedCall *calls, isize count) {
 	}
 }
 
+// NOTE(bill): A range loop over a `[dynamic]T` or `[dynamic; N]T` reads the array's header (its data and length)
+// for each element that which the body writes may hold the header. When the body can write nothing else which could,
+// the backend reads the header once before the loop instead, once it checks that the memory the body writes is apart from it.
+// The body may only call builtins which write no memory, and may only write the elements, its own locals, and outer locals and globals.
+// Any other write, or any other call, may change the array (e.g. through `append`).
+struct EscapeRangeSnapshot {
+	Scope *         body_scope;
+	Entity *        elem;         // the loop's value
+	bool            writes_elems; // through the loop's value
+	Array<Entity *> outer;
+};
+
+gb_internal bool escape_range_snapshot_builtin(BuiltinProcId id) {
+	if (BuiltinProc__type_begin < id && id < BuiltinProc__type_end) {
+		return true;
+	}
+	if (BuiltinProc__simd_begin < id && id < BuiltinProc__simd_end) {
+		return id != BuiltinProc_simd_scatter && id != BuiltinProc_simd_masked_store && id != BuiltinProc_simd_masked_compress_store;
+	}
+	switch (id) {
+	case BuiltinProc_len:
+	case BuiltinProc_cap:
+	case BuiltinProc_size_of:
+	case BuiltinProc_align_of:
+	case BuiltinProc_offset_of:
+	case BuiltinProc_offset_of_by_string:
+	case BuiltinProc_type_of:
+	case BuiltinProc_type_info_of:
+	case BuiltinProc_typeid_of:
+	case BuiltinProc_swizzle:
+	case BuiltinProc_complex:
+	case BuiltinProc_quaternion:
+	case BuiltinProc_real:
+	case BuiltinProc_imag:
+	case BuiltinProc_jmag:
+	case BuiltinProc_kmag:
+	case BuiltinProc_conj:
+	case BuiltinProc_expand_values:
+	case BuiltinProc_compress_values:
+	case BuiltinProc_min:
+	case BuiltinProc_max:
+	case BuiltinProc_abs:
+	case BuiltinProc_clamp:
+	case BuiltinProc_unreachable:
+	case BuiltinProc_raw_data:
+	case BuiltinProc_DIRECTIVE:
+	case BuiltinProc_is_package_imported:
+	case BuiltinProc_has_target_feature:
+	case BuiltinProc_constant_log2:
+	case BuiltinProc_constant_floor:
+	case BuiltinProc_constant_trunc:
+	case BuiltinProc_constant_ceil:
+	case BuiltinProc_constant_round:
+	case BuiltinProc_transpose:
+	case BuiltinProc_outer_product:
+	case BuiltinProc_hadamard_product:
+	case BuiltinProc_matrix_flatten:
+	case BuiltinProc_trap:
+	case BuiltinProc_count_ones:
+	case BuiltinProc_count_zeros:
+	case BuiltinProc_count_trailing_zeros:
+	case BuiltinProc_count_leading_zeros:
+	case BuiltinProc_count_trailing_ones:
+	case BuiltinProc_count_leading_ones:
+	case BuiltinProc_reverse_bits:
+	case BuiltinProc_byte_swap:
+	case BuiltinProc_overflow_add:
+	case BuiltinProc_overflow_sub:
+	case BuiltinProc_overflow_mul:
+	case BuiltinProc_saturating_add:
+	case BuiltinProc_saturating_sub:
+	case BuiltinProc_sqrt:
+	case BuiltinProc_fused_mul_add:
+	case BuiltinProc_ptr_offset:
+	case BuiltinProc_ptr_sub:
+	case BuiltinProc_unaligned_load:
+	case BuiltinProc_non_temporal_load:
+	case BuiltinProc_fixed_point_mul:
+	case BuiltinProc_fixed_point_div:
+	case BuiltinProc_fixed_point_mul_sat:
+	case BuiltinProc_fixed_point_div_sat:
+	case BuiltinProc_expect:
+	case BuiltinProc_likely:
+	case BuiltinProc_unlikely:
+		return true;
+	}
+	return false;
+}
+
+gb_internal bool escape_range_snapshot_expr(Ast *expr);
+
+gb_internal bool escape_range_snapshot_exprs(Slice<Ast *> const &exprs) {
+	for (Ast *expr : exprs) {
+		if (!escape_range_snapshot_expr(expr)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+// Whether `expr` writes no memory, and calls nothing which could
+gb_internal bool escape_range_snapshot_expr(Ast *expr) {
+	if (expr == nullptr || expr->tav.mode == Addressing_Constant || expr->tav.mode == Addressing_Type) {
+		return true;
+	}
+	switch (expr->kind) {
+	case Ast_Ident:
+	case Ast_Implicit:
+	case Ast_Uninit:
+	case Ast_BasicLit:
+	case Ast_BasicDirective:
+	case Ast_ImplicitSelectorExpr:
+		return true;
+	case_ast_node(cl, CompoundLit, expr);
+		return escape_range_snapshot_exprs(cl->elems);
+	case_end;
+	case_ast_node(fv, FieldValue, expr);
+		return escape_range_snapshot_expr(fv->field) && escape_range_snapshot_expr(fv->value);
+	case_end;
+	case_ast_node(te, TagExpr, expr);
+		return escape_range_snapshot_expr(te->expr);
+	case_end;
+	case_ast_node(ue, UnaryExpr, expr);
+		return escape_range_snapshot_expr(ue->expr);
+	case_end;
+	case_ast_node(be, BinaryExpr, expr);
+		return escape_range_snapshot_expr(be->left) && escape_range_snapshot_expr(be->right);
+	case_end;
+	case_ast_node(pe, ParenExpr, expr);
+		return escape_range_snapshot_expr(pe->expr);
+	case_end;
+	case_ast_node(se, SelectorExpr, expr);
+		return escape_range_snapshot_expr(se->expr);
+	case_end;
+	case_ast_node(ie, IndexExpr, expr);
+		return escape_range_snapshot_expr(ie->expr) && escape_range_snapshot_expr(ie->index);
+	case_end;
+	case_ast_node(mie, MatrixIndexExpr, expr);
+		return escape_range_snapshot_expr(mie->expr) && escape_range_snapshot_expr(mie->row_index) && escape_range_snapshot_expr(mie->column_index);
+	case_end;
+	case_ast_node(de, DerefExpr, expr);
+		return escape_range_snapshot_expr(de->expr);
+	case_end;
+	case_ast_node(se, SliceExpr, expr);
+		return escape_range_snapshot_expr(se->expr) && escape_range_snapshot_expr(se->low) && escape_range_snapshot_expr(se->high);
+	case_end;
+	case_ast_node(ce, CallExpr, expr);
+		TypeAndValue tv = type_and_value_of_expr(ce->proc);
+		if (tv.mode == Addressing_Builtin) {
+			Entity *e = entity_of_node(ce->proc);
+			if (!escape_range_snapshot_builtin(e != nullptr ? cast(BuiltinProcId)e->Builtin.id : BuiltinProc_DIRECTIVE)) {
+				return false;
+			}
+		} else if (tv.mode != Addressing_Type) {
+			return false;
+		}
+		return escape_range_snapshot_exprs(ce->args);
+	case_end;
+	case_ast_node(te, TernaryIfExpr, expr);
+		return escape_range_snapshot_expr(te->x) && escape_range_snapshot_expr(te->cond) && escape_range_snapshot_expr(te->y);
+	case_end;
+	case_ast_node(te, TernaryWhenExpr, expr);
+		return escape_range_snapshot_expr(te->x) && escape_range_snapshot_expr(te->cond) && escape_range_snapshot_expr(te->y);
+	case_end;
+	case_ast_node(oe, OrElseExpr, expr);
+		return escape_range_snapshot_expr(oe->x) && escape_range_snapshot_expr(oe->y);
+	case_end;
+	case_ast_node(oe, OrReturnExpr, expr);
+		return escape_range_snapshot_expr(oe->expr);
+	case_end;
+	case_ast_node(oe, OrBranchExpr, expr);
+		return escape_range_snapshot_expr(oe->expr);
+	case_end;
+	case_ast_node(ta, TypeAssertion, expr);
+		return escape_range_snapshot_expr(ta->expr);
+	case_end;
+	case_ast_node(tc, TypeCast, expr);
+		return escape_range_snapshot_expr(tc->expr);
+	case_end;
+	case_ast_node(ac, AutoCast, expr);
+		return escape_range_snapshot_expr(ac->expr);
+	case_end;
+	}
+	return false;
+}
+
+// Whether the body may store to `lhs`: an element, a local of its own, or an outer local or global, which is recorded
+gb_internal bool escape_range_snapshot_write(EscapeRangeSnapshot *s, Ast *lhs) {
+	// NOTE(bill): a swizzle or a bit field is within what it is selected from
+	lhs = unparen_expr(lhs);
+	while (lhs->kind == Ast_SelectorExpr && (lhs->SelectorExpr.swizzle_count > 0 || lhs->SelectorExpr.is_bit_field)) {
+		lhs = unparen_expr(lhs->SelectorExpr.expr);
+	}
+	if (is_blank_ident(lhs)) {
+		return true;
+	}
+	if (!escape_range_snapshot_expr(lhs)) {
+		return false;
+	}
+
+	EscapeLocation loc = {};
+	escape_outer_location(lhs, &loc);
+	Entity *e = loc.root;
+	if (e == nullptr || e->kind != Entity_Variable || escape_path_deref_index(loc.path) != loc.path.count) {
+		return false;
+	}
+	if (e == s->elem) {
+		s->writes_elems = true;
+		return true;
+	}
+	if (escape_is_reference(e)) {
+		// NOTE(bill): the value of another loop or switch, within what that ranges or switches over
+		return false;
+	}
+	Scope *scope = e->scope;
+	while (scope != nullptr && scope != s->body_scope) {
+		scope = scope->parent;
+	}
+	if (scope != nullptr) {
+		// NOTE(bill): a static of the body has no address before the loop to check
+		return escape_is_local(e);
+	}
+	escape_add_unique(&s->outer, e);
+	return true;
+}
+
+gb_internal bool escape_range_snapshot_stmt(EscapeRangeSnapshot *s, Ast *stmt);
+
+gb_internal bool escape_range_snapshot_stmts(EscapeRangeSnapshot *s, Slice<Ast *> const &stmts) {
+	for (Ast *stmt : stmts) {
+		if (!escape_range_snapshot_stmt(s, stmt)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+gb_internal bool escape_range_snapshot_stmt(EscapeRangeSnapshot *s, Ast *stmt) {
+	if (stmt == nullptr) {
+		return true;
+	}
+	switch (stmt->kind) {
+	case Ast_EmptyStmt:
+	case Ast_BranchStmt:
+		return true;
+	case_ast_node(es, ExprStmt, stmt);
+		return escape_range_snapshot_expr(es->expr);
+	case_end;
+	case_ast_node(as, AssignStmt, stmt);
+		if (!escape_range_snapshot_exprs(as->rhs)) {
+			return false;
+		}
+		for (Ast *lhs : as->lhs) {
+			if (!escape_range_snapshot_write(s, lhs)) {
+				return false;
+			}
+		}
+		return true;
+	case_end;
+	case_ast_node(vd, ValueDecl, stmt);
+		return escape_range_snapshot_exprs(vd->values);
+	case_end;
+	case_ast_node(bs, BlockStmt, stmt);
+		return escape_range_snapshot_stmts(s, bs->stmts);
+	case_end;
+	case_ast_node(is, IfStmt, stmt);
+		return escape_range_snapshot_stmt(s, is->init) && escape_range_snapshot_expr(is->cond) &&
+		       escape_range_snapshot_stmt(s, is->body) && escape_range_snapshot_stmt(s, is->else_stmt);
+	case_end;
+	case_ast_node(ws, WhenStmt, stmt);
+		if (ws->is_cond_determined) {
+			return escape_range_snapshot_stmt(s, ws->determined_cond ? ws->body : ws->else_stmt);
+		}
+		return escape_range_snapshot_stmt(s, ws->body) && escape_range_snapshot_stmt(s, ws->else_stmt);
+	case_end;
+	case_ast_node(fs, ForStmt, stmt);
+		return escape_range_snapshot_stmt(s, fs->init) && escape_range_snapshot_expr(fs->cond) &&
+		       escape_range_snapshot_stmt(s, fs->post) && escape_range_snapshot_stmt(s, fs->body);
+	case_end;
+	case_ast_node(rs, RangeStmt, stmt);
+		return escape_range_snapshot_stmt(s, rs->init) && escape_range_snapshot_expr(rs->expr) && escape_range_snapshot_stmt(s, rs->body);
+	case_end;
+	case_ast_node(rs, UnrollRangeStmt, stmt);
+		return escape_range_snapshot_stmt(s, rs->init) && escape_range_snapshot_exprs(rs->args) &&
+		       escape_range_snapshot_expr(rs->expr) && escape_range_snapshot_stmt(s, rs->body);
+	case_end;
+	case_ast_node(ss, SwitchStmt, stmt);
+		return escape_range_snapshot_stmt(s, ss->init) && escape_range_snapshot_expr(ss->tag) && escape_range_snapshot_stmt(s, ss->body);
+	case_end;
+	case_ast_node(ss, TypeSwitchStmt, stmt);
+		bool tag = ss->tag->kind == Ast_AssignStmt ? escape_range_snapshot_exprs(ss->tag->AssignStmt.rhs) : escape_range_snapshot_expr(ss->tag);
+		return tag && escape_range_snapshot_stmt(s, ss->body);
+	case_end;
+	case_ast_node(cc, CaseClause, stmt);
+		return escape_range_snapshot_exprs(cc->list) && escape_range_snapshot_stmts(s, cc->stmts);
+	case_end;
+	case_ast_node(rs, ReturnStmt, stmt);
+		return escape_range_snapshot_exprs(rs->results);
+	case_end;
+	}
+	return false;
+}
+
+gb_internal void escape_range_snapshot(AstRangeStmt *rs) {
+	Ast *expr = unparen_expr(rs->expr);
+	if (is_ast_range(expr) || expr->tav.mode == Addressing_Type || rs->body->kind != Ast_BlockStmt) {
+		return;
+	}
+	Type *t = base_type(type_deref(expr->tav.type));
+	if (t == nullptr || (t->kind != Type_DynamicArray && t->kind != Type_FixedCapacityDynamicArray)) {
+		return;
+	}
+
+	Ast *val0 = rs->vals.count > 0 ? unparen_expr(rs->vals[0]) : nullptr;
+	if (val0 != nullptr && val0->kind == Ast_UnaryExpr && val0->UnaryExpr.op.kind == Token_And) {
+		val0 = val0->UnaryExpr.expr;
+	}
+
+	EscapeRangeSnapshot s = {};
+	s.body_scope = rs->body->BlockStmt.scope;
+	s.elem       = val0 != nullptr ? entity_of_node(val0) : nullptr;
+	s.outer      = array_make<Entity *>(heap_allocator());
+	defer (array_free(&s.outer));
+	if (!escape_range_snapshot_stmt(&s, rs->body)) {
+		return;
+	}
+
+	AstRangeSnapshot *snapshot = permanent_alloc_item<AstRangeSnapshot>();
+	snapshot->writes_elems = s.writes_elems;
+	snapshot->outer        = slice_clone_from_array(permanent_allocator(), s.outer);
+	rs->snapshot = snapshot;
+}
+
+// The range loops of a body, wherever they are in it
+gb_internal void escape_range_snapshots_in(Ast *stmt) {
+	if (stmt == nullptr) {
+		return;
+	}
+	switch (stmt->kind) {
+	case_ast_node(bs, BlockStmt, stmt);
+		for (Ast *s : bs->stmts) {
+			escape_range_snapshots_in(s);
+		}
+	case_end;
+	case_ast_node(is, IfStmt, stmt);
+		escape_range_snapshots_in(is->body);
+		escape_range_snapshots_in(is->else_stmt);
+	case_end;
+	case_ast_node(ws, WhenStmt, stmt);
+		if (ws->is_cond_determined) {
+			escape_range_snapshots_in(ws->determined_cond ? ws->body : ws->else_stmt);
+		}
+	case_end;
+	case_ast_node(fs, ForStmt, stmt);
+		escape_range_snapshots_in(fs->body);
+	case_end;
+	case_ast_node(rs, RangeStmt, stmt);
+		escape_range_snapshot(rs);
+		escape_range_snapshots_in(rs->body);
+	case_end;
+	case_ast_node(rs, UnrollRangeStmt, stmt);
+		escape_range_snapshots_in(rs->body);
+	case_end;
+	case_ast_node(ss, SwitchStmt, stmt);
+		escape_range_snapshots_in(ss->body);
+	case_end;
+	case_ast_node(ss, TypeSwitchStmt, stmt);
+		escape_range_snapshots_in(ss->body);
+	case_end;
+	case_ast_node(cc, CaseClause, stmt);
+		for (Ast *s : cc->stmts) {
+			escape_range_snapshots_in(s);
+		}
+	case_end;
+	case_ast_node(ds, DeferStmt, stmt);
+		escape_range_snapshots_in(ds->stmt);
+	case_end;
+	}
+}
+
+gb_internal void escape_range_snapshots(ProcInfo **procs, isize count) {
+	for (isize k = 0; k < count; k++) {
+		escape_range_snapshots_in(procs[k]->body);
+	}
+}
+
 gb_internal void escape_graph_number_procs(ProcInfo **procs, isize count) {
 	EscapeGraph *g = &escape_graph;
 	i32 first = cast(i32)(procs - g->procs.data);
@@ -5823,6 +6209,13 @@ gb_internal void check_escapes(Checker *c) {
 		return;
 	}
 	g->threaded = !build_context.no_threaded_checker && build_context.thread_count > 1;
+	if (build_context.optimization_level >= OptimizationLevel_Size) {
+		escape_for_procs(g, escape_range_snapshots);
+	}
+	if (!analysis_in_use(AnalysisFlag_Escape) && build_context.no_bounds_check) {
+		// NOTE(bill): only the range loops were wanted
+		return;
+	}
 	escape_for_procs(g, escape_graph_number_procs);
 
 	// the calls of each procedure are counted, and then placed after those of the procedures before it

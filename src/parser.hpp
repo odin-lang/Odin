@@ -456,6 +456,13 @@ struct AstSplitArgs {
 	Slice<Ast *> named;
 };
 
+// What the body of a range loop over an array with a header writes, when nothing else in it could change the header,
+// see `escape_range_snapshots`
+struct AstRangeSnapshot {
+	bool            writes_elems; // through the loop's value
+	Slice<Entity *> outer;        // the outer locals and globals
+};
+
 enum AsmMemoryOperandKind : u8 {
 	AsmMemoryOperand_Default,
 	AsmMemoryOperand_Pre,
@@ -711,6 +718,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Ast *expr; \
 		Ast *body; \
 		bool reverse; \
+		AstRangeSnapshot *snapshot; \
 	}) \
 	AST_KIND(UnrollRangeStmt, "#unroll range statement", struct { \
 		Scope *scope; \

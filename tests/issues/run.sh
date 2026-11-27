@@ -134,6 +134,7 @@ else
 fi
 
 $ODIN test ../../core/runtime $COMMON -define:ODIN_TEST_NAMES=test_core_runtime.test_copy_soa_blocks
+$ODIN test ../test_range_snapshot $COMMON -o:speed
 
 if [[ $($ODIN check ../test_issue_soa_split_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "'#soa_split' cannot be applied") -eq 7 ]] &&
    [[ $($ODIN check ../test_issue_soa_split_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 8 ]] &&
