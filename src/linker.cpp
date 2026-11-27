@@ -37,17 +37,18 @@ gb_internal void build_temp_cleanup(void) {
 gb_internal String build_temp_file(String name) {
 	MUTEX_GUARD(&build_temp_mutex);
 	if (build_temp_dir_path.len == 0) {
-		String base = temporary_directory(heap_allocator());
+		String base = path_trim_trailing_separators(temporary_directory(heap_allocator()));
 		if (base.len == 0) {
 			gb_printf_err("Failed to find the temporary directory\n");
 			exit(1);
 		}
+		char const *sep = path_is_separator(base[base.len-1]) ? "" : "/";
 		String dir = {};
 	#if defined(GB_SYSTEM_WINDOWS)
 		for (u32 attempt = 0; attempt < 1000; attempt++) {
 			gbString candidate = gb_string_make(heap_allocator(), "");
 			candidate = gb_string_append_length(candidate, base.text, base.len);
-			candidate = gb_string_append_fmt(candidate, "/odin-%lu-%u", GetCurrentProcessId(), attempt);
+			candidate = gb_string_append_fmt(candidate, "%sodin-%lu-%u", sep, GetCurrentProcessId(), attempt);
 			String s = make_string(cast(u8 *)candidate, gb_string_length(candidate));
 			String16 wdir = string_to_win32_path(heap_allocator(), s);
 			bool created = CreateDirectoryW(cast(wchar_t *)wdir.text, nullptr) != 0;
@@ -64,7 +65,8 @@ gb_internal String build_temp_file(String name) {
 	#else
 		gbString candidate = gb_string_make(heap_allocator(), "");
 		candidate = gb_string_append_length(candidate, base.text, base.len);
-		candidate = gb_string_appendc(candidate, "/odin-XXXXXX");
+		candidate = gb_string_appendc(candidate, sep);
+		candidate = gb_string_appendc(candidate, "odin-XXXXXX");
 		if (mkdtemp(candidate) != nullptr) {
 			dir = copy_string(permanent_allocator(), make_string_c(candidate));
 		}
