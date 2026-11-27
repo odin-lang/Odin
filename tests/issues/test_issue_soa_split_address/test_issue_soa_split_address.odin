@@ -35,6 +35,10 @@ main :: proc() {
 	_ = &n[0].p
 	_ = &n[0].p.v
 
+	// `s.v` is an `#soa[]V` view of the columns, which `#soa[N]` needs an address for
+	_ = &s.v
+	_ = fixed().v
+
 	// fine
 	_ = &s[0].v.x
 	_ = &s[0].l[1]
@@ -45,4 +49,12 @@ main :: proc() {
 	_ = &q.v
 	a: #soa[2][2]P
 	_ = &a[0][1].v
+	_ = s.v
+	_ = &s.v[1]
+	_ = &s.v.x[1]
+	_ = n.p.v
+}
+
+fixed :: proc() -> (s: #soa[4]P) {
+	return
 }

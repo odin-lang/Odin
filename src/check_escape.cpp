@@ -1472,7 +1472,7 @@ gb_internal EscapeValue escape_elems_of(EscapeAnalysis *ea, Ast *x) {
 
 gb_internal bool escape_selector_path(Ast *se_node, EscapePath *path) {
 	ast_node(se, SelectorExpr, se_node);
-	if (se->swizzle_count > 0 || se->is_bit_field) {
+	if (se->swizzle_count > 0 || se->is_bit_field || se->is_soa_split_view) {
 		return false;
 	}
 
@@ -3684,6 +3684,10 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 			if (column != nullptr && is_type_array(column->type)) {
 				return escape_elems_at(ea, escape_addr(ea, expr), base_type(column->type));
 			}
+		}
+		if (se->is_soa_split_view) {
+			// the columns of a `#soa_split` field, as a slice of the array is
+			return escape_elems_of(ea, se->expr);
 		}
 		EscapePath path = {};
 		if (!escape_selector_path(expr, &path)) {

@@ -6631,6 +6631,30 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 	return nullptr;
 }
 
+// `s.f` for a `#soa_split` field `f` of the elements of the #soa array `s`: an `#soa[]` view of the field's columns
+gb_internal Entity *check_soa_split_view(CheckerContext *c, Operand *operand, Ast *node) {
+	ast_node(se, SelectorExpr, node);
+	Type *soa = base_type(type_deref(operand->type));
+	if (operand->mode == Addressing_Type || !is_type_soa_struct(soa) || !is_type_struct(soa->Struct.soa_elem)) {
+		return nullptr;
+	}
+	Selection sel = lookup_field(soa->Struct.soa_elem, se->selector->Ident.interned, false);
+	if (sel.entity == nullptr || sel.index.count != 1 || !is_soa_split_field(sel.entity)) {
+		return nullptr;
+	}
+
+	operand->expr = node;
+	add_entity_use(c, se->selector, sel.entity);
+	if (soa_has_inline_fields(soa) && !is_type_pointer(operand->type) && operand->mode != Addressing_Variable) {
+		error_soa_column_not_addressable(operand, node);
+		return sel.entity;
+	}
+	se->is_soa_split_view = true;
+	operand->type = make_soa_struct_slice(c, nullptr, nullptr, sel.entity->type);
+	operand->mode = Addressing_Value;
+	add_type_and_value(c, node, operand->mode, operand->type, operand->value);
+	return sel.entity;
+}
 
 gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *type_hint) {
 	ast_node(se, SelectorExpr, node);
@@ -6889,6 +6913,12 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			return swizzle_entity;
 		}
 	end_of_array_selector_swizzle:;
+	}
+
+	if (entity == nullptr && selector->kind == Ast_Ident && operand->type != nullptr) {
+		if (Entity *field = check_soa_split_view(c, operand, node)) {
+			return field;
+		}
 	}
 
 	if (entity == nullptr) {

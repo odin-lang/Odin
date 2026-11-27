@@ -5283,9 +5283,18 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gb_string_free(s);
 			return false;
 		}
-		auto types = permanent_slice_make<Type *>(t->Struct.fields.count-1);
+		// one result for each field of the element: a slice of its column, or the `#soa[]` view of a `#soa_split` field's columns
+		Type *elem = base_type(t->Struct.soa_elem);
+		auto types = permanent_slice_make<Type *>(elem->kind == Type_Struct ? elem->Struct.fields.count : t->Struct.fields.count-1);
+		isize column = 0;
 		for_array(i, types) {
-			Entity *f = t->Struct.fields[i];
+			if (elem->kind == Type_Struct && is_soa_split_field(elem->Struct.fields[i])) {
+				Type *split = elem->Struct.fields[i]->type;
+				types[i] = make_soa_struct_slice(c, nullptr, nullptr, split);
+				column += soa_split_column_count(split);
+				continue;
+			}
+			Entity *f = t->Struct.fields[column++];
 			GB_ASSERT(f->type->kind == Type_MultiPointer);
 			types[i] = alloc_type_slice(f->type->MultiPointer.elem);
 		}

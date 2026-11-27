@@ -444,17 +444,24 @@ gb_internal lbValue lb_soa_unzip(lbProcedure *p, AstCallExpr *ce, TypeAndValue c
 	lbValue len = lb_soa_struct_len(p, arg);
 
 	lbAddr res = lb_add_local_generated(p, tv.type, true);
-	if (is_type_tuple(tv.type)) {
-		lbValue rp = lb_addr_get_ptr(p, res);
-		for (i32 i = 0; i < cast(i32)(t->Struct.fields.count-1); i++) {
-			lbValue ptr = lb_emit_struct_ev(p, arg, i);
-			lbAddr dst = lb_addr(lb_emit_struct_ep(p, rp, i));
-			lb_fill_slice(p, dst, ptr, len);
+	lbValue rp = lb_addr_get_ptr(p, res);
+	bool is_tuple = is_type_tuple(tv.type);
+	i32 result_count = is_tuple ? cast(i32)tv.type->Tuple.variables.count : 1;
+	i32 column = 0;
+	for (i32 i = 0; i < result_count; i++) {
+		Type *result = is_tuple ? tv.type->Tuple.variables[i]->type : tv.type;
+		if (is_type_slice(result)) {
+			lbValue ptr = lb_emit_struct_ev(p, arg, column++);
+			lb_fill_slice(p, lb_addr(is_tuple ? lb_emit_struct_ep(p, rp, i) : rp), ptr, len);
+			continue;
 		}
-	} else {
-		GB_ASSERT(is_type_slice(tv.type));
-		lbValue ptr = lb_emit_struct_ev(p, arg, 0);
-		lb_fill_slice(p, res, ptr, len);
+		// the `#soa[]` view of a `#soa_split` field's columns
+		lbValue dst = is_tuple ? lb_emit_struct_ep(p, rp, i) : rp;
+		i32 count = cast(i32)soa_field_count(result);
+		for (i32 j = 0; j < count; j++) {
+			lb_emit_store(p, lb_emit_struct_ep(p, dst, j), lb_emit_struct_ev(p, arg, column++));
+		}
+		lb_emit_store(p, lb_emit_struct_ep(p, dst, count), len);
 	}
 
 	return lb_addr_load(p, res);

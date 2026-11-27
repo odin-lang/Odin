@@ -143,7 +143,7 @@ else
 fi
 
 if [[ $($ODIN check ../test_issue_soa_split_address $COMMON_CHECK 2>&1 >/dev/null | grep -c "which is a '#soa_split' field of an #soa element") -eq 8 ]] &&
-   [[ $($ODIN check ../test_issue_soa_split_address $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 8 ]]; then
+   [[ $($ODIN check ../test_issue_soa_split_address $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 10 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"

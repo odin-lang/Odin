@@ -4669,6 +4669,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 
 gb_internal lbValue lb_soa_column(lbProcedure *p, lbValue parent, Selection const &sel, Type *slice_type);
 gb_internal lbValue lb_build_soa_column(lbProcedure *p, Ast *expr);
+gb_internal lbValue lb_build_soa_split_view(lbProcedure *p, Ast *expr);
 gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr);
 gb_internal lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	u16 prev_state_flags = p->state_flags;
@@ -4815,6 +4816,9 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		GB_ASSERT(tav.mode != Addressing_Invalid);
 		if (se->is_soa_column) {
 			return lb_build_soa_column(p, expr);
+		}
+		if (se->is_soa_split_view) {
+			return lb_build_soa_split_view(p, expr);
 		}
 		return lb_addr_load(p, lb_build_addr(p, expr));
 	case_end;
@@ -5511,6 +5515,30 @@ gb_internal lbValue lb_build_soa_column(lbProcedure *p, Ast *expr) {
 	Selection sel = lookup_field(type_of_expr(se->expr), unparen_expr(se->selector)->Ident.interned, false);
 	GB_ASSERT(sel.entity != nullptr);
 	return lb_soa_column(p, lb_build_addr_ptr(p, se->expr), sel, type_of_expr(expr));
+}
+
+// `s.f`, the `#soa[]` view of the columns of the `#soa_split` field `f` of the elements of `s`
+gb_internal lbValue lb_build_soa_split_view(lbProcedure *p, Ast *expr) {
+	ast_node(se, SelectorExpr, expr);
+	lbValue soa = lb_build_addr_ptr(p, se->expr);
+	if (is_type_pointer(type_deref(soa.type))) {
+		soa = lb_emit_load(p, soa);
+	}
+	Type *t = base_type(type_deref(soa.type));
+	Selection sel = lookup_field(t->Struct.soa_elem, unparen_expr(se->selector)->Ident.interned, false);
+	i32 first = soa_split_column_offset(t->Struct.soa_elem, sel.index[0]);
+
+	Type *view_type = type_of_expr(expr);
+	i32 count = cast(i32)soa_field_count(view_type);
+	lbAddr view = lb_add_local_generated(p, view_type, false);
+	for (i32 i = 0; i < count; i++) {
+		lbValue column = lb_emit_struct_ep(p, soa, first + i);
+		lbValue data = soa_has_inline_fields(t) ? lb_emit_array_epi(p, column, 0) : lb_emit_load(p, column);
+		lbValue dst = lb_emit_struct_ep(p, view.addr, i);
+		lb_emit_store(p, dst, lb_emit_conv(p, data, type_deref(dst.type)));
+	}
+	lb_emit_store(p, lb_emit_struct_ep(p, view.addr, count), lb_soa_struct_len(p, soa));
+	return lb_addr_load(p, view);
 }
 
 gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
@@ -7017,6 +7045,9 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 	case_ast_node(se, SelectorExpr, expr);
 		if (se->is_soa_column) {
 			return lb_addr(lb_address_from_load_or_generate_local(p, lb_build_soa_column(p, expr)));
+		}
+		if (se->is_soa_split_view) {
+			return lb_addr(lb_address_from_load_or_generate_local(p, lb_build_soa_split_view(p, expr)));
 		}
 		Ast *sel_node = unparen_expr(se->selector);
 		if (sel_node->kind == Ast_Ident) {
