@@ -10,5 +10,6 @@ download_assets :: proc "contextless" () {
 }
 
 @(require) import "archive/sevenz"
+@(require) import "archive/tar"
 @(require) import "archive/zip"
 @(require) import "compress"

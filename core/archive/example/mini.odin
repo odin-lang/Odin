@@ -1,12 +1,13 @@
 /*
-A minimal archive tool on `core:archive`: lists a zip or 7z archive, tests it, unpacks one
+A minimal archive tool on `core:archive`: lists a zip, tar or 7z archive, tests it, unpacks one
 member, or creates or updates an archive.
 
 Build it with `odin build core/archive/example -out:mini`, then run:
 
-	mini list   <archive>             lists the format and the members: sizes, methods, times
-	                                  and CRC-32s
-	mini test   <archive>             decompresses every member and checks its CRC-32
+	mini list   <archive>             lists the format and the members: sizes, methods, times,
+	                                  CRC-32s and link targets
+	mini test   <archive>             decompresses every member and checks its CRC-32, or a
+	                                  compressed tar's own checksum
 	mini unpack <archive> <path>      writes one member to the current directory, under its
 	                                  base name, unless a file of that name exists
 	mini create <archive> <path>...   packs files and directory trees into a new archive, with
@@ -15,12 +16,14 @@ Build it with `odin build core/archive/example -out:mini`, then run:
 	                                  replacing the members it has at the same paths
 	mini -help                        shows the usage
 
-`archive.open` tells the formats apart by their contents, self-extracting zip and 7z archives
-included. A format's package registers it with `core:archive` when imported.
+`archive.open` tells the formats apart by their contents, self-extracting zip and 7z archives and
+compressed tar archives included. A format's package registers it with `core:archive` when
+imported. tar stores its members uncompressed, so the method listed for them is the whole
+archive's.
 
 Reading goes through `core:archive`, which has no writers, so `create` and `update` call the
-format's own package. `create` takes the format from the name, which must end in `.zip` or
-`.7z`, and `update` from the archive's contents.
+format's own package. `create` takes the format from the name, which must end in `.zip`, `.7z`
+or `.tar`, and `update` from the archive's contents. `core:archive/tar` can't update an archive.
 
 `core:archive` reads encrypted zip and 7z archives, but this tool takes no password. A program
 passes one in `archive.Read_Options`: to `archive.open` for a 7z archive's encrypted header, and
@@ -32,6 +35,7 @@ package mini
 
 import "core:archive"
 import "core:archive/sevenz"
+import "core:archive/tar"
 import "core:archive/zip"
 import "core:flags"
 import "core:fmt"
@@ -55,9 +59,10 @@ Options :: struct {
 }
 
 USAGE :: `usage:
-  mini list   <archive>             lists the format and the members: sizes, methods, times
-                                    and CRC-32s
-  mini test   <archive>             decompresses every member and checks its CRC-32
+  mini list   <archive>             lists the format and the members: sizes, methods, times,
+                                    CRC-32s and link targets
+  mini test   <archive>             decompresses every member and checks its CRC-32, or a
+                                    compressed tar's own checksum
   mini unpack <archive> <path>      writes one member to the current directory, under its
                                     base name, unless a file of that name exists
   mini create <archive> <path>...   packs files and directory trees into a new archive, with
@@ -239,17 +244,25 @@ pack :: proc(path: string, sources: []string, update: bool) -> bool {
 		format = .Zip
 	case strings.has_suffix(path, ".7z"):
 		format = .SevenZ
+	case strings.has_suffix(path, ".tar"):
+		format = .Tar
 	}
 
 	at:  string
 	err: archive.Error
-	#partial switch format {
+	switch format {
 	case .Zip:
 		at, err = pack_zip(path, sources, update)
 	case .SevenZ:
 		at, err = pack_7z(path, sources, update)
-	case:
-		fmt.eprintfln("%v: a new archive's name must end in .zip or .7z", path)
+	case .Tar:
+		if update {
+			fmt.eprintfln("%v: a tar archive can't be updated", path)
+			return false
+		}
+		at, err = pack_tar(path, sources)
+	case .Unknown:
+		fmt.eprintfln("%v: a new archive's name must end in .zip, .7z or .tar", path)
 		return false
 	}
 	if err != nil {
@@ -319,6 +332,27 @@ pack_7z :: proc(path: string, sources: []string, update: bool) -> (at: string, e
 	}
 	at = path
 	return at, sevenz.commit(&sw)
+}
+
+pack_tar :: proc(path: string, sources: []string) -> (at: string, err: archive.Error) {
+	at = path
+	tw: tar.Writer
+	tar.create(&tw, path) or_return
+	defer tar.close(&tw)
+
+	for source in sources {
+		at = source
+		fi := describe(source) or_return
+		if fi.type == .Directory {
+			tar.write_directory(&tw, source, fi.path) or_return
+		} else {
+			f := os.open(source) or_return
+			defer os.close(f)
+			tar.write_entry(&tw, fi, os.to_reader(f)) or_return
+		}
+	}
+	at = path
+	return at, tar.commit(&tw)
 }
 
 method_name :: proc(fi: archive.File_Info, method: archive.Method) -> string {

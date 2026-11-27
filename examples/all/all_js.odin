@@ -6,6 +6,7 @@ package all
 
 @(require) import "core:archive"
 @(require) import "core:archive/sevenz"
+@(require) import "core:archive/tar"
 @(require) import "core:archive/zip"
 
 @(require) import "core:bufio"
