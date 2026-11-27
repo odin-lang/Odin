@@ -425,7 +425,7 @@ decode_analyze :: proc(data: string, DEC_TBL := DEC_TABLE, options: Decode_Optio
 	return
 }
 
-decode :: proc(data: string, DEC_TBL := DEC_TABLE, dst: []byte = nil, allocator := context.allocator, options := Decode_Options{}) -> (decoded: []byte, err: Error) {
+decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator, options := Decode_Options{}) -> (decoded: []byte, err: Error) {
 	decode_info := decode_analyze(data, DEC_TBL, options) or_return
 
 	if decode_info.out_length == 0 {
