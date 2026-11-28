@@ -63,6 +63,11 @@ Event_Kind :: enum u32 {
 	Pointer_Lock_Change,
 	Pointer_Lock_Error,
 
+	// IME composition: `composition.text` carries the preedit, and Composition_End the text committed.
+	Composition_Start,
+	Composition_Update,
+	Composition_End,
+
 	Selection_Change,
 	Selection_Start,
 
@@ -112,6 +117,10 @@ event_kind_string := [Event_Kind]string{
 	.Blur         = "blur",
 	.Change       = "change",
 	.Select       = "select",
+
+	.Composition_Start  = "compositionstart",
+	.Composition_Update = "compositionupdate",
+	.Composition_End    = "compositionend",
 
 	.Animation_Start     = "animationstart",
 	.Animation_End       = "animationend",
@@ -176,6 +185,8 @@ Key_Location :: enum u8 {
 KEYBOARD_MAX_KEY_SIZE :: 16
 KEYBOARD_MAX_CODE_SIZE :: 16
 
+COMPOSITION_MAX_TEXT_SIZE :: 256
+
 Event_Target_Kind :: enum u32 {
 	Element  = 0,
 	Document = 1,
@@ -234,6 +245,13 @@ Event :: struct {
 
 			_key_buf:  [KEYBOARD_MAX_KEY_SIZE]byte,
 			_code_buf: [KEYBOARD_MAX_KEY_SIZE]byte,
+		},
+
+		composition: struct {
+			text: string,
+
+			_text_len: int,
+			_text_buf: [COMPOSITION_MAX_TEXT_SIZE]byte,
 		},
 
 		mouse: struct {

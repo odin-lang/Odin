@@ -47,6 +47,13 @@ Event_Kind :: enum u32 {
 	Cut,
 	Paste,
 
+	// IME composition: an input method building a string up before the user accepts it. `composition.text`
+	// carries the preedit (the DOM's CompositionEvent.data), and Composition_End carries the text that was
+	// finally committed, which may be empty when the composition was cancelled.
+	Composition_Start,
+	Composition_Update,
+	Composition_End,
+
 	// Drag,
 	// Drag_Start,
 	// Drag_End,
@@ -132,6 +139,10 @@ event_kind_string := [Event_Kind]string{
 	.Cut    = "cut",
 	.Paste  = "paste",
 
+	.Composition_Start  = "compositionstart",
+	.Composition_Update = "compositionupdate",
+	.Composition_End    = "compositionend",
+
 	// .Drag,       = "drag",
 	// .Drag_Start, = "dragstart",
 	// .Drag_End,   = "dragend",
@@ -188,6 +199,8 @@ Key_Location :: enum u8 {
 
 KEYBOARD_MAX_KEY_SIZE  :: 32
 KEYBOARD_MAX_CODE_SIZE :: 32
+
+COMPOSITION_MAX_TEXT_SIZE :: 256
 
 GAMEPAD_MAX_ID_SIZE      :: 96
 GAMEPAD_MAX_MAPPING_SIZE :: 64
@@ -287,6 +300,13 @@ Event :: struct {
 			_code_len: int                         `fmt:"-"`,
 			_key_buf:  [KEYBOARD_MAX_KEY_SIZE]byte `fmt:"-"`,
 			_code_buf: [KEYBOARD_MAX_KEY_SIZE]byte `fmt:"-"`,
+		},
+
+		composition: struct {
+			text: string,
+
+			_text_len: int                             `fmt:"-"`,
+			_text_buf: [COMPOSITION_MAX_TEXT_SIZE]byte `fmt:"-"`,
 		},
 
 		mouse: struct {
@@ -464,6 +484,8 @@ do_event_callback :: proc(user_data: rawptr, callback: proc(e: Event)) {
 		case .Key_Up, .Key_Down, .Key_Press:
 			event.key.key = string(event.key._key_buf[:event.key._key_len]) 
 			event.key.code = string(event.key._code_buf[:event.key._code_len]) 
+		case .Composition_Start, .Composition_Update, .Composition_End:
+			event.composition.text = string(event.composition._text_buf[:event.composition._text_len])
 		case .Gamepad_Connected, .Gamepad_Disconnected:
 			event.gamepad.id = string(event.gamepad._id_buf[:event.gamepad._id_len])
 			event.gamepad.mapping = string(event.gamepad._mapping_buf[:event.gamepad._mapping_len])
