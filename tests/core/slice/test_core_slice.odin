@@ -437,6 +437,617 @@ test_non_zero_allocating_procs :: proc(t: ^testing.T) {
 	testing.expect(t, slice.equal(values, []int{10, 20, 30}))
 }
 
+Sort_Item :: struct {
+	key:   i64,
+	index: i64,
+}
+
+Sort_Item_8 :: struct {
+	key:   i32,
+	index: i32,
+}
+
+// 4-aligned, and not a multiple of 8 bytes.
+Sort_Item_12 :: struct {
+	key:   i32,
+	index: i32,
+	pad:   i32,
+}
+
+Sort_Item_24 :: struct {
+	key:   i64,
+	index: i64,
+	pad:   u64,
+}
+
+Sort_Item_64 :: struct {
+	key:   i64,
+	index: i64,
+	pad:   [6]u64,
+}
+
+Sort_Item_96 :: struct {
+	key:   i64,
+	index: i64,
+	pad:   [10]u64,
+}
+
+Sort_Item_136 :: struct {
+	key:   i64,
+	index: i64,
+	pad:   [15]u64,
+}
+
+Sort_Item_264 :: struct {
+	key:   i64,
+	index: i64,
+	pad:   [31]u64,
+}
+
+Sort_Item_600 :: struct {
+	key:   i64,
+	index: i64,
+	pad:   [73]u64,
+}
+
+Sort_Item_20000 :: struct {
+	key:   i64,
+	index: i64,
+	pad:   [2498]u64,
+}
+
+Sort_Pattern :: enum {
+	Random,
+	Duplicates,
+	Few_Keys,
+	Mostly_Equal,
+	Equal,
+	Sorted,
+	Reversed,
+	Descending,
+	Nearly_Sorted,
+	Swapped,
+	Spikes,
+	Organ_Pipe,
+	Sawtooth,
+	Long_Runs,
+	Runs,
+	Short_Runs,
+	Half_Sorted,
+	Descending_Runs,
+}
+
+// The `_runtime` and `_constant` variants are called directly. `sort_by` and the like take the constant one only from
+// -o:speed, and the two take different paths.
+Sort_Api :: enum {
+	Sort_By,
+	Sort_By_Constant,
+	Sort_By_Cmp,
+	Sort_By_Cmp_Constant,
+	Sort_By_With_Data,
+	Sort_By_Cmp_With_Data,
+	Sort_By_Generic_Cmp,
+	Sort_By_Key,
+	Reverse_Sort_By,
+	Reverse_Sort_By_Constant,
+	Reverse_Sort_By_Cmp,
+	Reverse_Sort_By_Cmp_Constant,
+	Reverse_Sort_By_Key,
+}
+
+REVERSE_SORT_APIS :: bit_set[Sort_Api]{.Reverse_Sort_By, .Reverse_Sort_By_Constant, .Reverse_Sort_By_Cmp, .Reverse_Sort_By_Cmp_Constant, .Reverse_Sort_By_Key}
+
+// Fills `keys` with a pattern. Keys are never negative, and most patterns repeat them: stability shows only among equal keys.
+sort_pattern_keys :: proc(keys: []i64, pattern: Sort_Pattern) {
+	n := len(keys)
+	switch pattern {
+	case .Random:
+		for &k in keys {
+			k = i64(rand.int_max(1 << 30))
+		}
+	case .Duplicates:
+		for &k in keys {
+			k = i64(rand.int_max(max(n/4, 1)))
+		}
+	case .Few_Keys:
+		for &k in keys {
+			k = i64(rand.int_max(8))
+		}
+	case .Mostly_Equal:
+		// One key apart from every eighth item: nothing long is sorted, and a partition meets mostly its pivot.
+		for &k, i in keys {
+			k = i64(rand.int_max(10)) if i%8 == 3 else 5
+		}
+	case .Equal:
+		for &k in keys {
+			k = 7
+		}
+	case .Sorted:
+		for &k, i in keys {
+			k = i64(i/3)
+		}
+	case .Reversed:
+		for &k, i in keys {
+			k = i64((n-i)/3)
+		}
+	case .Descending:
+		// Strictly descending between equal pairs. A reversal past one would swap the pair.
+		for &k, i in keys {
+			k = i64(n - i + i/64)
+		}
+	case .Nearly_Sorted, .Swapped:
+		// With 1% of keys swapped, the sort keeps the sorted items in place and merges the others back, across segments
+		// once its buffer fills. With 8%, a comparator sort merges natural runs, the input still sorted at large scale.
+		for &k, i in keys {
+			k = i64(i/3)
+		}
+		swaps := (n+99)/100 if pattern == .Nearly_Sorted else n*8/100
+		for _ in 0..<swaps {
+			a, b := rand.int_max(n), rand.int_max(n)
+			keys[a], keys[b] = keys[b], keys[a]
+		}
+	case .Spikes:
+		// Lone items and equal pairs above what follows them, each equal to keys further on.
+		for &k, i in keys {
+			k = i64(i/3) + (40 if i%61 == 60 || i%60 == 57 || i%60 == 58 else 0)
+		}
+	case .Organ_Pipe:
+		for &k, i in keys {
+			k = i64(min(i, n-i))
+		}
+	case .Sawtooth:
+		for &k, i in keys {
+			k = i64(i%37)
+		}
+	case .Long_Runs:
+		// Ascending runs of n/6 keys with repeats, one starting in every quarter: drop-merge stops at the second.
+		for &k, i in keys {
+			k = i64(i % (n/6 + 1) / 2)
+		}
+	case .Runs:
+		// Long and short runs for a comparator sort to merge, ascending with repeats or strictly descending between equal pairs.
+		lengths := [?]int{300, 3, 31, 32, 33, 1, 700, 12, 64, 2, 250, 20, 97}
+		start, run := 0, 0
+		for start < n {
+			length := min(lengths[run % len(lengths)], n - start)
+			for j in 0..<length {
+				keys[start+j] = i64(j/2) if run%2 == 0 else i64(length - j + j/16)
+			}
+			start += length
+			run   += 1
+		}
+	case .Short_Runs:
+		// Sorted runs of 20 to 60 keys: few descents, but each run starts below the one before.
+		for &k in keys {
+			k = i64(rand.int_max(max(n/4, 1)))
+		}
+		for start := 0; start < n; {
+			end := min(start + 20 + rand.int_max(41), n)
+			slice.sort(keys[start:end])
+			start = end
+		}
+	case .Half_Sorted:
+		// Quarters in order and quarters not, over the same keys.
+		for &k, i in keys {
+			k = i64(i/3) if i < n/2 else i64(rand.int_max(max(n/6, 1)))
+		}
+	case .Descending_Runs:
+		for &k, i in keys {
+			k = i64(1000 - i%1000 + (i/1000)*7)
+		}
+	}
+}
+
+@(require_results)
+is_permutation_of_indices :: proc(items: []$T) -> bool {
+	seen := make([]bool, len(items))
+	defer delete(seen)
+
+	for item in items {
+		index := i64(item.index)
+		if !(0 <= index && index < i64(len(items))) {
+			return false
+		}
+		if seen[index] {
+			return false
+		}
+		seen[index] = true
+	}
+	return true
+}
+
+// Sorted by key, ascending or descending, with equal keys in their input order, and a permutation of the input.
+// Only the stable order passes.
+@(require_results)
+is_sorted_items :: proc(items: []$T, descending: bool) -> bool {
+	for i in 1..<len(items) {
+		prev, item := items[i-1], items[i]
+		in_order := prev.key > item.key if descending else prev.key < item.key
+		if !in_order && (prev.key != item.key || prev.index > item.index) {
+			return false
+		}
+	}
+	return is_permutation_of_indices(items)
+}
+
+sort_items :: proc(items: []$T, api: Sort_Api) {
+	less :: proc(a, b: T) -> bool {
+		return a.key < b.key
+	}
+	cmp :: proc(a, b: T) -> slice.Ordering {
+		return slice.cmp(a.key, b.key)
+	}
+	less_with_data :: proc(a, b: T, user_data: rawptr) -> bool {
+		assert(user_data == rawptr(uintptr(1)))
+		return a.key < b.key
+	}
+	cmp_with_data :: proc(a, b: T, user_data: rawptr) -> slice.Ordering {
+		assert(user_data == rawptr(uintptr(1)))
+		return slice.cmp(a.key, b.key)
+	}
+	generic_cmp :: proc(lhs, rhs: rawptr, user_data: rawptr) -> slice.Ordering {
+		assert(user_data == rawptr(uintptr(1)))
+		return slice.cmp((^T)(lhs).key, (^T)(rhs).key)
+	}
+	key :: proc(item: T) -> i64 {
+		return i64(item.key)
+	}
+
+	switch api {
+	case .Sort_By:                      slice.sort_by_runtime(items, less)
+	case .Sort_By_Constant:             slice.sort_by_constant(items, less)
+	case .Sort_By_Cmp:                  slice.sort_by_cmp_runtime(items, cmp)
+	case .Sort_By_Cmp_Constant:         slice.sort_by_cmp_constant(items, cmp)
+	case .Sort_By_With_Data:            slice.sort_by_with_data(items, less_with_data, rawptr(uintptr(1)))
+	case .Sort_By_Cmp_With_Data:        slice.sort_by_cmp_with_data(items, cmp_with_data, rawptr(uintptr(1)))
+	case .Sort_By_Generic_Cmp:          slice.sort_by_generic_cmp(items, generic_cmp, rawptr(uintptr(1)))
+	case .Sort_By_Key:                  slice.sort_by_key(items, key)
+	case .Reverse_Sort_By:              slice.reverse_sort_by_runtime(items, less)
+	case .Reverse_Sort_By_Constant:     slice.reverse_sort_by_constant(items, less)
+	case .Reverse_Sort_By_Cmp:          slice.reverse_sort_by_cmp_runtime(items, cmp)
+	case .Reverse_Sort_By_Cmp_Constant: slice.reverse_sort_by_cmp_constant(items, cmp)
+	case .Reverse_Sort_By_Key:          slice.reverse_sort_by_key(items, key)
+	}
+}
+
+// Every sort is stable: items carry their input position, and only the stable order passes.
+check_sorts :: proc(t: ^testing.T, $T: typeid, sizes: []int, apis: bit_set[Sort_Api]) {
+	keys  := make([]i64, slice.max(sizes))
+	items := make([]T, len(keys))
+	defer delete(keys)
+	defer delete(items)
+
+	for pattern in Sort_Pattern {
+		for n in sizes {
+			sort_pattern_keys(keys[:n], pattern)
+			for api in apis {
+				for &item, i in items[:n] {
+					item = {}
+					item.key   = type_of(item.key)(keys[i])
+					item.index = type_of(item.index)(i)
+				}
+				sort_items(items[:n], api)
+				testing.expectf(t, is_sorted_items(items[:n], api in REVERSE_SORT_APIS), "%v, %v, %v, n = %d", api, typeid_of(T), pattern, n)
+			}
+		}
+	}
+}
+
+// The sizes reach each part of the sort, on both sides of where it takes over.
+@test
+test_sort_patterns :: proc(t: ^testing.T) {
+	rand.reset(t.seed)
+
+	sizes: [dynamic]int
+	defer delete(sizes)
+	for n in 0..=200 {
+		append(&sizes, n)
+	}
+	append(&sizes, 255, 256, 257, 511, 512, 513, 1000, 1024, 1025, 2048, 2049, 4097)
+	check_sorts(t, Sort_Item, sizes[:], ~bit_set[Sort_Api]{})
+
+	// Comparators differ only in being calls or constants. Past these sizes, `sort_by` and `sort_by_constant` stand in for the rest.
+	check_sorts(t, Sort_Item, {16384, 16385, 20011, 70001}, {.Sort_By, .Sort_By_Constant})
+}
+
+// Element sizes set the buffer sizes, and with them where each part of the sort takes over.
+@test
+test_sort_element_sizes :: proc(t: ^testing.T) {
+	rand.reset(t.seed)
+
+	APIS :: bit_set[Sort_Api]{.Sort_By, .Sort_By_Constant}
+
+	sizes := []int{0, 1, 2, 3, 7, 8, 9, 16, 17, 31, 32, 33, 64, 65, 96, 97, 132, 133, 255, 256, 257, 1000, 1025, 5003, 20011}
+	check_sorts(t, Sort_Item_8,   sizes, APIS)
+	check_sorts(t, Sort_Item_12,  sizes, APIS)
+	check_sorts(t, Sort_Item_24,  sizes, APIS)
+	check_sorts(t, Sort_Item_64,  sizes, APIS)
+	check_sorts(t, Sort_Item_96,  sizes, APIS)
+	check_sorts(t, Sort_Item_136, sizes, APIS)
+	check_sorts(t, Sort_Item_264, sizes, APIS)
+	check_sorts(t, Sort_Item_600, sizes[:len(sizes)-1], APIS)
+
+	huge_sizes := []int{0, 1, 2, 15, 16, 17, 18, 33, 64, 100, 257}
+	check_sorts(t, Sort_Item_20000, huge_sizes, APIS)
+}
+
+// Nearly sorted elements over 512 bytes: drop-merge notes where its set-aside items are, in segments that end where the
+// notes fill up (5% swapped) or their offsets would not fit (1%), and the segments merge where few items cross.
+@test
+test_sort_huge_nearly_sorted :: proc(t: ^testing.T) {
+	rand.reset(t.seed)
+
+	N    :: 34_001
+	APIS :: bit_set[Sort_Api]{.Sort_By, .Sort_By_Constant, .Sort_By_Cmp}
+	keys  := make([]i64, N)
+	items := make([]Sort_Item_600, N)
+	defer delete(keys)
+	defer delete(items)
+
+	for percent in ([]int{1, 5}) {
+		for &k, i in keys {
+			k = i64(i/3)
+		}
+		for _ in 0..<N*percent/100 {
+			a, b := rand.int_max(N), rand.int_max(N)
+			keys[a], keys[b] = keys[b], keys[a]
+		}
+		for api in APIS {
+			for &item, i in items {
+				item = {key = keys[i], index = i64(i)}
+			}
+			sort_items(items, api)
+			testing.expectf(t, is_sorted_items(items, false), "%v, %d%% swapped", api, percent)
+		}
+	}
+}
+
+// Sorting either way must give the stable order, bit for bit. Bits tell apart values that compare equal: -0.0 and 0.0,
+// or equal strings at different addresses. A sort of the values tagged with their positions gives the stable order, and
+// the tags check it.
+expect_stable_order :: proc(t: ^testing.T, values: []$E, what: any, loc := #caller_location) {
+	Tagged :: struct {
+		key:   E,
+		index: i64,
+	}
+	less :: proc(a, b: Tagged) -> bool {
+		return a.key < b.key
+	}
+
+	n := len(values)
+	tagged   := make([]Tagged, n)
+	expected := make([]E, n)
+	sorted   := make([]E, n)
+	defer delete(tagged)
+	defer delete(expected)
+	defer delete(sorted)
+
+	for descending in ([?]bool{false, true}) {
+		for &x, i in tagged {
+			x = {values[i], i64(i)}
+		}
+		copy(sorted, values)
+		if descending {
+			slice.reverse_sort_by_runtime(tagged, less)
+			slice.reverse_sort(sorted)
+		} else {
+			slice.sort_by_runtime(tagged, less)
+			slice.sort(sorted)
+		}
+
+		api := "reverse_sort" if descending else "sort"
+		if !testing.expectf(t, is_sorted_items(tagged, descending), "%s_by on tags, %v, %v, n = %d", api, typeid_of(E), what, n, loc = loc) {
+			return
+		}
+		for x, i in tagged {
+			expected[i] = values[x.index]
+		}
+		testing.expectf(t, slice.equal(slice.to_bytes(sorted), slice.to_bytes(expected)), "%s, %v, %v, n = %d", api, typeid_of(E), what, n, loc = loc)
+	}
+}
+
+// `sort` and `reverse_sort` on values that compare equal but differ in their bits. f32 goes through a vector partition on
+// most targets and f64 through the scalar one. Strings take the paths for comparisons that are calls.
+@test
+test_sort_ordered_stable :: proc(t: ^testing.T) {
+	rand.reset(t.seed)
+
+	SIZES :: [?]int{0, 1, 2, 3, 5, 7, 8, 9, 16, 17, 31, 32, 33, 64, 65, 96, 97, 132, 133, 255, 256, 257, 1000, 1024, 1025, 2048, 2049, 4097, 16385, 20011}
+	N :: SIZES[len(SIZES)-1]
+
+	keys := make([]i64, N)
+	defer delete(keys)
+
+	floats :: proc(t: ^testing.T, $E: typeid, keys: []i64, pattern: Sort_Pattern) {
+		values := make([]E, len(keys))
+		defer delete(values)
+
+		// The lowest third of the keys become -0.0 or 0.0 at random.
+		lo, hi := slice.min(keys), slice.max(keys)
+		zero := lo + (hi-lo)/3
+		for &v, i in values {
+			if keys[i] > zero {
+				v = E(keys[i] - zero)
+			} else {
+				v = -0.0 if rand.int_max(2) == 0 else 0.0
+			}
+		}
+		expect_stable_order(t, values, pattern)
+	}
+
+	texts   := make([][8]u8, N)
+	strings := make([]string, N)
+	defer delete(texts)
+	defer delete(strings)
+
+	for pattern in Sort_Pattern {
+		for n in SIZES {
+			sort_pattern_keys(keys[:n], pattern)
+			floats(t, f32, keys[:n], pattern)
+			floats(t, f64, keys[:n], pattern)
+
+			// Big-endian bytes order as the keys do. Each string has its own copy.
+			for &s, i in strings[:n] {
+				texts[i] = transmute([8]u8)u64be(keys[i])
+				s = string(texts[i][:])
+			}
+			expect_stable_order(t, strings[:n], pattern)
+		}
+	}
+}
+
+// Integers in their own order go through a radix sort. Every width and sign must sort as a comparison sort does.
+@test
+test_sort_integers :: proc(t: ^testing.T) {
+	rand.reset(t.seed)
+
+	check :: proc(t: ^testing.T, $E: typeid) {
+		SIZES :: [?]int{0, 1, 2, 5, 17, 100, 133, 257, 1000, 1025, 5000, 20011}
+		N :: SIZES[len(SIZES)-1]
+
+		values := make([]E, N)
+		keys   := make([]i64, N)
+		defer delete(values)
+		defer delete(keys)
+
+		for pattern in Sort_Pattern {
+			for n in SIZES {
+				// Random keys use every bit. The others shift down by n/2, which crosses zero or wraps.
+				sort_pattern_keys(keys[:n], pattern)
+				for &v, i in values[:n] {
+					if pattern == .Random {
+						v = E(rand.uint128())
+					} else {
+						v = E(keys[i]) - E(n/2)
+					}
+				}
+				expect_stable_order(t, values[:n], pattern)
+			}
+		}
+
+		// A few distinct keys spread over every bit take the partition instead: 4-byte keys past the buffer, others past 1 MB.
+		few_values := make([]E, (1 << 20)/size_of(E) + 1)
+		defer delete(few_values)
+
+		for n in ([?]int{1025, 5000, len(few_values)}) {
+			few: [3]E
+			for &f in few {
+				f = E(rand.uint128())
+			}
+			for &v in few_values[:n] {
+				v = few[rand.int_max(len(few))]
+			}
+			expect_stable_order(t, few_values[:n], "few spread keys")
+		}
+	}
+
+	check(t, i8)
+	check(t, u8)
+	check(t, i16)
+	check(t, u16)
+	check(t, i32)
+	check(t, u32)
+	check(t, rune)
+	check(t, i64)
+	check(t, u64)
+	check(t, i128)
+	check(t, u128)
+}
+
+// The indices of equal values must come out in increasing order.
+@test
+test_sort_with_indices_patterns :: proc(t: ^testing.T) {
+	rand.reset(t.seed)
+
+	less :: proc(a, b: i64) -> bool {
+		return a < b
+	}
+	less_with_data :: proc(a, b: i64, user_data: rawptr) -> bool {
+		assert(user_data == rawptr(uintptr(1)))
+		return a < b
+	}
+
+	SIZES :: [?]int{0, 1, 2, 7, 8, 9, 33, 97, 133, 257, 1000, 1025, 5003, 20011}
+	N :: SIZES[len(SIZES)-1]
+
+	values   := make([]i64, N)
+	original := make([]i64, N)
+	items    := make([]Sort_Item, N)
+	defer delete(values)
+	defer delete(original)
+	defer delete(items)
+
+	Api :: enum {
+		Sort_With_Indices,
+		Sort_By_With_Indices,
+		Sort_By_With_Indices_With_Data,
+	}
+
+	for api in Api {
+		for pattern in Sort_Pattern {
+			for n in SIZES {
+				sort_pattern_keys(values[:n], pattern)
+				copy(original[:n], values[:n])
+
+				indices: []int
+				switch api {
+				case .Sort_With_Indices:              indices = slice.sort_with_indices(values[:n])
+				case .Sort_By_With_Indices:           indices = slice.sort_by_with_indices(values[:n], less)
+				case .Sort_By_With_Indices_With_Data: indices = slice.sort_by_with_indices_with_data(values[:n], less_with_data, rawptr(uintptr(1)))
+				}
+				defer delete(indices)
+
+				for index, i in indices {
+					items[i] = {values[i], i64(index)}
+				}
+				testing.expectf(t, is_sorted_items(items[:n], false), "%v, %v, n = %d: not sorted, stable, or a permutation", api, pattern, n)
+				for index, i in indices {
+					if values[i] != original[index] {
+						testing.expectf(t, false, "%v, %v, n = %d: index %d does not match", api, pattern, n, i)
+						break
+					}
+				}
+			}
+		}
+	}
+}
+
+@test
+test_sort_inconsistent_comparator :: proc(t: ^testing.T) {
+	rand.reset(t.seed)
+
+	random_less :: proc(a, b: Sort_Item) -> bool {
+		return rand.int_max(2) == 0
+	}
+	random_cmp :: proc(a, b: Sort_Item) -> slice.Ordering {
+		return slice.Ordering(rand.int_max(3) - 1)
+	}
+
+	sizes: [dynamic]int
+	defer delete(sizes)
+	for n in 0..=300 {
+		append(&sizes, n)
+	}
+	append(&sizes, 511, 512, 513, 1000, 2049, 5003, 20011)
+
+	items := make([]Sort_Item, slice.max(sizes[:]))
+	defer delete(items)
+
+	for n in sizes {
+		for &item, i in items[:n] {
+			item = {key = i64(i), index = i64(i)}
+		}
+
+		rand.shuffle(items[:n])
+		slice.sort_by(items[:n], random_less)
+		testing.expectf(t, is_permutation_of_indices(items[:n]), "sort_by lost or duplicated items, n = %d", n)
+
+		rand.shuffle(items[:n])
+		slice.sort_by_cmp(items[:n], random_cmp)
+		testing.expectf(t, is_permutation_of_indices(items[:n]), "sort_by_cmp lost or duplicated items, n = %d", n)
+	}
+}
+
 @test
 test_retain :: proc(t: ^testing.T) {
 	values := []int{1, 2, 3, 4, 5}

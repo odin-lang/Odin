@@ -89,6 +89,19 @@ gb_internal gbAllocator lb_function_type_args_allocator(void) {
 	return heap_allocator();
 }
 
+// The LLVM parameter, after any hidden return pointer, of the first pointer a split multiple-value result goes through.
+// An ignored argument has no LLVM parameter and a padded one has two. It is not `original_arg_count`.
+gb_internal isize lb_function_type_split_results_index(lbFunctionType *ft) {
+	isize index = 0;
+	for (isize i = 0; i < ft->original_arg_count; i++) {
+		lbArgType const &arg = ft->args[i];
+		if (arg.kind != lbArg_Ignore) {
+			index += arg.pad_type != nullptr ? 2 : 1;
+		}
+	}
+	return index;
+}
+
 
 gb_internal gb_inline i64 llvm_align_formula(i64 off, i64 a) {
 	return (off + a - 1) / a * a;
@@ -964,9 +977,14 @@ namespace lbAbi386 {
 		// `fastcall` passes the first two integers or pointers of 32 bits or fewer in ECX and EDX.
 		// Since MSVC 2015, Windows passes the first three vectors in XMM0-2 and the rest by reference.
 		bool      msvc_rules = build_context.metrics.os == TargetOs_windows;
+		bool      odin_cc    = is_calling_convention_odin(calling_convention);
 		Registers regs       = {calling_convention == ProcCC_FastCall ? 2 : 0, 3};
 		for (unsigned i = 0; i < arg_count; i++) {
 			if (by_ptr[i]) {
+				args[i] = indirect(arg_types[i], &regs);
+			} else if (odin_cc && is_aggregate(arg_types[i], srcs[i]) && lb_sizeof(arg_types[i]) > 16) {
+				// Odin parameters are immutable. A large aggregate goes by reference, as on the other targets,
+				// instead of being copied onto the stack at every call and every inlined call.
 				args[i] = indirect(arg_types[i], &regs);
 			} else {
 				args[i] = arg_type(c, arg_types[i], srcs[i], msvc_rules, &regs);

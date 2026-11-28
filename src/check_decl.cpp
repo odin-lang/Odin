@@ -2042,6 +2042,7 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 				break;
 			case ProcOverload_ParamCount:
 			case ProcOverload_ParamTypes:
+			case ProcOverload_ParamConstant:
 			case ProcOverload_TargetFeatures:
 				// This is okay :)
 				break;
@@ -2192,6 +2193,7 @@ gb_internal void check_asm_group_decl(CheckerContext *ctx, Entity *asm_entity, D
 				break;
 			case ProcOverload_ParamCount:
 			case ProcOverload_ParamTypes:
+			case ProcOverload_ParamConstant:
 			case ProcOverload_TargetFeatures:
 				// This is okay :)
 				break;

@@ -4143,6 +4143,7 @@ enum ProcTypeOverloadKind {
 	ProcOverload_ParamCount,
 	ProcOverload_ParamVariadic,
 	ProcOverload_ParamTypes,
+	ProcOverload_ParamConstant,
 	ProcOverload_ResultCount,
 	ProcOverload_ResultTypes,
 	ProcOverload_Polymorphic,
@@ -4175,6 +4176,7 @@ gb_internal ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) 
 		return ProcOverload_ParamCount;
 	}
 
+	bool constant_differs = false;
 	for (isize i = 0; i < px.param_count; i++) {
 		Entity *ex = px.params->Tuple.variables[i];
 		Entity *ey = py.params->Tuple.variables[i];
@@ -4185,10 +4187,17 @@ gb_internal ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) 
 		if (!are_types_identical(ex->type, ey->type)) {
 			return ProcOverload_ParamTypes;
 		}
+		if ((ex->kind == Entity_Constant) != (ey->kind == Entity_Constant)) {
+			constant_differs = true;
+		}
 	}
 	// IMPORTANT TODO(bill): Determine the rules for overloading procedures with variadic parameters
 	if (px.variadic != py.variadic) {
 		return ProcOverload_ParamVariadic;
+	}
+
+	if (constant_differs) {
+		return ProcOverload_ParamConstant;
 	}
 
 
