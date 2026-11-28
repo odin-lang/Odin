@@ -908,6 +908,69 @@ static void verify_error_helpers(ofstream& out) {
 	test_proc_end();
 }
 
+static void verify_crypt32(ofstream& out) {
+	test_proc_begin();
+	test_proc_comment("wincrypt.h");
+	expect_size(HCERTSTORE);
+	expect_size(CERT_CONTEXT);
+	expect_size(CERT_INFO);
+	expect_size(HCERTCHAINENGINE);
+	expect_size(CERT_CHAIN_ENGINE_CONFIG);
+	expect_size(CTL_USAGE);
+	expect_size(CERT_USAGE_MATCH);
+	expect_size(CERT_CHAIN_PARA);
+	expect_size(CERT_TRUST_STATUS);
+	expect_size(CERT_CHAIN_ELEMENT);
+	expect_size(CERT_SIMPLE_CHAIN);
+	expect_size(CERT_CHAIN_CONTEXT);
+	expect_size(CERT_CHAIN_POLICY_PARA);
+	expect_size(CERT_CHAIN_POLICY_STATUS);
+	expect_size(SSL_EXTRA_CERT_CHAIN_POLICY_PARA);
+	expect_value(X509_ASN_ENCODING);
+	expect_value(PKCS_7_ASN_ENCODING);
+	expect_value(CERT_STORE_CREATE_NEW_FLAG);
+	expect_value(CERT_STORE_ADD_NEW);
+	expect_value(CERT_STORE_ADD_USE_EXISTING);
+	expect_value(CERT_STORE_ADD_REPLACE_EXISTING);
+	expect_value(CERT_STORE_ADD_ALWAYS);
+	expect_value(CERT_CHAIN_CACHE_END_CERT);
+	expect_value(CERT_CHAIN_EXCLUSIVE_ENABLE_CA_FLAG);
+	expect_value(USAGE_MATCH_TYPE_AND);
+	expect_value(USAGE_MATCH_TYPE_OR);
+	expect_value(CERT_CHAIN_REVOCATION_CHECK_END_CERT);
+	expect_value(CERT_CHAIN_REVOCATION_CHECK_CHAIN);
+	expect_value(CERT_CHAIN_REVOCATION_CHECK_CHAIN_EXCLUDE_ROOT);
+	expect_value(CERT_CHAIN_REVOCATION_CHECK_CACHE_ONLY);
+	expect_value(CERT_CHAIN_DISABLE_AUTH_ROOT_AUTO_UPDATE);
+	expect_value(CERT_TRUST_IS_NOT_TIME_VALID);
+	expect_value(CERT_TRUST_IS_REVOKED);
+	expect_value(CERT_TRUST_IS_NOT_SIGNATURE_VALID);
+	expect_value(CERT_TRUST_IS_UNTRUSTED_ROOT);
+	expect_value(CERT_TRUST_IS_PARTIAL_CHAIN);
+	expect_value(CERT_TRUST_IS_EXPLICIT_DISTRUST);
+	expect_value(CERT_TRUST_IS_FROM_EXCLUSIVE_TRUST_STORE);
+	expect_value(AUTHTYPE_CLIENT);
+	expect_value(AUTHTYPE_SERVER);
+	expect_value(CRYPT_E_REVOKED);
+	expect_value(CRYPT_E_NO_REVOCATION_CHECK);
+	expect_value(CRYPT_E_REVOCATION_OFFLINE);
+	expect_value(TRUST_E_CERT_SIGNATURE);
+	expect_value(TRUST_E_BASIC_CONSTRAINTS);
+	expect_value(CERT_E_EXPIRED);
+	expect_value(CERT_E_PURPOSE);
+	expect_value(CERT_E_UNTRUSTEDROOT);
+	expect_value(CERT_E_CHAINING);
+	expect_value(CERT_E_REVOKED);
+	expect_value(CERT_E_UNTRUSTEDTESTROOT);
+	expect_value(CERT_E_REVOCATION_FAILURE);
+	expect_value(CERT_E_CN_NO_MATCH);
+	expect_value(CERT_E_WRONG_USAGE);
+	expect_value(TRUST_E_EXPLICIT_DISTRUST);
+	expect_value(CERT_E_INVALID_POLICY);
+	expect_value(CERT_E_INVALID_NAME);
+	test_proc_end();
+}
+
 static void test_core_sys_windows(ofstream& out) {
 	out << "#+build windows amd64" << endl
 		<< "package " << __func__
@@ -922,6 +985,7 @@ static void test_core_sys_windows(ofstream& out) {
 	verify_gdi32(out);
 	verify_winmm(out);
 	verify_advapi32(out);
+	verify_crypt32(out);
 	verify_winnls(out);
 	verify_winreg(out);
 	verify_verrsrc(out);
