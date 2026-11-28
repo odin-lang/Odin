@@ -28,7 +28,7 @@ _lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: 
 
 _lookup_env_buf :: proc(buf: []u8, key: string) -> (value: string, error: Error) {
 	if key == "" {
-		return
+		return "", .Env_Var_Not_Found
 	}
 
 	if len(key) + 1 > len(buf) {
@@ -40,19 +40,15 @@ _lookup_env_buf :: proc(buf: []u8, key: string) -> (value: string, error: Error)
 
 	cval := posix.getenv(cstring(raw_data(buf)))
 	if cval == nil {
-		return
+		return "", .Env_Var_Not_Found
 	}
 
-	if value = string(cval); value == "" {
-		return "", .Env_Var_Not_Found
-	} else {
-		if len(value) > len(buf) {
-			return "", .Buffer_Full
-		} else {
-			copy(buf, value)
-			return string(buf[:len(value)]), nil
-		}
+	value = string(cval)
+	if len(value) > len(buf) {
+		return "", .Buffer_Full
 	}
+	copy(buf, value)
+	return string(buf[:len(value)]), nil
 }
 
 _lookup_env :: proc{_lookup_env_alloc, _lookup_env_buf}
@@ -72,7 +68,10 @@ _set_env :: proc(key, value: string) -> (err: Error) {
 _unset_env :: proc(key: string) -> (ok: bool) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
-	ckey := strings.clone_to_cstring(key, temp_allocator)
+	ckey, ckey_err := strings.clone_to_cstring(key, temp_allocator)
+	if ckey_err != nil {
+		return false
+	}
 
 	ok = posix.unsetenv(ckey) == .OK
 	return
@@ -81,15 +80,21 @@ _unset_env :: proc(key: string) -> (ok: bool) {
 // NOTE(laytan): clearing the env is weird, why would you ever do that?
 
 _clear_env :: proc() {
-	for entry := posix.environ[0]; entry != nil; entry = posix.environ[0] {
+	i := 0
+	for entry := posix.environ[i]; entry != nil; entry = posix.environ[i] {
 		key := strings.truncate_to_byte(string(entry), '=')
 		_unset_env(key)
+		if rawptr(posix.environ[i]) == rawptr(entry) {
+			i += 1
+		}
 	}
 }
 
 _environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error) {
 	n := 0
-	for entry := posix.environ[0]; entry != nil; n, entry = n+1, posix.environ[n] {}
+	for posix.environ[n] != nil {
+		n += 1
+	}
 
 	r := make([dynamic]string, 0, n, allocator) or_return
 	defer if err != nil {
@@ -99,8 +104,8 @@ _environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error
 		delete(r)
 	}
 
-	for i, entry := 0, posix.environ[0]; entry != nil; i, entry = i+1, posix.environ[i] {
-		append(&r, strings.clone(string(entry), allocator) or_return)
+	for i in 0..<n {
+		append(&r, strings.clone(string(posix.environ[i]), allocator) or_return)
 	}
 
 	environ = r[:]

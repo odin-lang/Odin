@@ -3,6 +3,7 @@ package test_core_hash
 
 import "core:hash"
 import "core:math/rand"
+import "core:slice"
 import "core:testing"
 import "base:intrinsics"
 
@@ -279,6 +280,52 @@ test_crc32_combine :: proc(t: ^testing.T) {
 		testing.expectf(t, hash.crc32_combine(a, b, len(data) - split) == whole, "crc32_combine at split %v", split)
 	}
 	testing.expect_value(t, hash.crc32_combine(0x352441c2, 0, 0), 0x352441c2)
+}
+
+@test
+test_crc32_copy :: proc(t: ^testing.T) {
+	src := make([]byte, 4096 + 16)
+	defer delete(src)
+	dst := make([]byte, 4096 + 32)
+	defer delete(dst)
+	for &b in src {
+		b = byte(rand.uint32())
+	}
+
+	for length in 0..=1100 {
+		for offset in 0..<16 {
+			seed  := rand.uint32() if offset & 1 != 0 else 0
+			input := src[offset:][:length]
+			for extra in -1..=1 {
+				size   := max(length + extra, 0)
+				start  := offset * 5 % 16
+				n      := min(size, length)
+				output := dst[start:][:size]
+				slice.fill(dst[:start + size + 1], 0xa5)
+				got  := hash.crc32_copy(output, input, seed)
+				want := hash.crc32(input[:n], seed)
+				testing.expectf(t, got == want, "crc32_copy length %v, offset %v, size %v: expected 0x%08x, got 0x%08x", length, offset, size, want, got)
+				testing.expectf(t, slice.equal(output[:n], input[:n]), "crc32_copy length %v, offset %v, size %v: data differs", length, offset, size)
+				testing.expectf(t, dst[start + n] == 0xa5, "crc32_copy length %v, offset %v, size %v: wrote past the copy", length, offset, size)
+			}
+		}
+	}
+
+	running := u32(0)
+	for p := 0; p < len(src); p += 777 {
+		running = hash.crc32_copy(dst[p:], src[p:][:min(777, len(src) - p)], running)
+	}
+	testing.expect_value(t, running, hash.crc32(src))
+	testing.expect(t, slice.equal(dst[:len(src)], src))
+
+	buf := make([]byte, 3000)
+	defer delete(buf)
+	for shift in ([?]int{-1000, -999, -17, -1, 0, 1, 17, 999, 1000}) {
+		copy(buf, src)
+		got := hash.crc32_copy(buf[1000 + shift:][:1000], buf[1000:][:1000])
+		testing.expectf(t, got == hash.crc32(src[1000:][:1000]), "crc32_copy overlap shift %v: wrong checksum", shift)
+		testing.expectf(t, slice.equal(buf[1000 + shift:][:1000], src[1000:][:1000]), "crc32_copy overlap shift %v: data differs", shift)
+	}
 }
 
 @test

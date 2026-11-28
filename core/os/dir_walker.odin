@@ -18,29 +18,29 @@ Walker :: struct {
 }
 
 walker_init_path :: proc(w: ^Walker, path: string) {
+	walker_clear(w)
+
 	cloned_path, err := clone_string(path, file_allocator())
 	if err != nil {
 		walker_set_error(w, path, err)
 		return
 	}
 
-	walker_clear(w)
-
 	if _, err = queue.push(&w.todo, cloned_path); err != nil {
 		walker_set_error(w, cloned_path, err)
+		delete(cloned_path, file_allocator())
 		return
 	}
 }
 
 walker_init_file :: proc(w: ^Walker, f: ^File) {
+	walker_clear(w)
+
 	handle, err := clone(f)
 	if err != nil {
-		path, _ := clone_string(name(f), file_allocator())
-		walker_set_error(w, path, err)
+		walker_set_error(w, name(f), err)
 		return
 	}
-
-	walker_clear(w)
 
 	read_directory_iterator_init(&w.iter, handle)
 }
@@ -109,6 +109,7 @@ walker_clear :: proc(w: ^Walker) {
 	}
 	w.skip_dir = false
 
+	w.err.err = nil
 	w.err.path.allocator = file_allocator()
 	clear(&w.err.path)
 
@@ -185,49 +186,53 @@ walker_walk :: proc(w: ^Walker) -> (fi: File_Info, ok: bool) {
 		}
 	}
 
-	if w.iter.f == nil {
-		if queue.len(w.todo) == 0 {
-			return
+	for {
+		if w.iter.f == nil {
+			if queue.len(w.todo) == 0 {
+				return
+			}
+
+			next := queue.pop_front(&w.todo)
+
+			handle, err := open(next)
+			if err != nil {
+				walker_set_error(w, next, err)
+				delete(next, file_allocator())
+				return {}, true
+			}
+
+			read_directory_iterator_init(&w.iter, handle)
+
+			delete(next, file_allocator())
 		}
 
-		next := queue.pop_front(&w.todo)
+		info, _, iter_ok := read_directory_iterator(&w.iter)
 
-		handle, err := open(next)
-		if err != nil {
-			walker_set_error(w, next, err)
-			return {}, true
-		}
-
-		read_directory_iterator_init(&w.iter, handle)
-
-		delete(next, file_allocator())
-	}
-
-	info, _, iter_ok := read_directory_iterator(&w.iter)
-
-	if path, err := read_directory_iterator_error(&w.iter); err != nil {
-		walker_set_error(w, path, err)
-	}
-
-	if !iter_ok {
-		close(w.iter.f)
-		w.iter.f = nil
-		return walker_walk(w)
-	}
-
-	if info.type == .Directory {
-		path, err := clone_string(info.fullpath, file_allocator())
-		if err != nil {
-			walker_set_error(w, "", err)
-			return
-		}
-
-		_, err = queue.push_back(&w.todo, path)
-		if err != nil {
+		if path, err := read_directory_iterator_error(&w.iter); err != nil {
 			walker_set_error(w, path, err)
-			return
 		}
-	}
 
-	return info, iter_ok
+		if !iter_ok {
+			close(w.iter.f)
+			w.iter.f = nil
+			continue
+		}
+
+		if info.type == .Directory {
+			path, err := clone_string(info.fullpath, file_allocator())
+			if err != nil {
+				walker_set_error(w, "", err)
+				return
+			}
+
+			_, err = queue.push_back(&w.todo, path)
+			if err != nil {
+				walker_set_error(w, path, err)
+				delete(path, file_allocator())
+				return
+			}
+		}
+
+		return info, iter_ok
+	}
 }

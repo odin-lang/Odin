@@ -1,6 +1,7 @@
 #+build !js
 package image
 
+import "base:runtime"
 import "core:os"
 
 load :: proc{
@@ -12,6 +13,9 @@ load :: proc{
 load_from_file :: proc(filename: string, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	data, data_err := os.read_entire_file(filename, allocator)
 	defer delete(data, allocator)
+	if alloc_err, is_alloc_err := data_err.(runtime.Allocator_Error); is_alloc_err {
+		return nil, alloc_err
+	}
 	if data_err == nil {
 		return load_from_bytes(data, options, allocator)
 	} else {

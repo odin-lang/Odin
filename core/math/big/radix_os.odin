@@ -45,6 +45,9 @@ internal_int_read_from_ascii_file :: proc(a: ^Int, filename: string, radix := i8
 	defer delete(res, allocator)
 
 	if res_err != nil {
+		if alloc_err, is_alloc := res_err.(runtime.Allocator_Error); is_alloc {
+			return cast(Error)alloc_err
+		}
 		return .Cannot_Read_File
 	}
 
@@ -83,5 +86,8 @@ internal_int_write_to_ascii_file :: proc(a: ^Int, filename: string, radix := i8(
 	}
 
 	write_err := os.write_entire_file(filename, data, truncate=true)
+	if alloc_err, is_alloc := write_err.(runtime.Allocator_Error); is_alloc {
+		return cast(Error)alloc_err
+	}
 	return nil if write_err == nil else .Cannot_Write_File
 }

@@ -73,6 +73,17 @@ gb_internal String get_final_microarchitecture() {
 	return microarch;
 }
 
+// NOTE: LLVM tunes for the CPU it targets unless a procedure names another with "tune-cpu".
+// The default `x86-64-v2` tunes for Sandy Bridge, where unaligned 256-bit loads and stores are slow:
+// a procedure enabling AVX with `enable_target_feature` splits every one of them in two.
+// Like clang, tune for `generic` when no -microarch is given.
+gb_internal String get_tune_microarchitecture() {
+	if (build_context.microarch.len == 0 && build_context.metrics.arch == TargetArch_amd64) {
+		return str_lit("generic");
+	}
+	return {};
+}
+
 gb_internal String get_default_features() {
 	BuildContext *bc = &build_context;
 
@@ -1200,6 +1211,32 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	}
 
 	return {p->value, p->type};
+}
+
+// A read-only table of the element size of each field of an #soa type, for intrinsics.type_soa_field_sizes
+gb_internal lbValue lb_gen_soa_field_sizes_ptr(lbModule *m, Type *type) {
+	lbAddr *found = map_get(&m->soa_field_sizes_map, type);
+	if (found) {
+		return found->addr;
+	}
+
+	Type *soa = base_type(type);
+	isize count = soa_field_count(soa);
+	Type *table_type = alloc_type_array(t_int, count);
+
+	LLVMValueRef *sizes = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+	for (isize i = 0; i < count; i++) {
+		Type *column = base_type(soa->Struct.fields[i]->type);
+		Type *field_type = column->kind == Type_Array ? column->Array.elem : column->MultiPointer.elem;
+		sizes[i] = lb_const_int(m, t_int, type_size_of(field_type)).value;
+	}
+	lbValue table = {llvm_const_array(m, lb_type(m, t_int), sizes, count), table_type};
+
+	lbAddr addr = lb_add_global_generated_with_name(m, table_type, table, lb_internal_gen_name_from_type("ggv$soa_field_sizes", type));
+	lb_make_global_private_const(addr);
+
+	map_set(&m->soa_field_sizes_map, type, addr);
+	return addr.addr;
 }
 
 gb_internal lbValue lb_gen_map_cell_info_ptr(lbModule *m, Type *type) {
@@ -3169,31 +3206,32 @@ gb_internal String lb_filepath_ll_for_module(lbModule *m) {
 		s = m->info->init_package->name;
 	}
 
-	if (build_context.out_filepath.len > 0) {
-		path = concatenate_strings(permanent_allocator(), path, s);
-		path = concatenate_strings(permanent_allocator(), path, STR_LIT(".ll"));
-	} else {
-		path = concatenate_strings(permanent_allocator(), s, STR_LIT(".ll"));
-	}
+	path = concatenate3_strings(permanent_allocator(), path, s, STR_LIT(".ll"));
 	return path;
+}
+
+gb_internal bool lb_object_is_intermediate(void) {
+	switch (build_context.build_mode) {
+	case BuildMode_Executable:
+	case BuildMode_StaticLibrary:
+	case BuildMode_DynamicLibrary:
+		return !build_context.keep_object_files && !build_context.keep_temp_files;
+	}
+	return false;
 }
 
 gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 	String basename = build_context.build_paths[BuildPath_Output].basename;
 	String name = build_context.build_paths[BuildPath_Output].name;
 
-	bool use_temporary_directory = false;
-	if (USE_SEPARATE_MODULES && build_context.build_mode == BuildMode_Executable) {
-		// NOTE(bill): use a temporary directory
-		String dir = temporary_directory(permanent_allocator());
-		if (dir.len != 0) {
-			basename = dir;
-			use_temporary_directory = true;
-		}
-	}
+	// NOTE(bill): use a temporary directory
+	bool use_temporary_directory = lb_object_is_intermediate();
 
-	gbString path = gb_string_make_length(heap_allocator(), basename.text, basename.len);
-	path = gb_string_appendc(path, "/");
+	gbString path = gb_string_make(heap_allocator(), "");
+	if (!use_temporary_directory) {
+		path = gb_string_append_length(path, basename.text, basename.len);
+		path = gb_string_appendc(path, "/");
+	}
 
 	bool output_is_directory = path_is_directory(build_context.build_paths[BuildPath_Output]);
 
@@ -3240,8 +3278,12 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 	path = gb_string_append_length(path, ".", 1);
 	path = gb_string_append_length(path, ext.text, ext.len);
 
-	return make_string(cast(u8 *)path, gb_string_length(path));
-
+	String result = make_string(cast(u8 *)path, gb_string_length(path));
+	if (use_temporary_directory) {
+		result = build_temp_file(result);
+		gb_string_free(path);
+	}
+	return result;
 }
 
 gb_internal void lb_add_foreign_library_paths(lbGenerator *gen) {
@@ -3273,7 +3315,6 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 				continue;
 			}
 			array_add(&gen->output_object_paths, lb_filepath_obj_for_module(m));
-			array_add(&gen->output_temp_paths, lb_filepath_ll_for_module(m));
 		}
 		for (lbModule *m : lb_modules_by_cost(gen)) {
 			if (lb_is_module_empty(m)) {
@@ -3498,6 +3539,152 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 	return p;
 }
 
+// NOTE(bill, 2026-11-28): `#no_alias` on a slice-like parameter promises its data, and only a pointer parameter can tell LLVM.
+// The signature stays (the flag is not part of the type): an always-inline helper gets the body and the data pointers as `noalias` parameters.
+// Below -o:size nothing uses the alias scopes this makes: the promise is ignored, and stepping stays as written.
+
+gb_internal unsigned lb_no_alias_data_pointers(Entity *e) {
+	if (e->kind != Entity_Variable) {
+		return 0;
+	}
+	if ((e->flags & EntityFlag_NoAlias) == 0) {
+		return 0;
+	}
+	if (!is_type_no_alias_data(e->type)) {
+		return 0;
+	}
+	if (e->token.string.len == 0 || is_blank_ident(e->token)) {
+		return 0;
+	}
+
+	if (is_type_soa_struct(e->type)) {
+		return cast(unsigned)soa_field_count(e->type);
+	}
+	return 1;
+}
+
+gb_internal unsigned lb_no_alias_split_count(lbProcedure *p) {
+	Entity *e  = p->entity;
+	Type   *pt = p->type;
+
+	if (build_context.optimization_level < OptimizationLevel_Size) {
+		return 0;
+	}
+	// NOTE(bill): Neither `optnone` nor memcpy-like bodies are inlined
+	if (e->Procedure.optimization_mode == ProcedureOptimizationMode_None) {
+		return 0;
+	}
+	if (e->Procedure.is_memcpy_like) {
+		return 0;
+	}
+	if (pt->Proc.param_count == 0) {
+		return 0;
+	}
+	if (pt->Proc.c_vararg) {
+		return 0;
+	}
+	if (pt->Proc.calling_convention == ProcCC_Naked) {
+		return 0;
+	}
+
+	unsigned count = 0;
+	for (Entity *param : pt->Proc.params->Tuple.variables) {
+		count += lb_no_alias_data_pointers(param);
+	}
+	return count;
+}
+
+gb_internal void lb_generate_no_alias_split(lbModule *m, lbProcedure *p, unsigned data_count) {
+	auto const &params = p->type->Proc.params->Tuple.variables;
+
+	// NOTE(bill): The data pointers go before `context`: it must stay last
+	unsigned param_count = LLVMCountParams(p->value);
+	unsigned first_data  = p->type->Proc.calling_convention == ProcCC_Odin ? param_count-1 : param_count;
+	unsigned count       = param_count + data_count;
+
+	LLVMValueRef *args  = temporary_alloc_array<LLVMValueRef>(count);
+	LLVMTypeRef  *types = temporary_alloc_array<LLVMTypeRef>(count);
+	for (unsigned i = 0; i < param_count; i++) {
+		unsigned slot = i < first_data ? i : i + data_count;
+		args[slot]  = LLVMGetParam(p->value, i);
+		types[slot] = LLVMTypeOf(args[slot]);
+	}
+	for (unsigned i = first_data; i < first_data + data_count; i++) {
+		types[i] = LLVMPointerTypeInContext(m->ctx, 0);
+	}
+	LLVMTypeRef type = LLVMFunctionType(LLVMGetReturnType(LLVMGlobalGetValueType(p->value)), types, count, false);
+
+	lbProcedure *h = permanent_alloc_item<lbProcedure>();
+	gb_memmove(h, p, gb_size_of(lbProcedure));
+	h->name  = concatenate_strings(permanent_allocator(), p->name, str_lit("$no_alias"));
+	h->value = LLVMAddFunction(m->mod, alloc_cstring(temporary_allocator(), h->name), type);
+	LLVMSetLinkage(h->value, LLVMInternalLinkage);
+	LLVMSetFunctionCallConv(h->value, LLVMGetFunctionCallConv(p->value));
+
+	unsigned          attribute_count = LLVMGetAttributeCountAtIndex(p->value, LLVMAttributeIndex_FunctionIndex);
+	LLVMAttributeRef *attributes      = temporary_alloc_array<LLVMAttributeRef>(attribute_count);
+	LLVMGetAttributesAtIndex(p->value, LLVMAttributeIndex_FunctionIndex, attributes);
+	for (unsigned i = 0; i < attribute_count; i++) {
+		LLVMAddAttributeAtIndex(h->value, LLVMAttributeIndex_FunctionIndex, attributes[i]);
+	}
+	// NOTE(bill): The procedure keeps `noinline` and the instrumentation
+	lb_remove_attribute_from_proc(m, h->value, "noinline");
+	lb_add_attribute_to_proc(m, h->value, "alwaysinline");
+	char const *instrumentation[] = {"instrument-function-entry", "instrument-function-exit"};
+	for (char const *key : instrumentation) {
+		LLVMRemoveStringAttributeAtIndex(h->value, LLVMAttributeIndex_FunctionIndex, key, cast(unsigned)gb_strlen(key));
+	}
+	for (unsigned i = first_data; i < first_data + data_count; i++) {
+		lb_add_proc_attribute_at_index(h, 1+i, "noalias");
+	}
+	if (p->debug_info != nullptr) {
+		lb_add_procedure_debug_info(m, h, p->name);
+	}
+
+	lb_begin_procedure_body(p);
+	unsigned slot = first_data;
+	for (Entity *e : params) {
+		unsigned n = lb_no_alias_data_pointers(e);
+		if (n == 0) {
+			continue;
+		}
+		lbValue ptr = lb_find_value_from_entity(m, e);
+		for (unsigned k = 0; k < n; k++) {
+			args[slot++] = lb_emit_load(p, lb_emit_struct_ep(p, ptr, cast(i32)k)).value;
+		}
+	}
+	LLVMValueRef call = LLVMBuildCall2(p->builder, type, h->value, args, count, "");
+	LLVMSetInstructionCallConv(call, LLVMGetFunctionCallConv(p->value));
+	if (LLVMGetTypeKind(LLVMTypeOf(call)) == LLVMVoidTypeKind) {
+		LLVMBuildRetVoid(p->builder);
+	} else {
+		LLVMBuildRet(p->builder, call);
+	}
+	lb_end_procedure_body(p);
+
+	m->curr_procedure = h;
+	lb_begin_procedure_body(h);
+	slot = first_data;
+	for (Entity *e : params) {
+		unsigned n = lb_no_alias_data_pointers(e);
+		if (n == 0) {
+			continue;
+		}
+		lbAddr local = lb_add_local_generated(h, e->type, false);
+		lb_addr_store(h, local, lb_emit_load(h, lb_find_value_from_entity(m, e)));
+		for (unsigned k = 0; k < n; k++) {
+			LLVMBuildStore(h->builder, LLVMGetParam(h->value, slot++), lb_emit_struct_ep(h, local.addr, cast(i32)k).value);
+		}
+		lb_add_entity(m, e, local.addr);
+		map_remove(&h->direct_parameters, e);
+	}
+	lb_build_stmt(h, h->body);
+	lb_end_procedure_body(h);
+
+	MUTEX_GUARD(&m->generated_procedures_mutex);
+	array_add(&m->generated_procedures, h);
+}
+
 gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 	if (p->is_done.load(std::memory_order_relaxed)) {
 		return;
@@ -3507,9 +3694,14 @@ gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 
 	if (p->body != nullptr) { // Build Procedure
 		m->curr_procedure = p;
-		lb_begin_procedure_body(p);
-		lb_build_stmt(p, p->body);
-		lb_end_procedure_body(p);
+		unsigned data_count = lb_no_alias_split_count(p);
+		if (data_count != 0) {
+			lb_generate_no_alias_split(m, p, data_count);
+		} else {
+			lb_begin_procedure_body(p);
+			lb_build_stmt(p, p->body);
+			lb_end_procedure_body(p);
+		}
 		p->is_done.store(true, std::memory_order_relaxed);
 		m->curr_procedure = nullptr;
 	} else if (p->generate_body != nullptr) {
@@ -3660,6 +3852,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 
 	String llvm_cpu = get_final_microarchitecture();
+	gen->tune_cpu = get_tune_microarchitecture();
 
 	gbString llvm_features = gb_string_make(temporary_allocator(), "");
 	String_Iterator it = {build_context.target_features_string, 0};
@@ -3682,7 +3875,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 	gen->target_features = copy_string(permanent_allocator(), make_string_c(llvm_features));
 
-	debugf("CPU: %.*s, Features: %s\n", LIT(llvm_cpu), llvm_features);	
+	debugf("CPU: %.*s, Tune: %.*s, Features: %s\n", LIT(llvm_cpu), LIT(gen->tune_cpu), llvm_features);
 
 	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));
 
@@ -3763,12 +3956,12 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				}
 			}
 
-			LLVMMetadataRef init_file_metadata = lb_get_file_metadata(m, init_file);
-			if (init_file_metadata == nullptr) {
-				// every file of the initial package was excluded by its build tags, as can be done for `odin test`
-				String path = m->info->init_package->fullpath;
-				init_file_metadata = LLVMDIBuilderCreateFile(m->debug_builder, cast(char const *)path.text, path.len, "", 0);
+			if (init_file == nullptr && m->info->runtime_package != nullptr && m->info->runtime_package->files.count > 0) {
+				// every file of the initial package was excluded by its build tags, as can be done for `odin test`;
+				// a real file keeps the line table's checksums
+				init_file = m->info->runtime_package->files[0];
 			}
+			LLVMMetadataRef init_file_metadata = lb_get_file_metadata(m, init_file);
 
 			LLVMBool split_debug_inlining = build_context.build_mode == BuildMode_Assembly;
 			LLVMBool debug_info_for_profiling = false;
@@ -3829,9 +4022,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				isize types;
 				isize names;
 				isize offsets;
-				isize usings;
+				isize field_flags;
 				isize tags;
-				isize empty_usings;
+				isize empty_field_flags;
 				isize empty_tags;
 				isize enum_indices;
 			};
@@ -3858,10 +4051,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 					c.types   += n;
 					c.names   += n;
 					c.offsets += n;
-					if (lb_type_info_struct_has_usings(t)) {
-						c.usings += n;
+					if (lb_type_info_struct_has_field_flags(t)) {
+						c.field_flags += n;
 					} else {
-						c.empty_usings = gb_max(c.empty_usings, n);
+						c.empty_field_flags = gb_max(c.empty_field_flags, n);
 					}
 					if (lb_type_info_has_tags(t)) {
 						c.tags += n;
@@ -3907,16 +4100,16 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			for (lbModule *tm : gen->type_info_modules) {
 				MemberCounts const &c = counts[tm->type_info_part];
 				lbTypeInfoMembers *members = permanent_alloc_item<lbTypeInfoMembers>();
-				members->types   = global_type_info_make(tm, LB_TYPE_INFO_TYPES_NAME,   t_type_info_ptr, c.types);
-				members->names   = global_type_info_make(tm, LB_TYPE_INFO_NAMES_NAME,   t_string,        c.names);
-				members->offsets = global_type_info_make(tm, LB_TYPE_INFO_OFFSETS_NAME, t_uintptr,       c.offsets);
-				members->usings  = global_type_info_make(tm, LB_TYPE_INFO_USINGS_NAME,  t_bool,          c.empty_usings + c.usings);
-				members->tags    = global_type_info_make(tm, LB_TYPE_INFO_TAGS_NAME,    t_string,        c.empty_tags   + c.tags);
+				members->types       = global_type_info_make(tm, LB_TYPE_INFO_TYPES_NAME,       t_type_info_ptr, c.types);
+				members->names       = global_type_info_make(tm, LB_TYPE_INFO_NAMES_NAME,       t_string,        c.names);
+				members->offsets     = global_type_info_make(tm, LB_TYPE_INFO_OFFSETS_NAME,     t_uintptr,       c.offsets);
+				members->field_flags = global_type_info_make(tm, LB_TYPE_INFO_FIELD_FLAGS_NAME, t_u8,            c.empty_field_flags + c.field_flags);
+				members->tags        = global_type_info_make(tm, LB_TYPE_INFO_TAGS_NAME,        t_string,        c.empty_tags        + c.tags);
 
-				members->empty_usings_count = c.empty_usings;
-				members->empty_tags_count   = c.empty_tags;
-				members->usings_index       = c.empty_usings;
-				members->tags_index         = c.empty_tags;
+				members->empty_field_flags_count = c.empty_field_flags;
+				members->empty_tags_count        = c.empty_tags;
+				members->field_flags_index       = c.empty_field_flags;
+				members->tags_index              = c.empty_tags;
 
 				if (c.enum_indices > 0) {
 					members->enum_indices       = global_type_info_make(tm, LB_TYPE_INFO_ENUM_INDICES_NAME, t_type_info_enum_value, c.enum_indices);
@@ -4278,8 +4471,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				exit_with_errors();
 				return false;
 			}
-			array_add(&gen->output_temp_paths, filepath_ll);
-
 		}
 		if (build_context.build_mode == BuildMode_LLVM_IR) {
 			return true;

@@ -2414,7 +2414,8 @@ _prep :: proc(l: ^Event_Loop, cb: Callback, type: Operation_Type) -> ^Operation 
 	assert(type != .None)
 	l := l
 	if l == nil { l = _current_thread_event_loop() }
-	operation := pool.get(&l.operation_pool)
+	operation, err := pool.get(&l.operation_pool)
+	ensure(err == nil, "operation pool allocation failure")
 	operation.l = l
 	operation.type = type
 	operation.cb = cb

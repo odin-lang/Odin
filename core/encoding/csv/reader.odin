@@ -121,6 +121,10 @@ reader_destroy :: proc(r: ^Reader) {
 	delete(r.record_buffer)
 	delete(r.field_indices)
 	delete(r.last_record)
+	r.raw_buffer    = nil
+	r.record_buffer = nil
+	r.field_indices = nil
+	r.last_record   = nil
 	bufio.reader_destroy(&r.r)
 }
 

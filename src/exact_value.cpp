@@ -176,6 +176,19 @@ gb_internal ExactValue exact_value_string16(String16 string) {
 	return result;
 }
 
+gb_internal bool exact_value_to_path_string(ExactValue const &v, String *out) {
+	*out = {};
+	if (v.kind == ExactValue_String) {
+		*out = v.value_string;
+		return true;
+	}
+	if (v.kind == ExactValue_String16) {
+		*out = string16_to_string(permanent_allocator(), v.value_string16);
+		return v.value_string16.len == 0 || out->len > 0;
+	}
+	return false;
+}
+
 gb_internal ExactValue exact_value_i64(i64 i) {
 	ExactValue result = {ExactValue_Integer};
 	result.value_integer = {0};

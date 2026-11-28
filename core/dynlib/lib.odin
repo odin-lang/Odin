@@ -1,6 +1,7 @@
 package dynlib
 
 import "base:intrinsics"
+import "core:mem"
 import "core:reflect"
 import "base:runtime"
 _ :: intrinsics
@@ -27,6 +28,8 @@ On `windows` this paramater is ignored.
 The underlying behaviour is platform specific.
 On `linux`, `darwin`, `freebsd` and `openbsd` refer to `dlopen`.
 On `windows` refer to `LoadLibraryW`. Also temporarily needs an allocator to convert a string.
+`path` is copied with `allocator` first; if that runs out of memory, `did_load` is false and
+`last_error` does not describe it.
 
 Example:
 	import "core:dynlib"
@@ -82,6 +85,8 @@ Loads the address of a procedure/variable from a dynamic library.
 The underlying behaviour is platform specific.
 On `linux`, `darwin`, `freebsd` and `openbsd` refer to `dlsym`.
 On `windows` refer to `GetProcAddress`. Also temporarily needs an allocator to convert a string.
+`symbol` is copied with `allocator` first; if that runs out of memory, `found` is false and
+`last_error` does not describe it.
 
 Example:
 	import "core:dynlib"
@@ -114,10 +119,14 @@ Optionally also takes the struct member to assign the library handle to, `__hand
 
 This allows using one struct to hold library handles and symbol pointers for more than 1 dynamic library.
 
-Loading the same library twice unloads the previous incarnation, allowing for straightforward hot reload support.
+A reload loads the new library first and then unloads the previous incarnation, allowing for
+straightforward hot reload support. Symbols that only the previous incarnation provided are set to
+`nil`. Reloading the same path has to unload the previous incarnation before loading it again.
 
 Returns:
-* `-1, false` if the library could not be loaded.
+* `-1, false` if the library could not be loaded, including when that runs out of memory. The
+  struct and the previous incarnation are left untouched, unless the same path was being
+  reloaded: then its symbols and the handle are `nil`.
 * The number of symbols assigned on success. `ok` = true if `count` > 0
 
 See doc.odin for an example.
@@ -128,32 +137,63 @@ initialize_symbols :: proc(
 ) -> (count: int = -1, ok: bool = false) where intrinsics.type_is_struct(T) {
 	assert(symbol_table != nil)
 
-	// First, (re)load the library.
-	handle: Library
+	handle_ptr: ^Library
 	for field in reflect.struct_fields_zipped(T) {
 		if field.name == handle_field_name {
-			field_ptr := rawptr(uintptr(symbol_table) + field.offset)
-
-			// We appear to be hot reloading. Unload previous incarnation of the library.
-			if old_handle := (^Library)(field_ptr)^; old_handle != nil {
-				unload_library(old_handle) or_return
-			}
-
-			handle = load_library(library_path) or_return
-			(^Library)(field_ptr)^ = handle
+			handle_ptr = (^Library)(uintptr(symbol_table) + field.offset)
 			break
 		}
 	}
+	old_handle: Library
+	if handle_ptr != nil {
+		old_handle = handle_ptr^
+	}
 
-	// No field for it in the struct.
-	if handle == nil {
+	// First, (re)load the library.
+	handle := load_library(library_path) or_return
+
+	if old_handle != nil && handle == old_handle {
+		unload_library(handle)
+		bind_symbols(symbol_table, T, nil, old_handle, symbol_prefix, handle_field_name)
+		unload_library(old_handle)
+		handle_ptr^ = nil
+		old_handle = nil
 		handle = load_library(library_path) or_return
 	}
 
+	count = bind_symbols(symbol_table, T, handle, old_handle, symbol_prefix, handle_field_name)
+
+	// We appear to be hot reloading. Unload previous incarnation of the library.
+	if old_handle != nil {
+		unload_library(old_handle)
+	}
+
+	if handle_ptr != nil {
+		handle_ptr^ = handle
+	}
+
+	// No field for it in the struct.
+	if handle_ptr == nil && count == 0 {
+		unload_library(handle)
+	}
+	return count, count > 0
+}
+
+// Returns an error message for the last failed procedure call.
+last_error :: proc() -> string {
+	return _last_error()
+}
+
+@(private)
+bind_symbols :: proc(symbol_table: rawptr, T: typeid, library, previous: Library, symbol_prefix, handle_field_name: string) -> (count: int) {
 	// Buffer to concatenate the prefix + symbol name.
 	prefixed_symbol_buf: [2048]u8 = ---
 
-	count = 0
+	cstring_buf: [len(prefixed_symbol_buf) + 1]u8 = ---
+	cstring_arena: mem.Arena
+	mem.arena_init(&cstring_arena, cstring_buf[:])
+	cstring_allocator := mem.arena_allocator(&cstring_arena)
+
 	for field in reflect.struct_fields_zipped(T) {
 		// If we're not the library handle, the field needs to be a pointer type, be it a procedure pointer or an exported global.
 		if field.name == handle_field_name || !(reflect.is_procedure(field.type) || reflect.is_pointer(field.type)) {
@@ -161,7 +201,7 @@ initialize_symbols :: proc(
 		}
 
 		// Calculate address of struct member
-		field_ptr := rawptr(uintptr(symbol_table) + field.offset)
+		field_ptr := (^rawptr)(uintptr(symbol_table) + field.offset)
 
 		// Let's look up or construct the symbol name to find in the library
 		prefixed_name: string
@@ -178,15 +218,27 @@ initialize_symbols :: proc(
 			prefixed_name = string(prefixed_symbol_buf[:len(symbol_prefix) + len(field.name)])
 		}
 
-		// Assign procedure (or global) pointer if found.
-		sym_ptr := symbol_address(handle, prefixed_name) or_continue
-		(^rawptr)(field_ptr)^ = sym_ptr
-		count += 1
-	}
-	return count, count > 0
-}
+		symbol_allocator := context.temp_allocator
+		if len(prefixed_name) < len(cstring_buf) {
+			free_all(cstring_allocator)
+			symbol_allocator = cstring_allocator
+		}
 
-// Returns an error message for the last failed procedure call.
-last_error :: proc() -> string {
-	return _last_error()
+		// Assign procedure (or global) pointer if found.
+		if library != nil {
+			if sym_ptr, found := symbol_address(library, prefixed_name, symbol_allocator); found {
+				field_ptr^ = sym_ptr
+				count += 1
+				continue
+			}
+		}
+
+		if previous != nil && field_ptr^ != nil {
+			free_all(cstring_allocator)
+			if old_ptr, old_found := symbol_address(previous, prefixed_name, symbol_allocator); old_found && old_ptr == field_ptr^ {
+				field_ptr^ = nil
+			}
+		}
+	}
+	return
 }

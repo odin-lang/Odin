@@ -227,7 +227,7 @@ fontinfo :: struct {
 
 	numGlyphs: c.int,
 
-	loca, head, glyf, hhea, hmtx, kern, gpos, svg: c.int,
+	loca, head, glyf, hhea, hmtx, vhea, vmtx, kern, gpos, svg: c.int,
 	index_map: c.int,
 	indexToLocFormat: c.int,
 
@@ -397,9 +397,9 @@ foreign stbtt {
 
 	// fills svg with the character's SVG data.
 	// returns data size or 0 if SVG not found.
-	FindSVGDoc       :: proc(info: ^fontinfo, gl: b32) -> [^]byte ---
+	FindSVGDoc       :: proc(info: ^fontinfo, gl: c.int) -> [^]byte ---
 	GetCodepointSVG  :: proc(info: ^fontinfo, unicode_codepoint: rune, svg: ^cstring) -> c.int ---
-	GetGlyphSVG      :: proc(info: ^fontinfo, gl: b32, svg: ^cstring) -> c.int ---
+	GetGlyphSVG      :: proc(info: ^fontinfo, gl: c.int, svg: ^cstring) -> c.int ---
 }
 
 
@@ -443,7 +443,7 @@ foreign stbtt {
 
 	// same as stbtt_MakeCodepointBitmapSubpixel, but prefiltering
 	// is performed (see stbtt_PackSetOversampling)
-	MakeCodepointBitmapSubpixelPrefilter :: proc(info: ^fontinfo, output: [^]byte, out_w, out_h, out_stride: c.int, scale_x, scale_y, shift_x, shift_y: f32, oversample_x, oversample_y: b32, sub_x, sub_y: ^f32, codepoint: rune) ---
+	MakeCodepointBitmapSubpixelPrefilter :: proc(info: ^fontinfo, output: [^]byte, out_w, out_h, out_stride: c.int, scale_x, scale_y, shift_x, shift_y: f32, oversample_x, oversample_y: c.int, sub_x, sub_y: ^f32, codepoint: rune) ---
 
 	// get the bbox of the bitmap centered around the glyph origin; so the
 	// bitmap width is ix1-ix0, height is iy1-iy0, and location to place

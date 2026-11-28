@@ -421,6 +421,12 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 			print_string("#soa[dynamic]")
 			print_type(info.soa_base_type)
 			return
+		case .Fixed_Capacity_Dynamic:
+			print_string("#soa[dynamic; ")
+			print_u64(u64(info.soa_len))
+			print_byte(']')
+			print_type(info.soa_base_type)
+			return
 		}
 
 		print_string("struct ")
@@ -840,6 +846,12 @@ write_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, t
 			return true
 		case .Dynamic:
 			write_string    (i, buf, "#soa[dynamic]")    or_return
+			write_write_type(i, buf, info.soa_base_type) or_return
+			return true
+		case .Fixed_Capacity_Dynamic:
+			write_string    (i, buf, "#soa[dynamic; ")   or_return
+			write_u64       (i, buf, u64(info.soa_len))  or_return
+			write_byte      (i, buf, ']')                or_return
 			write_write_type(i, buf, info.soa_base_type) or_return
 			return true
 		}

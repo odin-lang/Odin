@@ -1139,7 +1139,7 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 			/*
 				Find left hand.
 			*/
-			internal_zero(t1)
+			internal_zero(t1) or_return
 			t1.digit[0] = ((t - 1) < 0) ? 0 : y.digit[t - 1]
 			t1.digit[1] = y.digit[t]
 			t1.used = 2
@@ -1845,9 +1845,6 @@ _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -
 	ic := #force_inline internal_cmp(a, base)
 	if ic <= 0 {
 		return 1 if ic == 0 else 0, nil
-	}
-	defer if err != nil {
-		res = -1
 	}
 
 	internal_set(bi_base, base, true, allocator)       or_return

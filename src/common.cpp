@@ -796,42 +796,51 @@ gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc, isize
 		if (a == 0) {
 			break;
 		}
-		if (in_quote) {
-			if (a == '\"') {
-				in_quote = false;
-			} else {
-				_argv[j++] = a;
-			}
-		} else {
-			switch (a) {
-			case '\"':
-				in_quote = true;
-				in_text = true;
-				if (in_space) {
-					check_double_dash();
-					argv[argc++] = _argv + j;
-				}
-				in_space = false;
-				break;
-			case ' ':
-			case '\t':
-			case '\n':
-			case '\r':
-				if (in_text) _argv[j++] = '\0';
-				in_text = false;
-				in_space = true;
-				break;
-			default:
-				in_text = true;
-				if (in_space) {
-					check_double_dash();
-					argv[argc++] = _argv + j;
-				}
-				_argv[j++] = a;
-				in_space = false;
-				break;
-			}
+		if (!in_quote && (a == ' ' || a == '\t' || a == '\n' || a == '\r')) {
+			if (in_text) _argv[j++] = '\0';
+			in_text = false;
+			in_space = true;
+			i++;
+			continue;
 		}
+		if (in_space) {
+			check_double_dash();
+			argv[argc++] = _argv + j;
+			in_space = false;
+		}
+		in_text = true;
+		if (a == '\\') {
+			u32 backslashes = 0;
+			while (cmd_line[i] == '\\') {
+				backslashes++;
+				i++;
+			}
+			if (cmd_line[i] == '\"') {
+				for (u32 k = 0; k < backslashes/2; k++) {
+					_argv[j++] = '\\';
+				}
+				if (backslashes & 1) {
+					_argv[j++] = '\"';
+					i++;
+				}
+			} else {
+				for (u32 k = 0; k < backslashes; k++) {
+					_argv[j++] = '\\';
+				}
+			}
+			continue;
+		}
+		if (a == '\"') {
+			if (in_quote && cmd_line[i+1] == '\"') {
+				_argv[j++] = '\"';
+				i += 2;
+				continue;
+			}
+			in_quote = !in_quote;
+			i++;
+			continue;
+		}
+		_argv[j++] = a;
 		i++;
 	}
 	_argv[j] = '\0';
@@ -869,7 +878,10 @@ gb_internal char **command_line_to_spawn_argv(const char *cmd_line, int *_argc) 
 			break;
 		}
 		if (in_quote) {
-			if (a == '\"') {
+			if (a == '\\' && (cmd_line[i+1] == '\"' || cmd_line[i+1] == '\\')) {
+				i++;
+				_argv[j++] = cmd_line[i];
+			} else if (a == '\"') {
 				in_quote = false;
 			} else {
 				_argv[j++] = a;
@@ -932,124 +944,77 @@ enum LoadedFileError {
 	LoadedFile_Invalid,
 	LoadedFile_NotExists,
 	LoadedFile_Permission,
-	
+	LoadedFile_Outside,
+
 	LoadedFile_COUNT,
 };
 
-gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memory_mapped_file, bool copy_file_contents) {
-	LoadedFileError err = LoadedFile_None;
+gb_internal LoadedFileError load_file_32(String fullpath, bool confined, LoadedFile *memory_mapped_file, bool copy_file_contents) {
+	memory_mapped_file->handle = nullptr;
+	memory_mapped_file->data   = nullptr;
+	memory_mapped_file->size   = 0;
+
+	ConfineHandle h = CONFINE_NO_HANDLE;
+	bool is_dir = false;
+	ConfineResult r = confined ? confine_open(fullpath, CONFINE_ANY, &h, &is_dir) : confine_open_direct(fullpath, &h, &is_dir);
+	switch (r) {
+	case Confine_Ok:         break;
+	case Confine_NotExists:  return LoadedFile_NotExists;
+	case Confine_Outside:    return LoadedFile_Outside;
+	case Confine_Permission: return LoadedFile_Permission;
+	case Confine_Invalid:    return LoadedFile_Invalid;
+	}
+	if (is_dir) {
+		confine_close(h);
+		return LoadedFile_Invalid;
+	}
+
+	i64 file_size = confine_size(h);
+	if (file_size < 0) {
+		confine_close(h);
+		return LoadedFile_Invalid;
+	}
+	if (file_size > I32_MAX) {
+		confine_close(h);
+		return LoadedFile_FileTooLarge;
+	}
+	if (file_size == 0) {
+		confine_close(h);
+		return LoadedFile_Empty;
+	}
 
 #if defined(GB_SYSTEM_WINDOWS)
-	{
-		TEMPORARY_ALLOCATOR_GUARD();
-
-		isize w_len = 0;
-		wchar_t *w_str = gb__alloc_utf8_to_ucs2(temporary_allocator(), fullpath, &w_len);
-		if (w_str == nullptr) {
+	if (!copy_file_contents) {
+		HANDLE file_mapping = CreateFileMappingW(h, nullptr, PAGE_READONLY, 0, 0, nullptr);
+		confine_close(h);
+		if (file_mapping == nullptr) {
 			return LoadedFile_Invalid;
 		}
-		i64 file_size = 0;
-		LARGE_INTEGER li_file_size = {};
-		HANDLE handle = nullptr;
-		HANDLE file_mapping = nullptr;
-		void *file_data = nullptr;
-		
-		handle = CreateFileW(w_str, GENERIC_READ, FILE_SHARE_READ|FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-		if (handle == INVALID_HANDLE_VALUE) {
-			handle = nullptr;
-			goto window_handle_file_error;
+		void *file_data = MapViewOfFileEx(file_mapping, FILE_MAP_READ, 0, 0, 0/*file_size*/, nullptr/*base address*/);
+		if (file_data == nullptr) {
+			CloseHandle(file_mapping);
+			return LoadedFile_Invalid;
 		}
-
-		li_file_size = {};
-		if (!GetFileSizeEx(handle, &li_file_size)) {
-			goto window_handle_file_error;
-		}
-		file_size = cast(i64)li_file_size.QuadPart;
-		if (file_size > I32_MAX) {
-			CloseHandle(handle);
-			return LoadedFile_FileTooLarge;
-		}
-
-		if (file_size == 0) {
-			CloseHandle(handle);
-			err = LoadedFile_Empty;
-			memory_mapped_file->handle = nullptr;
-			memory_mapped_file->data   = nullptr;
-			memory_mapped_file->size   = 0;
-			return err;
-		}
-
-		if (copy_file_contents) {
-			u8 *data = cast(u8 *)gb_alloc(permanent_allocator(), (file_size+1+15)&~15);
-			DWORD bytes_read = 0;
-			if (!ReadFile(handle, data, cast(DWORD)file_size, &bytes_read, nullptr)) {
-				goto window_handle_file_error;
-			}
-			CloseHandle(handle);
-			data[bytes_read] = 0;
-			memory_mapped_file->handle = nullptr;
-			memory_mapped_file->data   = data;
-			memory_mapped_file->size   = cast(i32)bytes_read;
-			return err;
-		}
-
-		file_mapping = CreateFileMappingW(handle, nullptr, PAGE_READONLY, 0, 0, nullptr);
-		CloseHandle(handle);
-
-		file_data = MapViewOfFileEx(file_mapping, FILE_MAP_READ, 0, 0, 0/*file_size*/, nullptr/*base address*/);
 		memory_mapped_file->handle = cast(void *)file_mapping;
-		memory_mapped_file->data = file_data;
-		memory_mapped_file->size = cast(i32)file_size;
-		return err;
-	
-	window_handle_file_error:;
-		{
-			DWORD handle_err = GetLastError();
-			CloseHandle(handle);
-			err = LoadedFile_Invalid;
-			switch (handle_err) {
-			case ERROR_FILE_NOT_FOUND: 
-			case ERROR_PATH_NOT_FOUND: 
-			case ERROR_INVALID_DRIVE:
-				err = LoadedFile_NotExists; 
-				break;
-			case ERROR_ACCESS_DENIED: 
-			case ERROR_INVALID_ACCESS:
-				err = LoadedFile_Permission;
-				break;
-			}
-			return err;
-		}
+		memory_mapped_file->data   = file_data;
+		memory_mapped_file->size   = cast(i32)file_size;
+		return LoadedFile_None;
 	}
 #else
 	gb_unused(copy_file_contents);
-
-	gbFileContents fc = gb_file_read_contents(permanent_allocator(), true, fullpath);
-
-	if (fc.size > I32_MAX) {
-		err = LoadedFile_FileTooLarge;
-		gb_file_free_contents(&fc);
-	} else if (fc.data != nullptr) {
-		memory_mapped_file->handle = nullptr;
-		memory_mapped_file->data = fc.data;
-		memory_mapped_file->size = cast(i32)fc.size;
-	} else {
-		gbFile f = {};
-		gbFileError file_err = gb_file_open(&f, fullpath);
-		defer (gb_file_close(&f));
-
-		switch (file_err) {
-		case gbFileError_Invalid:    err = LoadedFile_Invalid;    break;
-		case gbFileError_NotExists:  err = LoadedFile_NotExists;  break;
-		case gbFileError_Permission: err = LoadedFile_Permission; break;
-		}
-
-		if (err == LoadedFile_None && gb_file_size(&f) == 0) {
-			err = LoadedFile_Empty;
-		}
-	}
-	return err;
 #endif
+
+	u8 *data = cast(u8 *)gb_alloc(permanent_allocator(), (file_size+1+15)&~15);
+	isize bytes_read = 0;
+	bool ok = confine_read(h, data, cast(isize)file_size, &bytes_read);
+	confine_close(h);
+	if (!ok) {
+		return LoadedFile_Invalid;
+	}
+	data[bytes_read] = 0;
+	memory_mapped_file->data = data;
+	memory_mapped_file->size = cast(i32)bytes_read;
+	return bytes_read == 0 ? LoadedFile_Empty : LoadedFile_None;
 }
 
 

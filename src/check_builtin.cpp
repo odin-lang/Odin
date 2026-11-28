@@ -5,7 +5,7 @@ gb_internal int enum_constant_entity_cmp(void const* a, void const* b) {
 	Entity const *eb = *(cast(Entity const **)b);
 	GB_ASSERT(ea->kind == Entity_Constant && eb->kind == Entity_Constant);
 	GB_ASSERT(ea->Constant.value.kind == ExactValue_Integer && eb->Constant.value.kind == ExactValue_Integer);
-	
+
 	return big_int_cmp(&ea->Constant.value.value_integer, &eb->Constant.value.value_integer);
 }
 
@@ -391,10 +391,10 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 		return true;
 	} break;
 
-	case BuiltinProc_objc_find_selector: 
-	case BuiltinProc_objc_find_class: 
-	case BuiltinProc_objc_register_selector: 
-	case BuiltinProc_objc_register_class: 
+	case BuiltinProc_objc_find_selector:
+	case BuiltinProc_objc_find_class:
+	case BuiltinProc_objc_register_selector:
+	case BuiltinProc_objc_register_class:
 	{
 		String sel_name = {};
 		if (!is_constant_string(c, builtin_name, ce->args[0], &sel_name)) {
@@ -402,12 +402,12 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 		}
 
 		switch (id) {
-		case BuiltinProc_objc_find_selector: 
-		case BuiltinProc_objc_register_selector: 
+		case BuiltinProc_objc_find_selector:
+		case BuiltinProc_objc_register_selector:
 			operand->type = t_objc_SEL;
 			break;
-		case BuiltinProc_objc_find_class: 
-		case BuiltinProc_objc_register_class: 
+		case BuiltinProc_objc_find_class:
+		case BuiltinProc_objc_register_class:
 			operand->type = t_objc_Class;
 			break;
 
@@ -1639,12 +1639,12 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				error(call, "'%.*s' expected 2 arguments, got %td", LIT(builtin_name), ce->args.count);
 				return false;
 			}
-			
+
 			Operand src = {};
 			Operand indices = {};
 			check_expr(c, &src, ce->args[0]); if (src.mode == Addressing_Invalid) return false;
 			check_expr_with_type_hint(c, &indices, ce->args[1], src.type); if (indices.mode == Addressing_Invalid) return false;
-			
+
 			if (!is_type_simd_vector(src.type)) {
 				error(src.expr, "'%.*s' expected first argument to be a simd vector", LIT(builtin_name));
 				return false;
@@ -1653,24 +1653,24 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				error(indices.expr, "'%.*s' expected second argument (indices) to be a simd vector", LIT(builtin_name));
 				return false;
 			}
-			
+
 			Type *src_elem = base_array_type(src.type);
 			Type *indices_elem = base_array_type(indices.type);
-			
+
 			if (!is_type_integer(src_elem)) {
 				gbString src_str = type_to_string(src.type);
 				error(src.expr, "'%.*s' expected first argument to be a simd vector of integers, got '%s'", LIT(builtin_name), src_str);
 				gb_string_free(src_str);
 				return false;
 			}
-			
+
 			if (!is_type_integer(indices_elem)) {
 				gbString indices_str = type_to_string(indices.type);
 				error(indices.expr, "'%.*s' expected indices to be a simd vector of integers, got '%s'", LIT(builtin_name), indices_str);
 				gb_string_free(indices_str);
 				return false;
 			}
-			
+
 			if (!are_types_identical(src.type, indices.type)) {
 				gbString src_str = type_to_string(src.type);
 				gbString indices_str = type_to_string(indices.type);
@@ -1679,7 +1679,7 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				gb_string_free(src_str);
 				return false;
 			}
-			
+
 			operand->mode = Addressing_Value;
 			operand->type = src.type;
 			return true;
@@ -1792,6 +1792,8 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 
 	case BuiltinProc_simd_lanes_rotate_left:
 	case BuiltinProc_simd_lanes_rotate_right:
+	case BuiltinProc_simd_lanes_shift_left:
+	case BuiltinProc_simd_lanes_shift_right:
 		{
 			Operand x = {};
 			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
@@ -1808,6 +1810,17 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				return false;
 			}
 			check_assignment(c, &offset, t_int, builtin_name);
+
+			bool is_shift = id == BuiltinProc_simd_lanes_shift_left || id == BuiltinProc_simd_lanes_shift_right;
+			if (is_shift && offset.mode == Addressing_Constant) {
+				ExactValue value = exact_value_to_integer(offset.value);
+				if (value.kind == ExactValue_Integer && big_int_is_neg(&value.value_integer)) {
+					gbString str = expr_to_string(offset.expr);
+					error(offset.expr, "'%.*s' expected a non-negative offset, got %s", LIT(builtin_name), str);
+					gb_string_free(str);
+					return false;
+				}
+			}
 
 			operand->type = x.type;
 			operand->mode = Addressing_Value;
@@ -2055,24 +2068,22 @@ gb_internal void load_file_cache_load(LoadFileCache *cache, LoadFileTier tier) {
 	if (tier > cache->tier) {
 		cache->tier = tier;
 
-		TEMPORARY_ALLOCATOR_GUARD();
-		char *c_str = alloc_cstring(temporary_allocator(), path);
-
-		// NOTE(bill): not `gb_file_open`, whose `gb_file_last_write_time` looks the path up a second time
-		gbFile f = {};
-	#if defined(GB_SYSTEM_WINDOWS)
-		cache->file_error = gb__win32_file_open(&f.fd, &f.ops, gbFileMode_Read, c_str);
-		if (cache->file_error != gbFileError_None) {
-			cache->is_dir = path_is_directory(path);
+		ConfineHandle h = CONFINE_NO_HANDLE;
+		bool is_dir = false;
+		ConfineResult r = confine_open(path, CONFINE_ANY, &h, &is_dir);
+		defer (confine_close(h));
+		cache->outside = false;
+		switch (r) {
+		case Confine_Ok:         cache->file_error = gbFileError_None;       break;
+		case Confine_NotExists:  cache->file_error = gbFileError_NotExists;  break;
+		case Confine_Permission: cache->file_error = gbFileError_Permission; break;
+		case Confine_Invalid:    cache->file_error = gbFileError_Invalid;    break;
+		case Confine_Outside:
+			cache->file_error = gbFileError_Invalid;
+			cache->outside = true;
+			break;
 		}
-	#else
-		cache->file_error = gb__posix_file_open(&f.fd, &f.ops, gbFileMode_Read, c_str);
-		if (cache->file_error == gbFileError_None) {
-			struct stat st = {};
-			cache->is_dir = fstat(f.fd.i, &st) == 0 && S_ISDIR(st.st_mode);
-		}
-	#endif
-		defer (gb_file_close(&f));
+		cache->is_dir = is_dir;
 
 		if (cache->file_error == gbFileError_None) {
 			cache->exists = true;
@@ -2085,13 +2096,14 @@ gb_internal void load_file_cache_load(LoadFileCache *cache, LoadFileTier tier) {
 				if (cache->is_dir) {
 					break;
 				}
-				isize file_size = cast(isize)gb_file_size(&f);
-				if (file_size > 0) {
-					u8 *ptr = permanent_alloc_array<u8>(file_size+1);
-					gb_file_read_at(&f, ptr, file_size, 0);
-					ptr[file_size] = '\0';
+				i64 file_size = confine_size(h);
+				if (file_size > 0 && (gb_size_of(isize) >= 8 || file_size < I32_MAX)) {
+					u8 *ptr = permanent_alloc_array<u8>(cast(isize)file_size+1);
+					isize got = 0;
+					confine_read(h, ptr, cast(isize)file_size, &got);
+					ptr[got] = '\0';
 					cache->data.text = ptr;
-					cache->data.len = file_size;
+					cache->data.len = got;
 				}
 				break;
 			}
@@ -2119,10 +2131,8 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 	ast_node(bd, BasicDirective, ce->proc);
 	String builtin_name = bd->name.string;
 
-	String path;
-	if (gb_path_is_absolute((char*)original_string.text)) {
-		path = original_string;
-	} else {
+	String path = {};
+	{
 		String base_dir = dir_from_path(get_file_path_string(call->file_id));
 
 		bool ok = determine_path_from_string(true, call, base_dir, original_string, &path);
@@ -2141,7 +2151,16 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 	mutex_lock(&cache->mutex);
 	gbFileError file_error = cache->file_error;
 	bool is_dir = cache->is_dir;
+	bool outside = cache->outside;
 	mutex_unlock(&cache->mutex);
+
+	if (outside) {
+		if (err_on_not_found) {
+			error(ce->proc, "Failed to `#%.*s` file: %.*s; it resolves outside the project root and every collection", LIT(builtin_name), LIT(path));
+		}
+		call->state_flags |= StateFlag_DirectiveWasFalse;
+		return false;
+	}
 
 	if (is_dir && tier == LoadFileTier_Contents) {
 		if (err_on_not_found) {
@@ -2402,7 +2421,11 @@ gb_internal LoadDirectiveResult check_load_directive(CheckerContext *c, Operand 
 		return LoadDirective_Error;
 	}
 
-	GB_ASSERT(o.value.kind == ExactValue_String);
+	String original_string = {};
+	if (!exact_value_to_path_string(o.value, &original_string)) {
+		error(arg, "'#%.*s' expected a constant string argument", LIT(name));
+		return LoadDirective_Error;
+	}
 
 	operand->type = t_u8_slice;
 	if (ce->args.count == 1) {
@@ -2427,7 +2450,7 @@ gb_internal LoadDirectiveResult check_load_directive(CheckerContext *c, Operand 
 	operand->mode = Addressing_Constant;
 
 	LoadFileCache *cache = nullptr;
-	if (cache_load_file_directive(c, call, o.value.value_string, err_on_not_found, &cache, LoadFileTier_Contents)) {
+	if (cache_load_file_directive(c, call, original_string, err_on_not_found, &cache, LoadFileTier_Contents)) {
 		operand->value = exact_value_string(cache->data);
 		return LoadDirective_Success;
 	}
@@ -2534,23 +2557,21 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 		return LoadDirective_Error;
 	}
 
-	GB_ASSERT(o.value.kind == ExactValue_String);
+	String original_string = {};
+	if (!exact_value_to_path_string(o.value, &original_string)) {
+		error(arg, "'#%.*s' expected a constant string", LIT(name));
+		return LoadDirective_Error;
+	}
 
 	init_core_load_directory_file(c->checker);
 
 	operand->type = t_load_directory_file_slice;
 	operand->mode = Addressing_Value;
 
-
-	String original_string = o.value.value_string;
-	String path;
-	if (gb_path_is_absolute((char*)original_string.text)) {
-		path = original_string;
-	} else {
-		String base_dir = dir_from_path(get_file_path_string(call->file_id));
-
-		bool ok = determine_path_from_string(true, call, base_dir, original_string, &path);
-		gb_unused(ok);
+	String path = {};
+	String base_dir = dir_from_path(get_file_path_string(call->file_id));
+	if (!determine_path_from_string(true, call, base_dir, original_string, &path)) {
+		return LoadDirective_Error;
 	}
 	// NOTE(bill): the map is only locked to find or add the directory's entry which is loaded under its own mutex
 	LoadDirectoryCache *cache = nullptr;
@@ -2573,7 +2594,7 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 	if (!cache->loaded)  {
 		cache->loaded = true;
 		Array<FileInfo> list = {};
-		ReadDirectoryError rd_err = read_directory(path, &list);
+		ReadDirectoryError rd_err = confine_read_directory(path, &list);
 		defer (array_free(&list));
 
 		if (list.count == 1) {
@@ -2600,6 +2621,9 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 		case ReadDirectory_Unknown:
 			error(call, "%.*s error - unknown error whilst reading path %.*s", LIT(name), LIT(original_string));
 			return LoadDirective_Error;
+		case ReadDirectory_Outside:
+			error(call, "%.*s error - path resolves outside the project root and every collection: %.*s", LIT(name), LIT(original_string));
+			return LoadDirective_Error;
 		}
 
 		load_directory_prefetch(c->info, list);
@@ -2619,6 +2643,10 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 			} else {
 				result = LoadDirective_Error;
 			}
+		}
+
+		if (result == LoadDirective_Success && cache->files.count == 0) {
+			warning(call, "%.*s - directory holds only subdirectories, which are not loaded, so the result is empty: %.*s", LIT(name), LIT(original_string));
 		}
 
 		array_sort(cache->files, file_cache_sort_cmp);
@@ -2662,7 +2690,7 @@ gb_internal bool check_hash_kind(CheckerContext *c, Ast *call, String const &has
 		}
 		return false;
 	}
-	
+
 	if (hash_kind == "adler32") {
 		*hash_value = gb_adler32(data, data_size);
 	} else if (hash_kind == "crc32") {
@@ -2843,7 +2871,11 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		operand->type  = t_untyped_bool;
 		operand->mode  = Addressing_Constant;
 
-		String original_string = o.value.value_string;
+		String original_string = {};
+		if (!exact_value_to_path_string(o.value, &original_string)) {
+			error(ce->args[0], "'#exists' expected a constant string argument");
+			return false;
+		}
 		LoadFileCache *cache = nullptr;
 		if (cache_load_file_directive(c, call, original_string, /* err_on_not_found=*/ false, &cache, LoadFileTier_Exists)) {
 			operand->value = exact_value_bool(cache->exists);
@@ -2896,11 +2928,16 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		}
 		gbAllocator a = heap_allocator();
 
-		GB_ASSERT(o.value.kind == ExactValue_String);
-		GB_ASSERT(o_hash.value.kind == ExactValue_String);
-
-		String original_string = o.value.value_string;
-		String hash_kind = o_hash.value.value_string;
+		String original_string = {};
+		String hash_kind = {};
+		if (!exact_value_to_path_string(o.value, &original_string)) {
+			error(arg0, "'#load_hash' expected a constant string argument");
+			return false;
+		}
+		if (!exact_value_to_path_string(o_hash.value, &hash_kind)) {
+			error(arg1, "'#load_hash' expected a constant string argument");
+			return false;
+		}
 
 		LoadFileCache *cache = nullptr;
 		if (cache_load_file_directive(c, call, original_string, true, &cache, LoadFileTier_Contents)) {
@@ -2967,11 +3004,16 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		}
 		gbAllocator a = heap_allocator();
 
-		GB_ASSERT(o.value.kind == ExactValue_String);
-		GB_ASSERT(o_hash.value.kind == ExactValue_String);
-
-		String original_string = o.value.value_string;
-		String hash_kind = o_hash.value.value_string;
+		String original_string = {};
+		String hash_kind = {};
+		if (!exact_value_to_path_string(o.value, &original_string)) {
+			error(arg0, "'#hash' expected a constant string argument");
+			return false;
+		}
+		if (!exact_value_to_path_string(o_hash.value, &hash_kind)) {
+			error(arg1, "'#hash' expected a constant string argument");
+			return false;
+		}
 
 		// TODO: Cache hash values based off of string constant and hash kind?
 		u64 hash_value = 0;
@@ -3193,10 +3235,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_type_is_subtype_of:
 	case BuiltinProc_type_is_superset_of:
 	case BuiltinProc_objc_send:
-	case BuiltinProc_objc_find_selector: 
-	case BuiltinProc_objc_find_class: 
-	case BuiltinProc_objc_register_selector: 
-	case BuiltinProc_objc_register_class: 
+	case BuiltinProc_objc_find_selector:
+	case BuiltinProc_objc_find_class:
+	case BuiltinProc_objc_register_selector:
+	case BuiltinProc_objc_register_class:
 	case BuiltinProc_atomic_type_is_lock_free:
 	case BuiltinProc_has_target_feature:
 	case BuiltinProc_procedure_of:
@@ -3271,9 +3313,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		break;
 
 	case BuiltinProc_objc_send:
-	case BuiltinProc_objc_find_selector: 
-	case BuiltinProc_objc_find_class: 
-	case BuiltinProc_objc_register_selector: 
+	case BuiltinProc_objc_find_selector:
+	case BuiltinProc_objc_find_class:
+	case BuiltinProc_objc_register_selector:
 	case BuiltinProc_objc_register_class:
 	case BuiltinProc_objc_ivar_get:
 	case BuiltinProc_objc_block:
@@ -3380,12 +3422,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 		} else if (is_type_struct(op_type)) {
 			Type *bt = base_type(op_type);
-			if (bt->Struct.soa_kind == StructSoa_Fixed) {
+			bool constant_cap = bt->Struct.soa_kind == StructSoa_FixedCapacityDynamic && id == BuiltinProc_cap;
+			if (bt->Struct.soa_kind == StructSoa_Fixed || constant_cap) {
 				mode  = Addressing_Constant;
 				value = exact_value_i64(bt->Struct.soa_count);
 				type  = t_untyped_integer;
 			} else if ((bt->Struct.soa_kind == StructSoa_Slice && id == BuiltinProc_len) ||
-			           bt->Struct.soa_kind == StructSoa_Dynamic) {
+			           bt->Struct.soa_kind == StructSoa_Dynamic ||
+			           bt->Struct.soa_kind == StructSoa_FixedCapacityDynamic) {
 				mode = Addressing_Value;
 			}
 		} else if (is_type_simd_vector(op_type)) {
@@ -3521,9 +3565,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			return false;
 		}
 		GB_ASSERT(type != nullptr);
-		
+
 		InternedString field_name = {};
-		
+
 		if (field_arg == nullptr) {
 			error(call, "Expected an identifier for field argument");
 			return false;
@@ -3537,7 +3581,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			return false;
 		}
 
-		
+
 		if (is_type_array(type) || is_type_bit_field(type)) {
 			gbString t = type_to_string(type);
 			error(field_arg, "Expected a struct type for '%.*s', got '%s'", LIT(builtin_name), t);
@@ -3559,7 +3603,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 		}
-		
+
 		Selection sel = lookup_field(type, field_name, false);
 		if (sel.entity == nullptr) {
 			ERROR_BLOCK();
@@ -3588,7 +3632,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		operand->type  = t_uintptr;
 		break;
 	}
-	
+
 	case BuiltinProc_offset_of_by_string: {
 		// offset_of_by_string :: proc(Type, string) -> uintptr
 
@@ -3609,9 +3653,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			return false;
 		}
 		GB_ASSERT(type != nullptr);
-		
+
 		InternedString field_name = {};
-		
+
 		if (field_arg == nullptr) {
 			error(call, "Expected a constant (not-empty) string for field argument");
 			return false;
@@ -3627,14 +3671,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			return false;
 		}
 
-		
+
 		if (is_type_array(type)) {
 			gbString t = type_to_string(type);
 			error(field_arg, "Invalid a struct type for '%.*s', got '%s'", LIT(builtin_name), t);
 			gb_string_free(t);
 			return false;
 		}
-		
+
 		Selection sel = lookup_field(type, field_name, false);
 		if (sel.entity == nullptr) {
 			ERROR_BLOCK();
@@ -4291,7 +4335,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		Type *t = x->type;
 		Type *elem = core_array_type(t);
-		
+
 		if (is_type_complex(t)) {
 			if (x->mode == Addressing_Constant) {
 				// Keep the conjugate exact: negate the imaginary component(s) as ExactValues.
@@ -4839,7 +4883,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gb_string_free(type_str);
 			return false;
 		}
-		
+
 		if (ce->args.count <= 1) {
 			error(call, "Too few arguments for 'max', two or more are required");
 			return false;
@@ -5194,6 +5238,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			if (et->Struct.fields.count != fields.count) {
 				goto soa_zip_end;
 			}
+			for (Entity *f : et->Struct.fields) {
+				// NOTE(bill): a slice of a `#soa_split` field's values cannot be its separate columns
+				if (is_soa_split_field(f)) {
+					goto soa_zip_end;
+				}
+			}
 			if (!fail && first_is_field_value) {
 				for_array(i, names) {
 					Selection sel = lookup_field(et, string_interner_insert(names[i]), false);
@@ -5256,9 +5306,19 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gb_string_free(s);
 			return false;
 		}
-		auto types = permanent_slice_make<Type *>(t->Struct.fields.count-1);
+		// NOTE(bill): one result for each field of the element:
+		// slice of its column or the `#soa[]` view of a `#soa_split` field's columns
+		Type *elem = base_type(t->Struct.soa_elem);
+		auto types = permanent_slice_make<Type *>(elem->kind == Type_Struct ? elem->Struct.fields.count : t->Struct.fields.count-1);
+		isize column = 0;
 		for_array(i, types) {
-			Entity *f = t->Struct.fields[i];
+			if (elem->kind == Type_Struct && is_soa_split_field(elem->Struct.fields[i])) {
+				Type *split = elem->Struct.fields[i]->type;
+				types[i] = make_soa_struct_slice(c, nullptr, nullptr, split);
+				column += soa_split_column_count(split);
+				continue;
+			}
+			Entity *f = t->Struct.fields[column++];
 			GB_ASSERT(f->type->kind == Type_MultiPointer);
 			types[i] = alloc_type_slice(f->type->MultiPointer.elem);
 		}
@@ -5267,7 +5327,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		operand->mode = Addressing_Value;
 		break;
 	}
-	
+
 	case BuiltinProc_transpose: {
 		Operand x = {};
 		check_expr(c, &x, ce->args[0]);
@@ -5285,7 +5345,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gb_string_free(s);
 			return false;
 		}
-		
+
 		operand->mode = Addressing_Value;
 		if (t->kind == Type_Array) {
 			i32 rank = type_math_rank(t);
@@ -5331,7 +5391,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		operand->type = check_matrix_type_hint(operand->type, type_hint);
 		break;
 	}
-	
+
 	case BuiltinProc_outer_product: {
 		Operand x = {};
 		Operand y = {};
@@ -5347,7 +5407,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			error(call, "'%.*s' expects only arrays", LIT(builtin_name));
 			return false;
 		}
-		
+
 		if (!is_type_array(x.type) || !is_type_array(y.type)) {
 			gbString s1 = type_to_string(x.type);
 			gbString s2 = type_to_string(y.type);
@@ -5356,7 +5416,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gb_string_free(s1);
 			return false;
 		}
-		
+
 		Type *xt = base_type(x.type);
 		Type *yt = base_type(y.type);
 		GB_ASSERT(xt->kind == Type_Array);
@@ -5369,15 +5429,15 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gb_string_free(s1);
 			return false;
 		}
-		
+
 		Type *elem = xt->Array.elem;
-		
+
 		if (!is_type_valid_for_matrix_elems(elem)) {
 			gbString s = type_to_string(elem);
 			error(call, "Matrix elements types are limited to integers, floats, and complex, got %s", s);
 			gb_string_free(s);
 		}
-		
+
 		if (xt->Array.count == 0 || yt->Array.count == 0) {
 			gbString s1 = type_to_string(x.type);
 			gbString s2 = type_to_string(y.type);
@@ -5386,19 +5446,19 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gb_string_free(s1);
 			return false;
 		}
-		
+
 		i64 max_count = xt->Array.count*yt->Array.count;
 		if (max_count > MATRIX_ELEMENT_COUNT_MAX) {
 			error(call, "Product of the array lengths exceed the maximum matrix element count, got %d, expected a maximum of %d", cast(int)max_count, MATRIX_ELEMENT_COUNT_MAX);
 			return false;
 		}
-		
+
 		operand->mode = Addressing_Value;
 		operand->type = alloc_type_matrix(elem, xt->Array.count, yt->Array.count, nullptr, nullptr, false);
 		operand->type = check_matrix_type_hint(operand->type, type_hint);
 		break;
 	}
-	
+
 	case BuiltinProc_hadamard_product: {
 		Operand x = {};
 		Operand y = {};
@@ -5422,7 +5482,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gb_string_free(s1);
 			return false;
 		}
-		
+
 		if (!are_types_identical(x.type, y.type)) {
 			gbString s1 = type_to_string(x.type);
 			gbString s2 = type_to_string(y.type);
@@ -5431,20 +5491,20 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gb_string_free(s1);
 			return false;
 		}
-		
+
 		Type *elem = core_array_type(x.type);
 		if (!is_type_valid_for_matrix_elems(elem)) {
 			gbString s = type_to_string(elem);
 			error(call, "'%.*s' expects elements to be types are limited to integers, floats, and complex, got %s", LIT(builtin_name), s);
 			gb_string_free(s);
 		}
-		
+
 		operand->mode = Addressing_Value;
 		operand->type = x.type;
 		operand->type = check_matrix_type_hint(operand->type, type_hint);
 		break;
 	}
-	
+
 	case BuiltinProc_matrix_flatten: {
 		Operand x = {};
 		check_expr(c, &x, ce->args[0]);
@@ -5462,11 +5522,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gb_string_free(s);
 			return false;
 		}
-		
+
 		operand->mode = Addressing_Value;
 		if (is_type_array(t)) {
 			// Do nothing
-			operand->type = x.type;			
+			operand->type = x.type;
 		} else {
 			GB_ASSERT(t->kind == Type_Matrix);
 			operand->type = alloc_type_array(t->Matrix.elem, t->Matrix.row_count*t->Matrix.column_count);
@@ -5474,7 +5534,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		operand->type = check_matrix_type_hint(operand->type, type_hint);
 		break;
 	}
-	
+
 	case BuiltinProc_is_package_imported: {
 		bool value = false;
 
@@ -5490,7 +5550,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				}
 			}
 		}
-		
+
 		operand->mode = Addressing_Constant;
 		operand->type = t_untyped_bool;
 		operand->value = exact_value_bool(value);
@@ -5629,75 +5689,31 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->type = t_invalid;
 			return false;
 		}
+		if (is_type_soa_struct(elem)) {
+			gbString str = type_to_string(elem);
+			error(call, "Invalid type for 'intrinsics.soa_struct', the element type cannot be an #soa type, got '%s'", str);
+			gb_string_free(str);
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+			return false;
+		}
 
 		operand->mode = Addressing_Type;
-		Type *soa_struct = nullptr;
-		Scope *scope = nullptr;
 
-		if (is_type_array(elem)) {
-			Type *old_array = base_type(elem);
-			soa_struct = alloc_type_struct();
-			soa_struct->Struct.fields = permanent_slice_make<Entity *>(cast(isize)old_array->Array.count);
-			soa_struct->Struct.tags = permanent_alloc_array<String>(cast(isize)old_array->Array.count);
-			soa_struct->Struct.node = operand->expr;
-			soa_struct->Struct.soa_kind = StructSoa_Fixed;
-			soa_struct->Struct.soa_elem = elem;
-			soa_struct->Struct.soa_count = cast(i32)count;
-
-			scope = create_scope(c->info, c->scope);
-			soa_struct->Struct.scope = scope;
-
-			String params_xyzw[4] = {
-				str_lit("x"),
-				str_lit("y"),
-				str_lit("z"),
-				str_lit("w")
-			};
-
-			for (isize i = 0; i < cast(isize)old_array->Array.count; i++) {
-				Type *array_type = alloc_type_array(old_array->Array.elem, count);
-				Token token = {};
-				token.string = params_xyzw[i];
-
-				Entity *new_field = alloc_entity_field(scope, token, array_type, false, cast(i32)i);
-				soa_struct->Struct.fields[i] = new_field;
-				add_entity(c, scope, nullptr, new_field);
-				add_entity_use(c, nullptr, new_field);
-			}
-
-		} else {
-			GB_ASSERT(is_type_struct(elem));
-
-			Type *old_struct = base_type(elem);
-			soa_struct = alloc_type_struct();
-			soa_struct->Struct.fields = permanent_slice_make<Entity *>(old_struct->Struct.fields.count);
-			soa_struct->Struct.tags = permanent_alloc_array<String>(old_struct->Struct.fields.count);
-			soa_struct->Struct.node = operand->expr;
-			soa_struct->Struct.soa_kind = StructSoa_Fixed;
-			soa_struct->Struct.soa_elem = elem;
-			if (count > I32_MAX) {
-				count = I32_MAX;
-				error(call, "Array count too large for an #soa struct, got %lld", cast(long long)count);
-			}
-			soa_struct->Struct.soa_count = cast(i32)count;
-
-			scope = create_scope(c->info, old_struct->Struct.scope->parent);
-			soa_struct->Struct.scope = scope;
-
-			for_array(i, old_struct->Struct.fields) {
-				Entity *old_field = old_struct->Struct.fields[i];
-				if (old_field->kind == Entity_Variable) {
-					Type *array_type = alloc_type_array(old_field->type, count);
-					Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_index);
-					soa_struct->Struct.fields[i] = new_field;
-					add_entity(c, scope, nullptr, new_field);
-				} else {
-					soa_struct->Struct.fields[i] = old_field;
-				}
-
-				soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
-			}
+		if (count > I32_MAX) {
+			count = I32_MAX;
+			error(call, "Array count too large for an #soa struct, got %lld", cast(long long)count);
 		}
+		Type *soa_struct = alloc_type_struct();
+		soa_struct->Struct.node = operand->expr;
+		soa_struct->Struct.soa_kind = StructSoa_Fixed;
+		soa_struct->Struct.soa_elem = elem;
+		soa_struct->Struct.soa_count = cast(i32)count;
+
+		Scope *scope = create_scope(c->info, is_type_array(elem) ? c->scope : bt_elem->Struct.scope->parent);
+		soa_struct->Struct.scope = scope;
+
+		add_soa_columns(c, soa_struct, scope, 0);
 		wait_signal_set(&soa_struct->Struct.fields_wait_signal);
 
 		Token token = {};
@@ -6064,6 +6080,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		break;
 
 	case BuiltinProc_read_cycle_counter:
+		if (build_context.metrics.os == TargetOs_wasi || build_context.metrics.os == TargetOs_js || build_context.metrics.os == TargetOs_orca) {
+			add_package_dependency(c, "runtime", "_read_cycle_counter");
+		}
 		operand->mode = Addressing_Value;
 		operand->type = t_i64;
 		break;
@@ -6302,7 +6321,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				gb_string_free(xts);
 			}
 			// An untyped constant is integer-like, so it reaches the size check below, and
-			// `type_size_of` asserts on a type that has no size. 
+			// `type_size_of` asserts on a type that has no size.
 			// no-op on typed types
 			convert_to_typed(c, &x, default_type(x.type));
 			if (x.mode == Addressing_Invalid) {
@@ -7251,7 +7270,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->type = x.type;
 		}
 		break;
-		
+
 	case BuiltinProc_prefetch_read_instruction:
 	case BuiltinProc_prefetch_read_data:
 	case BuiltinProc_prefetch_write_instruction:
@@ -7259,7 +7278,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		{
 			operand->mode = Addressing_NoValue;
 			operand->type = nullptr;
-			
+
 			Operand x = {};
 			Operand y = {};
 			check_expr(c, &x, ce->args[0]);
@@ -7288,10 +7307,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(y.expr, "Second argument to '%.*s' representing the locality must be an integer in the range 0..=3", LIT(builtin_name));
 				return false;
 			}
-			
+
 		}
 		break;
-		
+
 	case BuiltinProc_syscall:
 		{
 			convert_to_typed(c, operand, t_uintptr);
@@ -7304,7 +7323,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				Operand x = {};
 				check_expr(c, &x, ce->args[i]);
 				if (x.mode != Addressing_Invalid) {
-					convert_to_typed(c, &x, t_uintptr);	
+					convert_to_typed(c, &x, t_uintptr);
 				}
 				convert_to_typed(c, &x, t_uintptr);
 				if (!is_type_uintptr(x.type)) {
@@ -7313,9 +7332,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 					gb_string_free(t);
 				}
 			}
-			
+
 			isize max_arg_count = 32;
-			
+
 			switch (build_context.metrics.os) {
 			case TargetOs_darwin:
 			case TargetOs_linux:
@@ -7331,13 +7350,13 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(call, "'%.*s' is not supported on this platform (%.*s)", LIT(builtin_name), LIT(target_os_names[build_context.metrics.os]));
 				break;
 			}
-			
+
 			if (ce->args.count > max_arg_count) {
 				error(ast_end_token(call), "'%.*s' has a maximum of %td arguments on this platform (%.*s), got %td", LIT(builtin_name), max_arg_count, LIT(target_os_names[build_context.metrics.os]), ce->args.count);
 			}
-			
-			
-			
+
+
+
 			operand->mode = Addressing_Value;
 			operand->type = t_uintptr;
 			return true;
@@ -7355,7 +7374,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				Operand x = {};
 				check_expr(c, &x, ce->args[i]);
 				if (x.mode != Addressing_Invalid) {
-					convert_to_typed(c, &x, t_uintptr);	
+					convert_to_typed(c, &x, t_uintptr);
 				}
 				convert_to_typed(c, &x, t_uintptr);
 				if (!is_type_uintptr(x.type)) {
@@ -7364,9 +7383,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 					gb_string_free(t);
 				}
 			}
-			
+
 			isize max_arg_count = 32;
-			
+
 			switch (build_context.metrics.os) {
 			case TargetOs_freebsd:
 			case TargetOs_netbsd:
@@ -7382,11 +7401,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(call, "'%.*s' is not supported on this platform (%.*s)", LIT(builtin_name), LIT(target_os_names[build_context.metrics.os]));
 				break;
 			}
-			
+
 			if (ce->args.count > max_arg_count) {
 				error(ast_end_token(call), "'%.*s' has a maximum of %td arguments on this platform (%.*s), got %td", LIT(builtin_name), max_arg_count, LIT(target_os_names[build_context.metrics.os]), ce->args.count);
 			}
-			
+
 			operand->mode = Addressing_Value;
 			operand->type = make_optional_ok_type(t_uintptr);
 			return true;
@@ -7487,7 +7506,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		if (operand->mode != Addressing_Type) {
 			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
 			return false;
-		} 
+		}
 
 		if (is_type_polymorphic(operand->type)) {
 			gbString t = type_to_string(operand->type);
@@ -7499,8 +7518,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		{
 			Type *bt = base_type(operand->type);
 
-			if (bt->kind != Type_Basic || 
-				(bt->Basic.flags & BasicFlag_Unsigned) != 0 || 
+			if (bt->kind != Type_Basic ||
+				(bt->Basic.flags & BasicFlag_Unsigned) != 0 ||
 				(bt->Basic.flags & BasicFlag_Integer) == 0) {
 				gbString t = type_to_string(operand->type);
 				error(operand->expr, "Expected a signed integer type for '%.*s', got %s", LIT(builtin_name), t);
@@ -7531,7 +7550,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		if (operand->mode != Addressing_Type) {
 			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
 			return false;
-		} 
+		}
 
 		if (is_type_polymorphic(operand->type)) {
 			gbString t = type_to_string(operand->type);
@@ -7543,8 +7562,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		{
 			Type *bt = base_type(operand->type);
 
-			if (bt->kind != Type_Basic || 
-				(bt->Basic.flags & BasicFlag_Unsigned) == 0 || 
+			if (bt->kind != Type_Basic ||
+				(bt->Basic.flags & BasicFlag_Unsigned) == 0 ||
 				(bt->Basic.flags & BasicFlag_Integer) == 0) {
 				gbString t = type_to_string(operand->type);
 				error(operand->expr, "Expected an unsigned integer type for '%.*s', got %s", LIT(builtin_name), t);
@@ -7862,7 +7881,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			break;
 		}
 		break;
-		
+
 	case BuiltinProc_type_field_bit_offset:
 	case BuiltinProc_type_field_bit_size:
 		{
@@ -8028,7 +8047,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			u = base_type(u);
 			GB_ASSERT(u->kind == Type_Union);
-			
+
 			operand->mode = Addressing_Type;
 			operand->type = union_tag_type(u);
 		}
@@ -8054,7 +8073,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			u = base_type(u);
 			GB_ASSERT(u->kind == Type_Union);
-			
+
 			// NOTE(jakubtomsu): forces calculation of variant_block_size
 			type_size_of(u);
 			if (u->Union.tag_size == 0) {
@@ -8064,7 +8083,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				//               What matters is that the tag size is > 0.
 				GB_ASSERT(u->Union.tag_size > 0);
 			}
-			
+
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_integer;
 			operand->value = exact_value_i64(u->Union.variant_block_size);
@@ -8091,7 +8110,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			u = base_type(u);
 			GB_ASSERT(u->kind == Type_Union);
-			
+
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_integer;
 			operand->value = exact_value_i64(u->Union.kind == UnionType_no_nil ? 0 : 1);
@@ -8169,7 +8188,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			u = base_type(u);
 			GB_ASSERT(u->kind == Type_Union);
-			
+
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_integer;
 			operand->value = exact_value_i64(u->Union.variants.count);
@@ -8203,7 +8222,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				operand->type = t_invalid;
 				return false;
 			}
-			
+
 			convert_to_typed(c, &x, t_int);
 			if (x.mode == Addressing_Invalid) {
 				operand->mode = Addressing_Type;
@@ -8222,7 +8241,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->type = u->Union.variants[index];
 		}
 		break;
-	
+
 	case BuiltinProc_type_variant_index_of:
 		{
 			if (operand->mode != Addressing_Type) {
@@ -8245,7 +8264,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			u = base_type(u);
 			GB_ASSERT(u->kind == Type_Union);
 
-			i64 index = -1;			
+			i64 index = -1;
 			for_array(i, u->Union.variants) {
 				Type *vt = u->Union.variants[i];
 				if (union_variant_index_types_equal(v, vt)) {
@@ -8253,14 +8272,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 					break;
 				}
 			}
-			
+
 			if (index < 0) {
 				error(operand->expr, "Expected a variant type for '%.*s'", LIT(builtin_name));
 				operand->mode = Addressing_Invalid;
 				operand->type = t_invalid;
 				return false;
 			}
-			
+
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_integer;
 			operand->value = exact_value_i64(index);
@@ -8280,6 +8299,17 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		operand->mode = Addressing_Constant;
 		operand->type = t_untyped_integer;
 		break;
+	case BuiltinProc_type_soa_field_sizes: {
+		if (operand->mode != Addressing_Type || !is_type_soa_struct(operand->type) || is_type_polymorphic(operand->type)) {
+			error(operand->expr, "Expected an #soa type for '%.*s'", LIT(builtin_name));
+			operand->mode = Addressing_Invalid;
+			operand->type = t_invalid;
+			return false;
+		}
+		operand->mode = Addressing_Value;
+		operand->type = alloc_type_pointer(alloc_type_array(t_int, soa_field_count(operand->type)));
+		break;
+	}
 	case BuiltinProc_type_struct_has_implicit_padding:
 		operand->value = exact_value_bool(false);
 		if (operand->mode != Addressing_Type) {
@@ -8766,14 +8796,20 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(ce->args[0], "Expected a fixed capacity dynamic array type for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (!is_type_fixed_capacity_dynamic_array(type)) {
+			bool is_soa = is_type_soa_struct(type) && type->Struct.soa_kind == StructSoa_FixedCapacityDynamic;
+			if (!is_type_fixed_capacity_dynamic_array(type) && !is_soa) {
 				error(ce->args[0], "Expected a fixed capacity dynamic array type for '%.*s'", LIT(builtin_name));
 				return false;
 			}
 
 			i64 sz = type_size_of(type);
 			gb_unused(sz);
-			i64 offset = type_offset_of(type, 1);
+			// NOTE(bill): The length of `#soa[dynamic; N]T` follows its fields.
+			i32 len_index = 1;
+			if (is_soa) {
+				len_index = cast(i32)soa_field_count(type);
+			}
+			i64 offset = type_offset_of(type, len_index);
 
 			operand->mode = Addressing_Constant;
 			operand->value = exact_value_u64(cast(u64)offset);
@@ -8817,25 +8853,25 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				gb_string_free(t);
 				return false;
 			}
-			
+
 			auto enum_constants = array_make<Entity *>(temporary_allocator(), type->Enum.fields.count);
 			array_copy(&enum_constants, type->Enum.fields, 0);
 			array_sort(enum_constants, enum_constant_entity_cmp);
-			
+
 			BigInt minus_one = big_int_make_i64(-1);
 			defer (big_int_dealloc(&minus_one));
 			BigInt diff = {};
-			
+
 			bool contiguous = true;
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_bool;
-			
+
 			for (isize i = 0; i < enum_constants.count - 1; i++) {
 				BigInt curr = enum_constants[i]->Constant.value.value_integer;
 				BigInt next = enum_constants[i + 1]->Constant.value.value_integer;
 				big_int_sub(&diff, &curr, &next);
 				defer (big_int_dealloc(&diff));
-				
+
 				if (!big_int_is_zero(&diff) && big_int_cmp(&diff, &minus_one) != 0) {
 					contiguous = false;
 					break;

@@ -14,6 +14,8 @@ Parser :: struct {
 	// `filled_pos` tracks which arguments have been filled into positional
 	// spots, much like how `fmt` treats them.
 	filled_pos: bit_array.Bit_Array,
+
+	owned_values: [dynamic]rawptr,
 }
 
 parse_one_odin_arg :: proc(model: ^$T, parser: ^Parser, arg: string) -> (error: Error) {

@@ -66,10 +66,6 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 		}
 	}
 
-	defer if err != nil {
-		_locations_destroy(locations, allocator)
-	}
-
 	// Debug info is needed.
 	when !ODIN_DEBUG {
 		fill_unresolved(locations, msgs, allocator)

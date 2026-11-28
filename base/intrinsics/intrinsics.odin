@@ -257,7 +257,11 @@ type_is_superset_of :: proc($Super, $Sub: typeid) -> bool ---
 
 type_field_index_of :: proc($T: typeid, $name: string) -> uintptr ---
 
-type_fixed_capacity_dynamic_array_len_offset :: proc($T: typeid/[dynamic; $N]$E) -> uintptr ---
+// T is `[dynamic; N]E` or `#soa[dynamic; N]E`
+type_fixed_capacity_dynamic_array_len_offset :: proc($T: typeid) -> uintptr ---
+
+// A pointer to a read-only table of the element size of each field of the #soa type T, in order
+type_soa_field_sizes :: proc($T: typeid) -> ^[N]int ---
 
 // "Contiguous" means that the set of enum constants, when sorted, have a difference of either 0 or 1 between consecutive values.
 // This is the exact opposite of "sparse".
@@ -392,6 +396,11 @@ simd_lanes_reverse :: proc(a: #simd[N]T) -> #simd[N]T ---
 
 simd_lanes_rotate_left  :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 simd_lanes_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
+
+// the rotates with zeroes shifted in, e.g. shift_left(a, 1) == {a[1], a[2], a[3], 0}
+// offset must not be negative. An offset of N or more gives all zeroes.
+simd_lanes_shift_left  :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
+simd_lanes_shift_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 
 // return {b[0], a[1], b[2], a[3], ...}
 simd_odd_even :: proc(a, b: #simd[N]T) -> #simd[N]T ---

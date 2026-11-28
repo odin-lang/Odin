@@ -353,7 +353,7 @@ parse_array :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 	array.allocator = p.allocator
 	defer if err != nil {
 		for elem in array {
-			destroy_value(elem, loc=loc)
+			destroy_value(elem, p.allocator, loc)
 		}
 		delete(array, loc)
 	}
@@ -434,21 +434,20 @@ parse_object_key_view :: proc(p: ^Parser, buf: []byte) -> (key: string, allocate
 }
 
 @(require_results)
-parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_location) -> (obj: Object, err: Error) {
+parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_location) -> (result: Object, err: Error) {
 	p.depth += 1
 	defer p.depth -= 1
 	if p.depth > MAX_DEPTH {
 		return nil, .Max_Depth_Exceeded
 	}
-	obj = make(Object, allocator=p.allocator, loc=loc)
+	obj := make(Object, allocator=p.allocator, loc=loc)
 
 	defer if err != nil {
 		for key, elem in obj {
 			delete(key, p.allocator, loc)
-			destroy_value(elem, loc=loc)
+			destroy_value(elem, p.allocator, loc)
 		}
 		delete(obj, loc)
-		obj = nil
 	}
 
 	for p.curr_token.kind != end_token {
@@ -473,7 +472,7 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_loca
 		// `elem` is owned by this iteration for the same reason, until it is stored.
 		elem_stored := false
 		defer if !elem_stored {
-			destroy_value(elem, loc = loc)
+			destroy_value(elem, p.allocator, loc)
 		}
 
 		_, value_ptr, just_inserted, insert_err := map_entry(&obj, key, loc)

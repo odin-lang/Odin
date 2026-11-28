@@ -724,6 +724,7 @@ struct LoadFileCache {
 	String         path;
 	gbFileError    file_error;
 	bool           is_dir;
+	bool           outside;
 	String         data;
 	StringMap<u64> hashes;
 };

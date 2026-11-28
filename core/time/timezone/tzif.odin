@@ -47,7 +47,7 @@ Leapsecond_Record :: struct #packed {
 
 @private
 tzif_data_block_size :: proc(hdr: ^TZif_Header, version: TZif_Version) -> (block_size: int, ok: bool) {
-	time_size : int
+	time_size : i64
 
 	if version == .V1 {
 		time_size = 4
@@ -57,13 +57,17 @@ tzif_data_block_size :: proc(hdr: ^TZif_Header, version: TZif_Version) -> (block
 		return
 	}
 
-	return (int(hdr.timecnt) * time_size)              +
-		   int(hdr.timecnt)                            +
-		   int(hdr.typecnt * size_of(Local_Time_Type)) +
-		   int(hdr.charcnt)                            +
-		   (int(hdr.leapcnt) * (time_size + 4))        +
-		   int(hdr.isstdcnt)                           +
-		   int(hdr.isutcnt), true
+	size := (i64(hdr.timecnt) * time_size)              +
+		    i64(hdr.timecnt)                            +
+		    i64(hdr.typecnt) * size_of(Local_Time_Type) +
+		    i64(hdr.charcnt)                            +
+		    (i64(hdr.leapcnt) * (time_size + 4))        +
+		    i64(hdr.isstdcnt)                           +
+		    i64(hdr.isutcnt)
+	if size > i64(max(int)) {
+		return
+	}
+	return int(size), true
 }
 
 @private
@@ -137,6 +141,9 @@ parse_posix_tz_shortname :: proc(str: string) -> (out: string, idx: int, ok: boo
 @private
 parse_posix_tz_offset :: proc(str: string) -> (out_sec: i64, idx: int, ok: bool) {
 	str := str
+	if len(str) == 0 {
+		return
+	}
 
 	sign : i64 = 1
 	start_idx := 0
@@ -311,10 +318,14 @@ parse_posix_rrule :: proc(str: string) -> (out: datetime.TZ_Transition_Date, idx
 		off := 0
 
 		month_str, off = skim_digits(str[i:]) or_return
-		i += off + 1
+		i += off
+		if i >= len(str) || str[i] != '.' { return }
+		i += 1
 
 		week_str, off = skim_digits(str[i:]) or_return
-		i += off + 1
+		i += off
+		if i >= len(str) || str[i] != '.' { return }
+		i += 1
 
 		day_str, off = skim_digits(str[i:]) or_return
 		i += off

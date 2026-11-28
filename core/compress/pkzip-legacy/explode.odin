@@ -21,8 +21,7 @@ explode_from_context :: proc(z: ^compress.Context, implode_options: Implode_Opti
 		return nil
 	}
 
-	start := len(z.output)
-	defer z.bytes_written = i64(len(z.output) - start)
+	defer z.bytes_written = i64(len(z.output))
 
 	p: Output_Progress
 	progress_begin(&p, z, expected, options)
@@ -39,17 +38,14 @@ explode_from_context :: proc(z: ^compress.Context, implode_options: Implode_Opti
 	min_match     := 3 if literal_tree else 2
 
 	b := Bits{z.code_buffer, z.num_bits}
-	defer {
-		z.code_buffer = b.buffer
-		z.num_bits    = b.count
-	}
+	defer bits_hand_back(z, &b)
 
 	o := out_load(z)
 	defer out_store(z, &o)
 
-	for o.at - start < expected {
-		if o.at - start >= p.mark {
-			progress_report(&p, z, o.at - start, b.count) or_return
+	for o.at < expected {
+		if o.at >= p.mark {
+			progress_report(&p, z, o.at, b.count) or_return
 		}
 		flag, available := bits_read(z, &p.pulled, &b, 1) or_return
 		if !available {
@@ -66,7 +62,7 @@ explode_from_context :: proc(z: ^compress.Context, implode_options: Implode_Opti
 			if !available {
 				break
 			}
-			out_literal(z, &o, start, expected, u8(symbol)) or_return
+			out_literal(z, &o, expected, u8(symbol)) or_return
 			continue
 		}
 
@@ -90,14 +86,14 @@ explode_from_context :: proc(z: ^compress.Context, implode_options: Implode_Opti
 			}
 		}
 		distance := high << distance_bits + low + 1
-		out_match(z, &o, start, expected, distance, length + extra + min_match) or_return
+		out_match(z, &o, expected, distance, length + extra + min_match) or_return
 	}
 
-	if o.at - start != expected {
+	if o.at != expected {
 		return General_Error.Stream_Too_Short
 	}
-	if o.at - start >= p.mark {
-		return progress_report(&p, z, o.at - start, b.count)
+	if o.at >= p.mark {
+		return progress_report(&p, z, o.at, b.count)
 	}
 	return nil
 }

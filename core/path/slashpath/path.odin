@@ -24,29 +24,27 @@ is_abs :: proc(path: string) -> bool {
 // If the path is empty, it returns ".".
 // If the path is all slashes, it returns "/"
 base :: proc(path: string, new := false, allocator := context.allocator) -> (last_element: string) {
-	defer if new {
-		last_element = strings.clone(last_element, allocator)
-	}
-
 	if path == "" {
 		last_element = "."
-		return
-	}
-
-
-	path := path
-
-	for len(path) > 0 && is_separator(path[len(path)-1]) {
-		path = path[:len(path)-1]
-	}
-	if i := strings.last_index(path, "/"); i >= 0 {
-		path = path[i+1:]
-	}
-
-	if path == "" {
-		last_element = "/"
 	} else {
-		last_element = path
+		path := path
+
+		for len(path) > 0 && is_separator(path[len(path)-1]) {
+			path = path[:len(path)-1]
+		}
+		if i := strings.last_index(path, "/"); i >= 0 {
+			path = path[i+1:]
+		}
+
+		if path == "" {
+			last_element = "/"
+		} else {
+			last_element = path
+		}
+	}
+
+	if new {
+		last_element = strings.clone(last_element, allocator)
 	}
 	return
 }
@@ -179,18 +177,17 @@ name :: proc(path: string, new := false, allocator := context.allocator) -> (nam
 	_, file := split(path)
 	name = file
 
-	defer if new {
-		name = strings.clone(name, allocator)
-	}
-
 	for i := len(file)-1; i >= 0 && !is_separator(file[i]); i -= 1 {
 		if file[i] == '.' {
 			name = file[:i]
-			return
+			break
 		}
 	}
-	return file
 
+	if new {
+		name = strings.clone(name, allocator)
+	}
+	return
 }
 
 

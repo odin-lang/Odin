@@ -99,9 +99,7 @@ reset :: proc(ctx: ^Context) {
 
 @(private)
 _init_kmac :: proc(ctx: ^Context, key, s: []byte, sec_strength: int) {
-	if ctx.is_initialized {
-		reset(ctx)
-	}
+	crypto.zero_explicit(ctx, size_of(Context))
 
 	ensure(len(key) >= sec_strength / 8, "crypto/kmac: invalid KMAC key, too short")
 

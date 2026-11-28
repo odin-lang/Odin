@@ -188,14 +188,13 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			case  1:
 				errno = posix.Errno(errno_byte)
 			case -1:
-				errno = posix.errno()
-				if errno == .EINTR {
+				// Retry without keeping EINTR in `errno`: the next read can return 0,
+				// which means `execve` succeeded and leaves `errno` as it is.
+				if posix.errno() == .EINTR {
 					continue
-				} else {
-					// If the read failed, something weird happened. Do not return the read
-					// error so the user knows to wait on it.
-					errno = nil
 				}
+				// If the read failed, something weird happened. Do not return the read
+				// error so the user knows to wait on it.
 			}
 			break
 		}

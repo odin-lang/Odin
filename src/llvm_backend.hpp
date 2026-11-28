@@ -63,6 +63,8 @@ struct lbAddr {
 		struct {
 			lbValue index;
 			Ast *index_expr;
+			i32 column; // the first column of a `#soa_split` field's value, e.g. `s[i].pos`
+			Type *elem; // the type of that value, or nullptr for the whole element
 		} soa;
 		struct {
 			lbValue index;
@@ -120,16 +122,16 @@ struct lbTypeInfoMembers {
 	lbAddr types;
 	lbAddr names;
 	lbAddr offsets;
-	lbAddr usings;
+	lbAddr field_flags;
 	lbAddr tags;
 
 	isize types_index;
 	isize names_index;
 	isize offsets_index;
-	isize usings_index;
+	isize field_flags_index;
 	isize tags_index;
 
-	isize empty_usings_count;
+	isize empty_field_flags_count;
 	isize empty_tags_count;
 
 	lbAddr enum_indices;
@@ -228,6 +230,7 @@ struct lbModule {
 	isize             objc_next_block_id;  // Used to name objective-c blocks. Tracked per module.
 
 	PtrMap<u64/*type hash*/, lbAddr> map_cell_info_map; // address of runtime.Map_Info
+	PtrMap<u64/*type hash*/, lbAddr> soa_field_sizes_map; // address of the table from intrinsics.type_soa_field_sizes
 	PtrMap<u64/*type hash*/, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info
 
 	PtrMap<Ast *, lbAddr> exact_value_compound_literal_addr_map; // Key: Ast_CompoundLit
@@ -276,6 +279,7 @@ struct lbGenerator : LinkerData {
 	bool modules_in_parallel;
 
 	String target_features;
+	String tune_cpu; // empty: tune for the target CPU
 
 	lbProcedure *startup_runtime;
 	lbProcedure *cleanup_runtime;
@@ -429,6 +433,7 @@ struct lbProcedure {
 	bool         is_export;
 	bool         is_entry_point;
 	bool         is_startup;
+	bool         sanitize_address;
 
 	lbFunctionType *abi_function_type;
 
@@ -593,6 +598,7 @@ gb_internal lbValue lb_build_call_expr(lbProcedure *p, Ast *expr, lbValue *resul
 gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type);
 gb_internal void lb_begin_procedure_body(lbProcedure *p);
 gb_internal void lb_end_procedure_body(lbProcedure *p);
+gb_internal unsigned lb_no_alias_data_pointers(Entity *e);
 
 gb_internal lbAddr lb_find_or_generate_context_ptr(lbProcedure *p);
 gb_internal lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx);
@@ -662,6 +668,7 @@ gb_internal lbValue lb_generate_local_array(lbProcedure *p, Type *elem_type, i64
 gb_internal lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 count, String prefix, i64 id);
 gb_internal lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue const &map_ptr, lbValue key, lbValue *key_ptr_);
 gb_internal lbValue lb_gen_map_cell_info_ptr(lbModule *m, Type *type);
+gb_internal lbValue lb_gen_soa_field_sizes_ptr(lbModule *m, Type *type);
 gb_internal lbValue lb_gen_map_info_ptr(lbModule *m, Type *map_type);
 
 gb_internal lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map_ptr, lbValue const &key);
@@ -699,6 +706,7 @@ gb_internal lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, As
 gb_internal lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *false_block);
 
 gb_internal LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValueRef *values, isize value_count_);
+gb_internal LLVMValueRef llvm_const_slice_with_type(lbModule *m, Type *t, LLVMValueRef data, LLVMValueRef len);
 gb_internal LLVMValueRef llvm_const_named_struct_internal(lbModule *m, LLVMTypeRef t, LLVMValueRef *values, isize value_count_, bool force_non_named=false);
 gb_internal void lb_set_entity_from_other_modules_linkage_correctly(lbModule *other_module, Entity *e, String const &name);
 
@@ -728,6 +736,7 @@ gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef p
 
 gb_internal bool lb_const_has_misaligned_pointer(LLVMTargetDataRef td, LLVMValueRef c, u64 offset, u64 base_align);
 gb_internal void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, char const *name, u64 value=0);
+gb_internal void lb_add_tune_cpu_to_proc(lbModule *m, LLVMValueRef proc_value);
 
 gb_internal gb_inline i64 lb_max_zero_init_size(void) {
 	if (build_context.metrics.os == TargetOs_darwin && build_context.metrics.arch == TargetArch_arm64) {
@@ -772,7 +781,7 @@ gb_internal u64 lb_get_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, Stri
 #define LB_TYPE_INFO_TYPES_NAME        "__$type_info_types_data"
 #define LB_TYPE_INFO_NAMES_NAME        "__$type_info_names_data"
 #define LB_TYPE_INFO_OFFSETS_NAME      "__$type_info_offsets_data"
-#define LB_TYPE_INFO_USINGS_NAME       "__$type_info_usings_data"
+#define LB_TYPE_INFO_FIELD_FLAGS_NAME  "__$type_info_field_flags_data"
 #define LB_TYPE_INFO_TAGS_NAME         "__$type_info_tags_data"
 #define LB_TYPE_INFO_ENUM_INDICES_NAME "__$type_info_enum_indices"
 

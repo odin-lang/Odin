@@ -129,6 +129,11 @@ writer_write_byte :: proc(b: ^Writer, c: byte) -> io.Error {
 	if writer_available(b) <= 0 && writer_flush(b) != nil {
 		return b.err
 	}
+	if writer_available(b) <= 0 {
+		single := [1]byte{c}
+		_, err := writer_write(b, single[:])
+		return err
+	}
 	b.buf[b.n] = c
 	b.n += 1
 	return nil
@@ -181,6 +186,9 @@ writer_write_string :: proc(b: ^Writer, s: string) -> (int, io.Error) {
 writer_read_from :: proc(b: ^Writer, r: io.Reader) -> (n: i64, err: io.Error) {
 	if b.err != nil {
 		return 0, b.err
+	}
+	if len(b.buf) == 0 {
+		return 0, .Buffer_Full
 	}
 	for {
 		if writer_available(b) == 0 {

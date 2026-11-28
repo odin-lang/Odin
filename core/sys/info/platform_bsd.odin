@@ -15,6 +15,7 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 	kernel_version_buf: [1024]u8
 
 	b := strings.builder_make_none(allocator = allocator, loc = loc)
+	defer if !ok { strings.builder_destroy(&b) }
 	// Retrieve kernel info using `sysctl`, e.g. OpenBSD and NetBSD
 	mib := []i32{sys.CTL_KERN, sys.KERN_OSTYPE}
 	if !sys.sysctl(mib, &kernel_version_buf) {

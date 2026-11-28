@@ -172,7 +172,7 @@ _exec :: proc(op: ^Operation) {
 	case .Poll:
 		op.poll.result = .Error
 	case .Open:
-		op.open.err = .Unsupported
+		op.open.err = FS_Error.Unsupported
 	case .Stat:
 		op.stat.err = .Unsupported
 	case .None, ._Link_Timeout, ._Remove, ._Splice:

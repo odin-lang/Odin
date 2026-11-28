@@ -1,4 +1,5 @@
-// An implementation of the [BNG](https://bngformat.org)
+// Reader and writer for `BNG` images.
+// The BNG specification is at [[ https://bngformat.org ]].
 package bng
 
 import "core:image"

@@ -14,7 +14,7 @@ e  :: testing.expect
 @(deferred_in=event_loop_guard_exit)
 event_loop_guard :: proc(t: ^testing.T) -> bool {
 	err := nbio.acquire_thread_event_loop()
-	if err == .Unsupported || !nbio.FULLY_SUPPORTED {
+	if err == nbio.General_Error.Unsupported || !nbio.FULLY_SUPPORTED {
 		log.warn("nbio unsupported, skipping")
 		return false
 	}

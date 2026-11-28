@@ -16,15 +16,7 @@ find_data_to_file_info :: proc(base_path: string, wbase_path: []u16, d: ^win32.W
 	}
 
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
-	filename := win32_wstring_to_utf8(cstring16(raw_data(d.cFileName[:])), temp_allocator) or_else ""
-
-	pieces: []string
-	if len(base_path) > 0 && is_path_separator(base_path[len(base_path) - 1]) {
-		pieces = {base_path, filename}
-	} else {
-		pieces = {base_path, Path_Separator_String, filename}
-	}
-	path := concatenate(pieces, allocator) or_return
+	filename := win32_wstring_to_utf8(cstring16(raw_data(d.cFileName[:])), temp_allocator) or_return
 
 	name_len := 0
 	for name_len < len(d.cFileName) && d.cFileName[name_len] != 0 {
@@ -40,6 +32,14 @@ find_data_to_file_info :: proc(base_path: string, wbase_path: []u16, d: ^win32.W
 		wpath[len(wbase_path)] = '\\'
 	}
 	copy(wpath[len(wbase_path) + separator:], d.cFileName[:name_len])
+
+	pieces: []string
+	if len(base_path) > 0 && is_path_separator(base_path[len(base_path) - 1]) {
+		pieces = {base_path, filename}
+	} else {
+		pieces = {base_path, Path_Separator_String, filename}
+	}
+	path := concatenate(pieces, allocator) or_return
 
 	handle := win32.CreateFileW(
 		cstring16(raw_data(wpath)),
@@ -193,7 +193,11 @@ _read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
 	if search_len == 0 || !_is_path_separator_u16(wpath[search_len-1]) {
 		search_len += 1
 	}
-	wpath_search := make([]u16, search_len+2, temp_allocator)
+	wpath_search, search_err := make([]u16, search_len+2, temp_allocator)
+	if search_err != nil {
+		read_directory_iterator_set_error(it, impl.name, search_err)
+		return
+	}
 	copy(wpath_search, wpath)
 	wpath_search[search_len-1] = '\\'
 	wpath_search[search_len+0] = '*'

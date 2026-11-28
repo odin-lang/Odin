@@ -287,36 +287,8 @@ make_dns_packet :: proc(buf: []byte, id: u16be, hostname: string, type: DNS_Reco
 
 // `records` slice is also destroyed.
 destroy_dns_records :: proc(records: []DNS_Record, allocator := context.allocator) {
-	context.allocator = allocator
-
 	for rec in records {
-		switch r in rec {
-		case DNS_Record_IP4:
-			delete(r.base.record_name)
-
-		case DNS_Record_IP6:
-			delete(r.base.record_name)
-
-		case DNS_Record_CNAME:
-			delete(r.base.record_name)
-			delete(r.host_name)
-
-		case DNS_Record_TXT:
-			delete(r.base.record_name)
-			delete(r.value)
-
-		case DNS_Record_NS:
-			delete(r.base.record_name)
-			delete(r.host_name)
-
-		case DNS_Record_MX:
-			delete(r.base.record_name)
-			delete(r.host_name)
-
-		case DNS_Record_SRV:
-			delete(r.record_name)
-			delete(r.target)
-		}
+		destroy_dns_record(rec, allocator)
 	}
 
 	delete(records, allocator)

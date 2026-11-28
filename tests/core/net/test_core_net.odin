@@ -236,6 +236,7 @@ two_servers_binding_same_endpoint :: proc(t: ^testing.T) {
 	testing.expect(t, err1 == nil, "expected first server binding to endpoint to do so without error")
 	testing.expect_value(t, perr, nil)
 	testing.expect(t, err2 == net.Bind_Error.Address_In_Use, "expected second server to bind to an endpoint to return .Address_In_Use")
+	testing.expect_value(t, skt2, net.TCP_Socket(0))
 }
 
 @(test)

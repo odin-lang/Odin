@@ -137,9 +137,13 @@ differential_enums :: proc(t: ^testing.T) {
 	expect_same_enum(t, json.Specification,        ref.Specification)
 }
 
-expect_same_enum :: proc(t: ^testing.T, $A, $B: typeid, loc := #caller_location) {
+expect_same_enum :: proc(t: ^testing.T, $A, $B: typeid, reference_only: []string = nil, loc := #caller_location) {
 	names_a,  names_b  := reflect.enum_field_names(A),  reflect.enum_field_names(B)
 	values_a, values_b := reflect.enum_field_values(A), reflect.enum_field_values(B)
+	n := len(reference_only)
+	if n > 0 && len(names_b) >= n && slice.equal(names_b[len(names_b)-n:], reference_only) {
+		names_b, values_b = names_b[:len(names_b)-n], values_b[:len(values_b)-n]
+	}
 	same := slice.equal(names_a, names_b) && slice.equal(values_a, values_b)
 	testing.expectf(t, same, "%v and %v no longer line up: %v vs %v", typeid_of(A), typeid_of(B), names_a, names_b, loc = loc)
 }

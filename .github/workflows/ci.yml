@@ -9,7 +9,7 @@ jobs:
         os: [macos-latest, ubuntu-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.os == 'macos-latest' && 'MacOS ARM' || (matrix.os == 'ubuntu-latest' && 'Ubuntu') || (matrix.os == 'ubuntu-24.04-arm' && 'Ubuntu ARM') }} Build, Check, and Test
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
 
       - uses: actions/checkout@v7
@@ -119,7 +119,7 @@ jobs:
         run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
       - name: Normal Core library tests
         run: ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
-      - name: Compression tests
+      - name: Compression and archive tests
         run: ./odin test tests/core/compress.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Optimized Core library tests
         run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
@@ -264,7 +264,7 @@ jobs:
   build_windows:
     name: Windows ${{ matrix.arch }} Build, Check, and Test
     runs-on: windows-2022
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -316,7 +316,7 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true %ODIN_ASAN% %ODIN_TARGET%
-      - name: Compression tests
+      - name: Compression and archive tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
@@ -545,3 +545,35 @@ jobs:
 
       - name: Core library tests on WASI WASM32
         run: ./tests/core/wasi.sh
+
+  build_pkg_docs:
+    runs-on: ubuntu-latest
+    name: Package Docs Build
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download LLVM
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22
+          echo "/usr/lib/llvm-22/bin" >> $GITHUB_PATH
+
+      - name: Install libcmark
+        run: sudo apt-get install -y libcmark-dev
+
+      - name: Build Odin
+        run: ./build_odin.sh release
+
+      - name: Odin version
+        run: ./odin version
+
+      - name: Clone pkg.odin-lang.org
+        run: git clone --depth 1 https://github.com/odin-lang/pkg.odin-lang.org.git "$RUNNER_TEMP/pkg"
+
+      - name: Build the doc tool
+        run: ./odin build "$RUNNER_TEMP/pkg" -debug -out:"$RUNNER_TEMP/odin-html-docs"
+
+      - name: Generate the docs
+        run: bash "$RUNNER_TEMP/pkg/generate.sh" "$RUNNER_TEMP/odin-html-docs" "$RUNNER_TEMP/site"

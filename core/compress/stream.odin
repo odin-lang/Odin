@@ -72,14 +72,14 @@ init_context_from_slice :: proc(data: ^[]byte, output: ^[dynamic]byte = nil) -> 
 }
 
 // Initialize I/O `Context` from `io.Stream`
-init_context_from_stream :: proc(stream: io.Stream, output: ^[dynamic]byte = nil, buffer: []byte = nil, allocator := context.allocator) -> (ctx: Context) {
+init_context_from_stream :: proc(stream: io.Stream, output: ^[dynamic]byte = nil, buffer: []byte = nil, allocator := context.allocator) -> (ctx: Context, err: runtime.Allocator_Error) #optional_allocator_error {
 	ctx.input         = stream
 	ctx.output        = output
 	ctx.backing_allocator = allocator
 	if buffer != nil {
 		ctx.backing = buffer
 	} else {
-		ctx.backing, _    = make([]byte, CONTEXT_WINDOW_SIZE, allocator)
+		ctx.backing       = make([]byte, CONTEXT_WINDOW_SIZE, allocator) or_return
 		ctx.owns_backing  = true
 	}
 	ctx.buffer = ctx.backing[:0]
@@ -110,6 +110,9 @@ refill_window :: proc(z: ^Context, need: int) -> (err: io.Error) #no_bounds_chec
 		return nil
 	}
 	if is_memory_context(z) || need > len(z.backing) - CONTEXT_HISTORY {
+		if !is_memory_context(z) && z.backing == nil {
+			return .Buffer_Full
+		}
 		return .EOF if len(z.window) == 0 else .Short_Buffer
 	}
 
@@ -327,7 +330,7 @@ skip :: proc(z: ^Context, offset: i64) -> (err: io.Error) #no_bounds_check {
 	}
 
 	for remaining > 0 {
-		refill_window(z, int(min(remaining, i64(len(z.backing) - CONTEXT_HISTORY)))) or_return
+		refill_window(z, max(int(min(remaining, i64(len(z.backing) - CONTEXT_HISTORY))), 1)) or_return
 		n := min(i64(len(z.window)), remaining)
 		z.window   = z.window[n:]
 		remaining -= n

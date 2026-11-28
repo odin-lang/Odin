@@ -86,6 +86,7 @@ Type_Info_Struct_Soa_Kind :: enum u8 {
 	Fixed   = 1,
 	Slice   = 2,
 	Dynamic = 3,
+	Fixed_Capacity_Dynamic = 4, // `#soa[dynamic; N]T`, with `soa_len` as the capacity
 }
 
 Type_Info_String_Encoding_Kind :: enum u8 {
@@ -166,15 +167,22 @@ Type_Info_Struct_Flag :: enum u8 {
 	simple      = 4,
 }
 
+Type_Info_Struct_Field_Flags :: distinct bit_set[Type_Info_Struct_Field_Flag; u8]
+Type_Info_Struct_Field_Flag :: enum u8 {
+	Using     = 0,
+	Subtype   = 1,
+	Soa_Split = 2,
+}
+
 Type_Info_Struct :: struct {
 	using header: Type_Info,
 
 	// Slice these with `field_count`
-	types:   [^]^Type_Info `fmt:"v,field_count"`,
-	names:   [^]string     `fmt:"v,field_count"`,
-	offsets: [^]uintptr    `fmt:"v,field_count"`,
-	usings:  [^]bool       `fmt:"v,field_count"`,
-	tags:    [^]string     `fmt:"v,field_count"`,
+	types:       [^]^Type_Info                   `fmt:"v,field_count"`,
+	names:       [^]string                       `fmt:"v,field_count"`,
+	offsets:     [^]uintptr                      `fmt:"v,field_count"`,
+	field_flags: [^]Type_Info_Struct_Field_Flags `fmt:"v,field_count"`,
+	tags:        [^]string                       `fmt:"v,field_count"`,
 
 	field_count: i32,
 

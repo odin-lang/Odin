@@ -288,6 +288,22 @@ map_total_allocation_size_from_value :: #force_inline proc "contextless" (m: $M/
 	return map_total_allocation_size(uintptr(cap(m)), map_info(M))
 }
 
+@(private, require_results)
+map_total_allocation_size_fits :: proc "contextless" (capacity: uintptr, info: ^Map_Info) -> bool {
+	Wide :: u128 when size_of(uintptr) == 8 else u64
+	cells :: proc "contextless" (count: uintptr, info: ^Map_Cell_Info) -> Wide {
+		n       := info.elements_per_cell
+		stride  := info.size_of_cell if n == 1 else info.size_of_type
+		padding := info.size_of_cell - n*stride
+		return Wide(count)*Wide(stride) + Wide(count/n + 1)*Wide(padding) + MAP_CACHE_LINE_SIZE
+	}
+	INFO_HS := intrinsics.type_map_cell_info(Map_Hash)
+
+	size := cells(capacity, info.ks) + cells(capacity, info.vs) + cells(capacity, INFO_HS)
+	size += cells(2, info.ks) + cells(2, info.vs)
+	return size <= Wide(max(int))
+}
+
 
 // The only procedure which needs access to the context is the one which allocates the map.
 @(require_results)
@@ -297,13 +313,16 @@ map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, alloc
 		return
 	}
 
-	if log2_capacity >= 64 {
-		// Overflowed, would be caused by log2_capacity > 64
+	if log2_capacity >= 8*size_of(uintptr) {
+		// Overflowed: `1 << log2_capacity` doesn't fit in a `uintptr`
 		return {}, .Out_Of_Memory
 	}
 
 	new_log2_capacity := max(log2_capacity, MAP_MIN_LOG2_CAPACITY)
 	capacity := uintptr(1) << new_log2_capacity
+	if !map_total_allocation_size_fits(capacity, info) {
+		return {}, .Out_Of_Memory
+	}
 
 	CACHE_MASK :: MAP_CACHE_LINE_SIZE - 1
 
@@ -464,6 +483,9 @@ map_insert_hash_dynamic_with_key :: proc "odin" (#no_alias m: ^Raw_Map, #no_alia
 				intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v_src), size_of_v)
 				hs[pos] = element_hash
 				hs[la_pos] = 0
+				if key == k_src {
+					key, result = k_dst, v_dst
+				}
 
 				pos = (pos + 1) & mask
 				la_pos = (la_pos + 1) & mask
@@ -491,6 +513,9 @@ map_insert_hash_dynamic_with_key :: proc "odin" (#no_alias m: ^Raw_Map, #no_alia
 			intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v_src), size_of_v)
 			hs[pos] = element_hash
 			hs[la_pos] = 0
+			if key == k_src {
+				key, result = k_dst, v_dst
+			}
 		} else {
 			// place saved, save probed
 			if result == 0 {
@@ -506,6 +531,9 @@ map_insert_hash_dynamic_with_key :: proc "odin" (#no_alias m: ^Raw_Map, #no_alia
 			h = hs[la_pos]
 			hs[la_pos] = 0
 			distance = probe_distance - look_ahead
+			if key == k_src {
+				key, result = 0, 0
+			}
 		}
 
 		pos = (pos + 1) & mask

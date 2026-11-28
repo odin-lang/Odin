@@ -112,6 +112,13 @@ wasm_allocator_proc :: proc(a: rawptr, mode: Allocator_Mode, size, alignment: in
 		wasm_allocator_init(a)
 	}
 
+	if size < 0 {
+		#partial switch mode {
+		case .Alloc, .Alloc_Non_Zeroed, .Resize, .Resize_Non_Zeroed:
+			return nil, .Out_Of_Memory
+		}
+	}
+
 	switch mode {
 	case .Alloc:
 		ptr := aligned_alloc(a, uint(alignment), uint(size), loc)
@@ -129,6 +136,10 @@ wasm_allocator_proc :: proc(a: rawptr, mode: Allocator_Mode, size, alignment: in
 		return ([^]byte)(ptr)[:size], nil
 
 	case .Resize:
+		if size == 0 {
+			free(a, old_memory, loc)
+			return nil, nil
+		}
 		ptr := aligned_realloc(a, old_memory, uint(alignment), uint(size), loc)
 		if ptr == nil {
 			return nil, .Out_Of_Memory
@@ -144,6 +155,10 @@ wasm_allocator_proc :: proc(a: rawptr, mode: Allocator_Mode, size, alignment: in
 		return bytes, nil
 
 	case .Resize_Non_Zeroed:
+		if size == 0 {
+			free(a, old_memory, loc)
+			return nil, nil
+		}
 		ptr := aligned_realloc(a, old_memory, uint(alignment), uint(size), loc)
 		if ptr == nil {
 			return nil, .Out_Of_Memory
@@ -476,6 +491,9 @@ claim_more_memory :: proc(a: ^WASM_Allocator, num_bytes: uint) -> bool {
 	PAGE_SIZE :: 64 * 1024
 
 	page_alloc :: proc(page_count: int) -> []byte {
+		if page_count > 1 << 16 {
+			return nil
+		}
 		prev_page_count := intrinsics.wasm_memory_grow(0, uintptr(page_count))
 		if prev_page_count < 0 { return nil }
 
@@ -497,19 +515,23 @@ claim_more_memory :: proc(a: ^WASM_Allocator, num_bytes: uint) -> bool {
 		// If the allocated memory is a direct continuation of the spill from before,
 		// we can just extend the spill.
 		spill_end := uintptr(raw_data(a.spill)) + uintptr(len(a.spill))
-		if spill_end == uintptr(raw_data(allocated)) {
+		if spill_end == uintptr(raw_data(allocated)) && len(a.spill) <= max(int) - len(allocated) {
 			raw_spill := (^Raw_Slice)(&a.spill)
 			raw_spill.len += len(allocated)
 		} else {
 			// Otherwise, we have to "waste" the previous spill.
 			// Now this is probably uncommon, and will only happen if another code path
-			// is also requesting pages.
+			// is also requesting pages, or if the joined spill would not fit in an `int`.
 			a.spill = allocated
 		}
 
 		bytes = raw_data(a.spill)
 		a.spill = a.spill[num_bytes:]
 		return
+	}
+
+	if num_bytes > uint(max(int)) - PAGE_SIZE - a.alignment {
+		return false
 	}
 
 	num_bytes := num_bytes
@@ -586,7 +608,7 @@ allocate_memory :: proc(a: ^WASM_Allocator, alignment: uint, size: uint, loc := 
 		payload_start_ptr_aligned := align_forward(payload_start_ptr, uintptr(alignment))
 		payload_end_ptr := uintptr(region_payload_end_ptr(free_region))
 
-		if payload_start_ptr_aligned + uintptr(size) > payload_end_ptr {
+		if payload_start_ptr_aligned < payload_start_ptr || payload_start_ptr_aligned > payload_end_ptr || uintptr(size) > payload_end_ptr - payload_start_ptr_aligned {
 			return nil
 		}
 
@@ -630,7 +652,9 @@ allocate_memory :: proc(a: ^WASM_Allocator, alignment: uint, size: uint, loc := 
 
 	assert_locked(a)
 	assert(is_power_of_two(alignment))
-	assert(size <= MAX_ALLOC_SIZE, "allocation too big", loc=loc)
+	if size > MAX_ALLOC_SIZE {
+		return nil
+	}
 
 	alignment := alignment
 	alignment  = max(alignment, a.alignment)
@@ -714,11 +738,11 @@ allocate_memory :: proc(a: ^WASM_Allocator, alignment: uint, size: uint, loc := 
 	}
 
 	// We were unable to find a free memory region. Must claim more memory!
-	num_bytes_to_claim := size+size_of(Region)*3
-	if alignment > a.alignment {
-		num_bytes_to_claim += alignment
+	num_bytes_to_claim, overflowed := intrinsics.overflow_add(size, size_of(Region)*3)
+	if alignment > a.alignment && !overflowed {
+		num_bytes_to_claim, overflowed = intrinsics.overflow_add(num_bytes_to_claim, alignment)
 	}
-	success := claim_more_memory(a, num_bytes_to_claim)
+	success := !overflowed && claim_more_memory(a, num_bytes_to_claim)
 	if (success) {
 		// Try allocate again with the newly available memory.
 		return allocate_memory(a, alignment, size)
@@ -801,8 +825,9 @@ aligned_realloc :: proc(a: ^WASM_Allocator, ptr: rawptr, alignment, size: uint, 
 			assert(region_is_free(next_reg))
 			new_next_region_start_ptr := uintptr(region) + uintptr(size)
 			assert(has_alignment(new_next_region_start_ptr, size_of(uint)))
+			room := next_region_end_ptr - uintptr(region)
 			// Next region does not shrink to too small size?
-			if new_next_region_start_ptr + size_of(Region) <= next_region_end_ptr {
+			if uintptr(size) + size_of(Region) <= room {
 				unlink_from_free_list(next_reg)
 				create_free_region(rawptr(new_next_region_start_ptr), uint(next_region_end_ptr - new_next_region_start_ptr))
 				link_to_free_list(a, (^Region)(new_next_region_start_ptr))
@@ -810,7 +835,7 @@ aligned_realloc :: proc(a: ^WASM_Allocator, ptr: rawptr, alignment, size: uint, 
 				return true
 			}
 			// If we remove the next region altogether, allocation is satisfied?
-			if new_next_region_start_ptr <= next_region_end_ptr {
+			if uintptr(size) <= room {
 				unlink_from_free_list(next_reg)
 				create_used_region(region, region.size + next_reg.size)
 				return true

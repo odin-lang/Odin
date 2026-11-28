@@ -117,6 +117,9 @@ writer_init :: proc(dw: ^Writer, w: io.Writer, format: Format, level := Deflate_
 	dw.allocator = allocator
 	dw.options   = options
 	defer dw.err = err
+	defer if err != nil {
+		writer_destroy(dw)
+	}
 
 	if format > .Raw64 || options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
 		return General_Error.Incompatible_Options

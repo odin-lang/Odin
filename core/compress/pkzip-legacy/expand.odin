@@ -21,8 +21,7 @@ expand_from_context :: proc(z: ^compress.Context, factor: int, expected_output_s
 		return nil
 	}
 
-	start := len(z.output)
-	defer z.bytes_written = i64(len(z.output) - start)
+	defer z.bytes_written = i64(len(z.output))
 
 	p: Output_Progress
 	progress_begin(&p, z, expected, options)
@@ -40,17 +39,14 @@ expand_from_context :: proc(z: ^compress.Context, factor: int, expected_output_s
 	length := 0
 
 	b := Bits{z.code_buffer, z.num_bits}
-	defer {
-		z.code_buffer = b.buffer
-		z.num_bits    = b.count
-	}
+	defer bits_hand_back(z, &b)
 
 	o := out_load(z)
 	defer out_store(z, &o)
 
-	for o.at - start < expected {
-		if o.at - start >= p.mark {
-			progress_report(&p, z, o.at - start, b.count) or_return
+	for o.at < expected {
+		if o.at >= p.mark {
+			progress_report(&p, z, o.at, b.count) or_return
 		}
 		symbol, available := expand_symbol_bits(z, &p.pulled, &b, &e, last) or_return
 		if !available {
@@ -62,11 +58,11 @@ expand_from_context :: proc(z: ^compress.Context, factor: int, expected_output_s
 			if symbol == REDUCE_DLE {
 				state = .DLE
 			} else {
-				out_literal(z, &o, start, expected, u8(symbol)) or_return
+				out_literal(z, &o, expected, u8(symbol)) or_return
 			}
 		case .DLE:
 			if symbol == 0 {
-				out_literal(z, &o, start, expected, REDUCE_DLE) or_return
+				out_literal(z, &o, expected, REDUCE_DLE) or_return
 				state = .Literal
 			} else {
 				v      = symbol
@@ -78,17 +74,17 @@ expand_from_context :: proc(z: ^compress.Context, factor: int, expected_output_s
 			state   = .Distance
 		case .Distance:
 			distance := (v >> length_bits & distance_mask) << 8 + symbol + 1
-			out_match(z, &o, start, expected, distance, length + REDUCE_MIN_MATCH) or_return
+			out_match(z, &o, expected, distance, length + REDUCE_MIN_MATCH) or_return
 			state = .Literal
 		}
 		last = symbol
 	}
 
-	if o.at - start != expected {
+	if o.at != expected {
 		return General_Error.Stream_Too_Short
 	}
-	if o.at - start >= p.mark {
-		return progress_report(&p, z, o.at - start, b.count)
+	if o.at >= p.mark {
+		return progress_report(&p, z, o.at, b.count)
 	}
 	return nil
 }

@@ -196,7 +196,11 @@ make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (socket: UDP
 listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: TCP_Socket, err: Network_Error) {
 	assert(backlog > 0 && backlog < int(max(i32)))
 
-	return _listen_tcp(interface_endpoint, backlog)
+	socket, err = _listen_tcp(interface_endpoint, backlog)
+	if err != nil {
+		return {}, err
+	}
+	return
 }
 
 /*

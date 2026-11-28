@@ -95,10 +95,11 @@ _read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
 }
 
 _read_directory_iterator_destroy :: proc(it: ^Read_Directory_Iterator) {
-	if it.impl.dir == nil {
-		return
+	if it.impl.dir != nil {
+		posix.closedir(it.impl.dir)
+		it.impl.dir = nil
 	}
 
-	posix.closedir(it.impl.dir)
 	delete(it.impl.fullpath)
+	it.impl.fullpath = nil
 }

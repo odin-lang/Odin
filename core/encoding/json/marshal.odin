@@ -172,7 +172,7 @@ marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocato
 
 marshal_to_builder :: proc(b: ^strings.Builder, v: any, opt: Marshal_Options = {}) -> Marshal_Error {
 	err := marshal_to_writer(strings.to_writer(b), v, opt)
-	if err == io.Error.EOF {
+	if err == io.Error.Short_Write {
 		return runtime.Allocator_Error.Out_Of_Memory
 	}
 	return err
@@ -521,7 +521,7 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 
 				json_name, extra := json_name_from_tag_value(reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "json"))
 
-				if json_name == "-" || (json_name == "" && name == "_" && !info.usings[i]) {
+				if json_name == "-" || (json_name == "" && name == "_" && .Using not_in info.field_flags[i]) {
 					continue
 				}
 
@@ -542,7 +542,7 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 
 				// Marshal the fields of 'using _: T' fields directly into the parent struct
 				_, is_struct := runtime.type_info_base(info.types[i]).variant.(^runtime.Type_Info_Struct)
-				if json_name == "" && is_struct && info.usings[i] && name == "_" {
+				if json_name == "" && is_struct && .Using in info.field_flags[i] && name == "_" {
 					marshal_struct_fields(w, the_value, opt, first_iteration) or_return
 					continue
 				}

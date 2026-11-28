@@ -760,7 +760,7 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 			internal_copy(remainder, numerator) or_return
 		}
 		if quotient != nil {
-			internal_zero(quotient)
+			internal_zero(quotient) or_return
 		}
 		return nil
 	}
@@ -1525,8 +1525,11 @@ internal_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -
 	*/
 	if a.used == 1 { return internal_log(a.digit[0], DIGIT(base)) }
 
-	return _private_int_log(a, base)
-
+	res, err = _private_int_log(a, base)
+	if err != nil {
+		return -1, err
+	}
+	return
 }
 
 /*
@@ -2204,12 +2207,16 @@ internal_int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator
 		/*
 			`[dynamic]DIGIT` already knows what allocator was used for it, so resize will do the right thing.
 		*/
-		resize(&a.digit, needed)
+		if resize_err := resize(&a.digit, needed); resize_err != nil {
+			return cast(Error)resize_err
+		}
 	} else if cap > needed {
 		/*
 			Same applies to builtin.shrink here as resize above
 		*/
-		builtin.shrink(&a.digit, needed)
+		if _, shrink_err := builtin.shrink(&a.digit, needed); shrink_err != nil {
+			return cast(Error)shrink_err
+		}
 	}
 	/*
 		Let's see if the allocation/resize worked as expected.

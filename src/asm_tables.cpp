@@ -76,6 +76,17 @@ struct AsmOperandConstraint {
 	i32 width_operand; // ShiftCount
 };
 
+// NOTE(Jeroen): On riscv64, glibc and musl define these as plain integer macros, which break the REG_* table enums.
+// On x86 they're enum constants with self-referencing macros, which the struct-scoped enums shadow harmlessly.
+#undef REG_PC
+#undef REG_RA
+#undef REG_SP
+#undef REG_TP
+#undef REG_S0
+#undef REG_S1
+#undef REG_A0
+#undef REG_S2
+
 #include "asm_tables_amd64.cpp"
 #include "asm_tables_riscv.cpp"
 #include "asm_tables_arm64.cpp"

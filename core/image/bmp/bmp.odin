@@ -420,7 +420,7 @@ decode_rgb :: proc(ctx: ^compress.Context, img: ^Image, info: image.BMP_Header, 
 		skip_space(ctx, pixel_offset)
 
 		// TODO(Jeroen): if in memory, don't bother with `read_buf`
-		data := make([]byte, (img.width + 7) / 8, allocator)
+		data := make([]byte, (img.width + 7) / 8, allocator) or_return
 		defer delete(data, allocator)
 
 		for y in 0..<img.height {
@@ -439,7 +439,7 @@ decode_rgb :: proc(ctx: ^compress.Context, img: ^Image, info: image.BMP_Header, 
 		pixel_offset -= int(4 * colors_used)
 		skip_space(ctx, pixel_offset)
 
-		data := make([]byte, (img.width + 3) / 4, allocator)
+		data := make([]byte, (img.width + 3) / 4, allocator) or_return
 		defer delete(data, allocator)
 
 		for y in 0..<img.height {
@@ -466,7 +466,7 @@ decode_rgb :: proc(ctx: ^compress.Context, img: ^Image, info: image.BMP_Header, 
 		}
 		skip_space(ctx, pixel_offset)
 
-		data := make([]byte, (img.width + 1) / 2, allocator)
+		data := make([]byte, (img.width + 1) / 2, allocator) or_return
 		defer delete(data, allocator)
 
 		for y in 0..<img.height {
@@ -492,7 +492,7 @@ decode_rgb :: proc(ctx: ^compress.Context, img: ^Image, info: image.BMP_Header, 
 		}
 		skip_space(ctx, pixel_offset)
 
-		data := make([]byte, align4(img.width), allocator)
+		data := make([]byte, align4(img.width), allocator) or_return
 		defer delete(data, allocator)
 
 		for y in 0..<img.height {
@@ -508,7 +508,7 @@ decode_rgb :: proc(ctx: ^compress.Context, img: ^Image, info: image.BMP_Header, 
 		pixel_offset -= read
 		skip_space(ctx, pixel_offset)
 
-		data := make([]byte, align4(img.width * 2), allocator)
+		data := make([]byte, align4(img.width * 2), allocator) or_return
 		defer delete(data, allocator)
 
 		for y in 0..<img.height {
@@ -527,7 +527,7 @@ decode_rgb :: proc(ctx: ^compress.Context, img: ^Image, info: image.BMP_Header, 
 		// Eat useless palette and other padding
 		skip_space(ctx, pixel_offset)
 
-		data := make([]byte, align4(img.width * 3), allocator)
+		data := make([]byte, align4(img.width * 3), allocator) or_return
 		defer delete(data, allocator)
 
 		for y in 0..<img.height {
@@ -544,7 +544,7 @@ decode_rgb :: proc(ctx: ^compress.Context, img: ^Image, info: image.BMP_Header, 
 		pixel_offset -= read
 		skip_space(ctx, pixel_offset)
 
-		data := make([]byte, img.width * size_of(RGBA_Pixel), allocator)
+		data := make([]byte, img.width * size_of(RGBA_Pixel), allocator) or_return
 		defer delete(data, allocator)
 
 		for y in 0..<img.height {

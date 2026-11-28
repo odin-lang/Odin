@@ -765,20 +765,29 @@ gb_internal String16 string_to_string16(gbAllocator a, String s) {
 	}
 
 	len = convert_multibyte_to_widechar(cast(char *)s.text, cast(int)s.len, nullptr, 0);
-	if (len == 0) {
+	if (len <= 0) {
 		return make_string16(nullptr, 0);
 	}
 
 	text = gb_alloc_array(a, u16, len+1);
 
 	len1 = convert_multibyte_to_widechar(cast(char *)s.text, cast(int)s.len, cast(wchar_t *)text, cast(int)len);
-	if (len1 == 0) {
+	if (len1 <= 0) {
 		gb_free(a, text);
 		return make_string16(nullptr, 0);
 	}
 	text[len] = 0;
 	return make_string16(text, len);
 }
+
+#if defined(GB_SYSTEM_WINDOWS)
+gb_internal String16 string_to_win32_path(gbAllocator a, String s) {
+	String16 s16 = string_to_string16(a, s);
+	isize len = s16.len;
+	wchar_t *w = gb__win32_long_path(a, cast(wchar_t *)s16.text, &len);
+	return make_string16(cast(u16 *)w, len);
+}
+#endif
 
 
 gb_internal String string16_to_string(gbAllocator a, String16 s) {
@@ -790,7 +799,7 @@ gb_internal String string16_to_string(gbAllocator a, String16 s) {
 	}
 
 	len = convert_widechar_to_multibyte(cast(wchar_t *)s.text, cast(int)s.len, nullptr, 0);
-	if (len == 0) {
+	if (len <= 0) {
 		return make_string(nullptr, 0);
 	}
 	len += 1; // NOTE(bill): It needs an extra 1 for some reason
@@ -798,7 +807,7 @@ gb_internal String string16_to_string(gbAllocator a, String16 s) {
 	text = gb_alloc_array(a, u8, len+1);
 
 	len1 = convert_widechar_to_multibyte(cast(wchar_t *)s.text, cast(int)s.len, cast(char *)text, cast(int)len);
-	if (len1 == 0) {
+	if (len1 <= 0) {
 		gb_free(a, text);
 		return make_string(nullptr, 0);
 	}
@@ -820,11 +829,6 @@ gb_internal String temporary_directory(gbAllocator allocator) {
 	u16 *b = gb_alloc_array(heap_allocator(), u16, len+1);
 	defer (gb_free(heap_allocator(), b));
 	n = GetTempPathW(len, cast(wchar_t *)b);
-	if (n == 3 && b[1] == ':' && b[2] == '\\') {
-
-	} else if (n > 0 && b[n-1] == '\\') {
-		n -= 1;
-	}
 	b[n] = 0;
 	String16 s = make_string16(b, n);
 	return string16_to_string(allocator, s);

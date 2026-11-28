@@ -230,6 +230,8 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_lanes_reverse,
 	BuiltinProc_simd_lanes_rotate_left,
 	BuiltinProc_simd_lanes_rotate_right,
+	BuiltinProc_simd_lanes_shift_left,
+	BuiltinProc_simd_lanes_shift_right,
 
 	BuiltinProc_simd_gather,
 	BuiltinProc_simd_scatter,
@@ -370,6 +372,8 @@ BuiltinProc__type_simple_boolean_end,
 	BuiltinProc_type_field_index_of,
 
 	BuiltinProc_type_fixed_capacity_dynamic_array_len_offset,
+
+	BuiltinProc_type_soa_field_sizes,
 
 	BuiltinProc_type_bit_set_backing_type,
 
@@ -647,6 +651,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_lanes_reverse"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_lanes_rotate_left"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_lanes_rotate_right"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_lanes_shift_left"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_lanes_shift_right"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_gather"),       3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_scatter"),      3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
@@ -780,6 +786,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_field_index_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_fixed_capacity_dynamic_array_len_offset"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("type_soa_field_sizes"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_bit_set_backing_type"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 

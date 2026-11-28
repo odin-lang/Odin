@@ -77,6 +77,7 @@ _read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
 	// NOTE: Allow calling `init` to target a new directory with the same iterator.
 	if it.impl.buf != nil {
 		buf = slice.into_dynamic(it.impl.buf)
+		it.impl.buf = nil
 	}
 	buf.allocator = file_allocator()
 
@@ -101,7 +102,6 @@ _read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
 
 		assert(int(n) == len(buf))
 	}
-	it.impl.buf = buf[:]
 
 	// NOTE: Allow calling `init` to target a new directory with the same iterator.
 	it.impl.fullpath.allocator = file_allocator()
@@ -114,6 +114,7 @@ _read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
 	append(&it.impl.fullpath, impl.name)
 	append(&it.impl.fullpath, "/")
 
+	it.impl.buf = buf[:]
 	return
 }
 

@@ -524,7 +524,8 @@ gb_internal i64 lb_llvm_natural_alignof(LLVMTypeRef type) {
 			unsigned field_count = LLVMCountStructElementTypes(type);
 			i64 max_align = 1;
 			for (unsigned i = 0; i < field_count; i++) {
-				max_align = gb_max(max_align, lb_llvm_natural_alignof(LLVMStructGetTypeAtIndex(type, i)));
+				i64 field_align = lb_llvm_natural_alignof(LLVMStructGetTypeAtIndex(type, i));
+				max_align = gb_max(max_align, field_align);
 			}
 			return max_align;
 		}
@@ -650,7 +651,8 @@ gb_internal i64 lb_abi_required_alignment(Type *t) {
 			i64 align = gb_max(t->Struct.custom_align, t->Struct.custom_min_field_align);
 			for (Entity *f : t->Struct.fields) {
 				if (f->kind == Entity_Variable) {
-					align = gb_max(align, lb_abi_required_alignment(f->type));
+					i64 field_align = lb_abi_required_alignment(f->type);
+					align = gb_max(align, field_align);
 				}
 			}
 			return align;
@@ -659,7 +661,8 @@ gb_internal i64 lb_abi_required_alignment(Type *t) {
 		{
 			i64 align = t->Union.custom_align;
 			for (Type *variant : t->Union.variants) {
-				align = gb_max(align, lb_abi_required_alignment(variant));
+				i64 variant_align = lb_abi_required_alignment(variant);
+				align = gb_max(align, variant_align);
 			}
 			return align;
 		}

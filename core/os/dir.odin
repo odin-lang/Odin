@@ -26,9 +26,9 @@ read_directory :: proc(f: ^File, n: int, allocator: runtime.Allocator) -> (files
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
 	it := read_directory_iterator_create(f)
-	defer _read_directory_iterator_destroy(&it)
+	defer read_directory_iterator_destroy(&it)
 
-	dfi := make([dynamic]File_Info, 0, size, temp_allocator)
+	dfi := make([dynamic]File_Info, 0, size, temp_allocator) or_return
 	defer if err != nil {
 		for fi in dfi {
 			file_info_delete(fi, allocator)
@@ -42,7 +42,12 @@ read_directory :: proc(f: ^File, n: int, allocator: runtime.Allocator) -> (files
 
 		_ = read_directory_iterator_error(&it) or_break
 
-		append(&dfi, file_info_clone(fi, allocator) or_return)
+		cloned := file_info_clone(fi, allocator) or_return
+		if _, append_err := append(&dfi, cloned); append_err != nil {
+			file_info_delete(cloned, allocator)
+			err = append_err
+			return
+		}
 	}
 
 	_ = read_directory_iterator_error(&it) or_return

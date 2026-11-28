@@ -8,7 +8,7 @@ crc32 :: proc "contextless" (data: []byte, seed := u32(0)) -> u32 #no_bounds_che
 
 	if length >= CRC32_HW_MIN && crc32_hw_available() {
 		consumed: int
-		crc, consumed = crc32_hw(crc, buffer, length)
+		crc, consumed = crc32_hw(crc, nil, buffer, length, false)
 		buffer = buffer[consumed:]
 		length -= consumed
 	}
@@ -72,6 +72,25 @@ crc32 :: proc "contextless" (data: []byte, seed := u32(0)) -> u32 #no_bounds_che
 
 
 	return ~crc
+}
+
+// Like the `copy` built-in, but also returns the CRC-32 of the copied bytes.
+// Where the CPU allows, each block is checksummed on its way to `dst`, so `src` is read once instead of twice.
+crc32_copy :: proc "contextless" (dst, src: []byte, seed := u32(0)) -> u32 {
+	n := min(len(dst), len(src))
+	d, s := uintptr(raw_data(dst)), uintptr(raw_data(src))
+	if d < s + uintptr(n) && s < d + uintptr(n) {
+		crc := crc32(src[:n], seed)
+		copy(dst, src)
+		return crc
+	}
+
+	crc, p := ~seed, 0
+	if n >= CRC32_HW_MIN && crc32_hw_available() {
+		crc, p = crc32_hw(crc, raw_data(dst), raw_data(src), n, true)
+	}
+	copy(dst[p:n], src[p:n])
+	return crc32(src[p:n], ~crc)
 }
 
 crc32_combine :: proc "contextless" (crc1, crc2: u32, length2: int) -> u32 {

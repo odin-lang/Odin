@@ -8,7 +8,10 @@ import "core:odin/tokenizer"
 _ :: intrinsics
 
 new_from_positions :: proc($T: typeid, pos, end: tokenizer.Pos) -> ^T {
-	n, _ := mem.new(T)
+	n, err := mem.new(T)
+	if err != nil {
+		return nil
+	}
 	n.pos = pos
 	n.end = end
 	n.derived = n
@@ -73,10 +76,23 @@ clone_decl :: proc(node: ^Decl) -> ^Decl {
 	return cast(^Decl)clone_node(node)
 }
 clone_node :: proc(node: ^Node) -> ^Node {
-	if node == nil {
-		return nil
+	root: ^Node
+	slot := &root
+	node := node
+	for node != nil {
+		res, next := clone_one(node)
+		slot^ = res
+		if res == nil || next == nil {
+			break
+		}
+		node = next^
+		slot = next
 	}
+	return root
+}
 
+@(private)
+clone_one :: proc(node: ^Node) -> (res: ^Node, next: ^^Node) {
 	size  := size_of(Node)
 	align := align_of(Node)
 	ti := reflect.union_variant_type_info(node.derived)
@@ -91,10 +107,10 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		panic("Cannot clone this node type")
 	}
 
-	res := cast(^Node)(mem.alloc(size, align) or_else nil)
+	res = cast(^Node)(mem.alloc(size, align) or_else nil)
 	if res == nil {
 		// allocation failure
-		return nil
+		return
 	}
 	src: rawptr = node
 	if node.derived != nil {
@@ -126,48 +142,58 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		case ^Basic_Lit:
 		case ^Basic_Directive:
 		case ^Comment_Group:
+			list := make([]tokenizer.Token, len(r.list))
+			copy(list, r.list)
+			r.list = list
 
 		case ^Ellipsis:
 			r.expr = clone(r.expr)
 		case ^Proc_Lit:
 			r.type = auto_cast clone(r.type)
 			r.body = clone(r.body)
+			r.where_clauses = clone(r.where_clauses)
 		case ^Comp_Lit:
 			r.type  = clone(r.type)
 			r.elems = clone(r.elems)
+			r.tag   = clone(r.tag)
 
 		case ^Tag_Expr:
 			r.expr = clone(r.expr)
 		case ^Unary_Expr:
 			r.expr = clone(r.expr)
 		case ^Binary_Expr:
-			r.left  = clone(r.left)
+			next = (^^Node)(&r.left)
 			r.right = clone(r.right)
 		case ^Paren_Expr:
 			r.expr = clone(r.expr)
 		case ^Selector_Expr:
-			r.expr = clone(r.expr)
+			next = (^^Node)(&r.expr)
 			r.field = auto_cast clone(r.field)
 		case ^Implicit_Selector_Expr:
 			r.field = auto_cast clone(r.field)
 		case ^Selector_Call_Expr:
-			r.expr = clone(r.expr)
+			shared := r.call != nil && r.expr == unparen_expr(r.call.expr)
 			r.call = auto_cast clone(r.call)
+			if shared {
+				r.expr = unparen_expr(r.call.expr)
+			} else {
+				r.expr = clone(r.expr)
+			}
 		case ^Index_Expr:
-			r.expr = clone(r.expr)
+			next = (^^Node)(&r.expr)
 			r.index = clone(r.index)
 		case ^Matrix_Index_Expr:
-			r.expr         = clone(r.expr)
+			next = (^^Node)(&r.expr)
 			r.row_index    = clone(r.row_index)
 			r.column_index = clone(r.column_index)
 		case ^Deref_Expr:
-			r.expr = clone(r.expr)
+			next = (^^Node)(&r.expr)
 		case ^Slice_Expr:
-			r.expr = clone(r.expr)
+			next = (^^Node)(&r.expr)
 			r.low  = clone(r.low)
 			r.high = clone(r.high)
 		case ^Call_Expr:
-			r.expr = clone(r.expr)
+			next = (^^Node)(&r.expr)
 			r.args = clone(r.args)
 		case ^Field_Value:
 			r.field = clone(r.field)
@@ -184,12 +210,12 @@ clone_node :: proc(node: ^Node) -> ^Node {
 			r.x    = clone(r.x)
 			r.y    = clone(r.y)
 		case ^Or_Return_Expr:
-			r.expr = clone(r.expr)
+			next = (^^Node)(&r.expr)
 		case ^Or_Branch_Expr:
-			r.expr  = clone(r.expr)
+			next = (^^Node)(&r.expr)
 			r.label = clone(r.label)
 		case ^Type_Assertion:
-			r.expr = clone(r.expr)
+			next = (^^Node)(&r.expr)
 			r.type = clone(r.type)
 		case ^Type_Cast:
 			r.type = clone(r.type)
@@ -270,6 +296,7 @@ clone_node :: proc(node: ^Node) -> ^Node {
 			r.values     = clone(r.values)
 		case ^Package_Decl:
 		case ^Import_Decl:
+			r.attributes = clone(r.attributes)
 		case ^Foreign_Block_Decl:
 			r.attributes      = clone(r.attributes)
 			r.foreign_library = clone(r.foreign_library)
@@ -321,10 +348,12 @@ clone_node :: proc(node: ^Node) -> ^Node {
 			r.align = clone(r.align)
 			r.min_field_align = clone(r.min_field_align)
 			r.max_field_align = clone(r.max_field_align)
+			r.where_clauses = clone(r.where_clauses)
 			r.fields = auto_cast clone(r.fields)
 		case ^Union_Type:
 			r.poly_params = auto_cast clone(r.poly_params)
 			r.align = clone(r.align)
+			r.where_clauses = clone(r.where_clauses)
 			r.variants = clone(r.variants)
 		case ^Enum_Type:
 			r.base_type = clone(r.base_type)
@@ -388,5 +417,5 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		}
 	}
 
-	return res
+	return
 }
