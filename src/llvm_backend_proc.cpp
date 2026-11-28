@@ -1185,9 +1185,25 @@ gb_internal bool lb_copy_escapes(lbProcedure *p, PtrMap<LLVMValueRef, bool> *esc
 	return escaped;
 }
 
+// NOTE(bill): The callee's by-value parameters are `noalias`, and two of them must not be one memory.
+// A call given one local more than once, whole or in parts, keeps the copies of all but one.
+gb_internal bool lb_local_given_again(Array<lbPendingCopy const *> const &dropped, lbPendingCopy const &c) {
+	if (c.call == 0) {
+		return false;
+	}
+	for (lbPendingCopy const *d : dropped) {
+		if (d->call == c.call && d->local == c.local) {
+			return true;
+		}
+	}
+	return false;
+}
+
 gb_internal void lb_drop_unneeded_copies(lbProcedure *p) {
 	PtrMap<LLVMValueRef, bool> escapes = {};
 	lbModule *m = p->module;
+	Array<lbPendingCopy const *> dropped = {};
+	array_init(&dropped, heap_allocator());
 
 	// NOTE(bill): Backwards: the copies made from a parameter's local are dropped before the parameter's own copy.
 	for (isize i = p->pending_copies.count-1; i >= 0; i -= 1) {
@@ -1200,15 +1216,17 @@ gb_internal void lb_drop_unneeded_copies(lbProcedure *p) {
 		}
 		// NOTE(bill): A copy stays when its local escapes, and for the call an `any` of the local is boxed for.
 		// Once every procedure is built, a read-only call may still drop it.
-		if (lb_copy_escapes(p, &escapes, c) || lb_boxed_for_call(p, c.local, c.call)) {
+		if (lb_copy_escapes(p, &escapes, c) || lb_boxed_for_call(p, c.local, c.call) || lb_local_given_again(dropped, c)) {
 			lbKeptCopy kept = {c.temp, c.copy, c.local == c.temp};
 			mutex_lock(&m->kept_copies_mutex);
 			array_add(&m->kept_copies, kept);
 			mutex_unlock(&m->kept_copies_mutex);
 			continue;
 		}
+		array_add(&dropped, &c);
 		lb_drop_copy(c.copy, c.temp);
 	}
+	array_free(&dropped);
 	map_destroy(&escapes);
 
 	array_free(&p->pending_copies);

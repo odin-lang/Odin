@@ -356,3 +356,43 @@ test_by_value_params_result_into_argument :: proc(t: ^testing.T) {
 	testing.expect_value(t, row.cells[0], 15)
 	testing.expect_value(t, row.cells[15], 0)
 }
+
+@(private="file")
+write_variadic :: #force_no_inline proc(args: ..any) {
+	(^Big)(args[0].data).a = 99
+}
+
+// Reads `w` again after writing through an `any` of `v`
+@(private="file")
+write_one_read_other :: #force_no_inline proc(v, w: Big) -> int {
+	write_variadic(v)
+	return w.a
+}
+
+@(private="file")
+forward_twice :: #force_no_inline proc(v: Big) -> int {
+	return write_one_read_other(v, v)
+}
+
+@(private="file")
+Big_Holder :: struct {
+	big: Big,
+	n:   int,
+}
+
+@(private="file")
+write_whole_read_part :: #force_no_inline proc(h: Big_Holder, w: Big) -> int {
+	write_variadic(h.big)
+	return w.a
+}
+
+// The parameters are `noalias`: a call given one local twice, or a local and a part of it, copies all but one.
+// Each parameter keeps its value through a write through another.
+@(test)
+test_by_value_params_same_local_twice :: proc(t: ^testing.T) {
+	x := Big{a = 1}
+	testing.expect_value(t, write_one_read_other(x, x), 1)
+	testing.expect_value(t, forward_twice(x), 1)
+	h := Big_Holder{big = {a = 1}}
+	testing.expect_value(t, write_whole_read_part(h, h.big), 1)
+}
