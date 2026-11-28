@@ -352,6 +352,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		break;
 	}
 
+	lb_add_tune_cpu_to_proc(m, p->value);
 	if (pt->Proc.enable_target_feature.len != 0) {
 		lb_add_target_features_to_proc(m, p->value, pt->Proc.enable_target_feature);
 	}
@@ -594,6 +595,7 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 	LLVMTypeRef func_type = lb_get_procedure_raw_type(m, p->type);
 
 	p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
+	lb_add_tune_cpu_to_proc(m, p->value);
 
 	Type *pt = p->type;
 	LLVMSetFunctionCallConv(p->value, lb_calling_convention_kind(pt->Proc.calling_convention));

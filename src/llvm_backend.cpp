@@ -73,6 +73,17 @@ gb_internal String get_final_microarchitecture() {
 	return microarch;
 }
 
+// NOTE: LLVM tunes for the CPU it targets unless a procedure names another with "tune-cpu".
+// The default `x86-64-v2` tunes for Sandy Bridge, where unaligned 256-bit loads and stores are slow:
+// a procedure enabling AVX with `enable_target_feature` splits every one of them in two.
+// Like clang, tune for `generic` when no -microarch is given.
+gb_internal String get_tune_microarchitecture() {
+	if (build_context.microarch.len == 0 && build_context.metrics.arch == TargetArch_amd64) {
+		return str_lit("generic");
+	}
+	return {};
+}
+
 gb_internal String get_default_features() {
 	BuildContext *bc = &build_context;
 
@@ -3720,6 +3731,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 
 	String llvm_cpu = get_final_microarchitecture();
+	gen->tune_cpu = get_tune_microarchitecture();
 
 	gbString llvm_features = gb_string_make(temporary_allocator(), "");
 	String_Iterator it = {build_context.target_features_string, 0};
@@ -3742,7 +3754,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 	gen->target_features = copy_string(permanent_allocator(), make_string_c(llvm_features));
 
-	debugf("CPU: %.*s, Features: %s\n", LIT(llvm_cpu), llvm_features);	
+	debugf("CPU: %.*s, Tune: %.*s, Features: %s\n", LIT(llvm_cpu), LIT(gen->tune_cpu), llvm_features);
 
 	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));
 
