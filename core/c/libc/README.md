@@ -39,7 +39,7 @@ The following is a mostly-complete projection of the C11 standard library as def
 Not all C standard library functionality can be fully projected due to language differences. These limitations are listed here.
 
 ### `long double`
-As Odin lacks a means to interact with `long double` in it's foreign interface, this projection effort does not bind or define anything requiring `long double` which is permitted by the C standard.
+As Odin lacks a means to interact with `long double` in its foreign interface, this projection effort does not bind or define anything requiring `long double` which is permitted by the C standard.
 
 ### `<complex.h>`
 The special values `_Complex_I`, `_Imaginary_I` and the appropriate definition of `I` cannot be realized with the same type in Odin as it would be in C. The literal `1i` is tempting to use for these definitions but the semantics differ from C and would be confusing to use.
