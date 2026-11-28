@@ -175,6 +175,7 @@ HODGEPODGE_RUN_MIN          :: 32
 HODGEPODGE_DROP_DESCENTS    :: 32
 HODGEPODGE_RADIX_DESCENTS   :: 16
 HODGEPODGE_DROP_NEW_RUN     :: 16
+HODGEPODGE_DROP_ASCENT      :: 8
 HODGEPODGE_DROP_SPIKES      :: 4
 HODGEPODGE_DROP_EARLY       :: 8
 HODGEPODGE_FAR_DESCENTS     :: 48
@@ -1540,16 +1541,13 @@ hodgepodge_drop_merge :: #force_no_inline proc(a, s: []$E, call: $P, $KIND: Sort
 		s[lows] = x
 		lows += 1
 
-		// A new run below the kept items: the next three items each have HODGEPODGE_DROP_NEW_RUN kept items above them.
-		// A few kept outliers, or one low item, do not look like that.
-		if lows % HODGEPODGE_DROP_NEW_RUN == 0 && i+HODGEPODGE_OUT < n {
-			kept := a[base:base+k]
-			if k - hodgepodge_rank(kept, a[i+1], call, KIND, .Not_Greater) >= HODGEPODGE_DROP_NEW_RUN &&
-			   k - hodgepodge_rank(kept, a[i+2], call, KIND, .Not_Greater) >= HODGEPODGE_DROP_NEW_RUN &&
-			   k - hodgepodge_rank(kept, a[i+3], call, KIND, .Not_Greater) >= HODGEPODGE_DROP_NEW_RUN {
-				flush(a, s, base, k, lows, spikes, call)
-				return i + 1
-			}
+		// A new run below the kept items: x and the next HODGEPODGE_DROP_ASCENT items ascend, and the last of them is
+		// below the HODGEPODGE_DROP_NEW_RUN-th last kept item. Low outliers in a row rarely ascend that far.
+		if lows % HODGEPODGE_DROP_NEW_RUN == 0 && k >= HODGEPODGE_DROP_NEW_RUN && i+HODGEPODGE_OUT < n &&
+		   hodgepodge_greater(a[base+k-HODGEPODGE_DROP_NEW_RUN], a[i+HODGEPODGE_DROP_ASCENT], call, KIND) &&
+		   hodgepodge_is_sorted(a[i:][:HODGEPODGE_DROP_ASCENT+1], call, KIND) {
+			flush(a, s, base, k, lows, spikes, call)
+			return i + 1
 		}
 	}
 	if lows+spikes > 0 {
