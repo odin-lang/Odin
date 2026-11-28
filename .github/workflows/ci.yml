@@ -545,3 +545,35 @@ jobs:
 
       - name: Core library tests on WASI WASM32
         run: ./tests/core/wasi.sh
+
+  build_pkg_docs:
+    runs-on: ubuntu-latest
+    name: Package Docs Build
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download LLVM
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22
+          echo "/usr/lib/llvm-22/bin" >> $GITHUB_PATH
+
+      - name: Install libcmark
+        run: sudo apt-get install -y libcmark-dev
+
+      - name: Build Odin
+        run: ./build_odin.sh release
+
+      - name: Odin version
+        run: ./odin version
+
+      - name: Clone pkg.odin-lang.org
+        run: git clone --depth 1 https://github.com/odin-lang/pkg.odin-lang.org.git "$RUNNER_TEMP/pkg"
+
+      - name: Build the doc tool
+        run: ./odin build "$RUNNER_TEMP/pkg" -debug -out:"$RUNNER_TEMP/odin-html-docs"
+
+      - name: Generate the docs
+        run: bash "$RUNNER_TEMP/pkg/generate.sh" "$RUNNER_TEMP/odin-html-docs" "$RUNNER_TEMP/site"

@@ -14,4 +14,5 @@ package all
 @(require) import "vendor:android/openmaxal"
 @(require) import "vendor:android/opensles"
 @(require) import "vendor:android/sync"
+@(require) import "vendor:egl"
 @(require) import "vendor:x11/xlib"

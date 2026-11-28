@@ -71,9 +71,11 @@ package all
 @(require) import "core:crypto/sha2"
 @(require) import "core:crypto/sha3"
 @(require) import "core:crypto/shake"
+@(require) import "core:crypto/siphash"
 @(require) import "core:crypto/sm3"
 @(require) import "core:crypto/tls"
 @(require) import "core:crypto/tuplehash"
+@(require) import "core:crypto/turboshake"
 @(require) import "core:crypto/x25519"
 @(require) import "core:crypto/x448"
 @(require) import "core:crypto/x509"
@@ -153,6 +155,7 @@ package all
 @(require) import "base:runtime"
 @(require) import "base:sanitizer"
 @(require) import "core:simd"
+@(require) import "core:simd/arm"
 @(require) import "core:simd/x86"
 @(require) import "core:slice"
 @(require) import "core:slice/heap"
@@ -180,6 +183,7 @@ package all
 
 @(require) import "core:sys/orca"
 @(require) import "core:sys/info"
+@(require) import "core:sys/llvm"
 
 @(require) import "core:unicode"
 @(require) import "core:unicode/utf8"
