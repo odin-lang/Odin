@@ -453,8 +453,11 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		p->body = nullptr;
 		LLVMSetLinkage(p->value, LLVMExternalLinkage);
 	}
-
-	lb_set_linkage_from_entity_flags(p->module, p->value, entity->flags);
+	// NOTE(bill): A declaration of a procedure another module defines refers to a definition the program has.
+	// It stays external, whatever linkage that definition has.
+	if (!ignore_body || p->is_foreign) {
+		lb_set_linkage_from_entity_flags(p->module, p->value, entity->flags, p->body != nullptr);
+	}
 
 	// With LTO on all platforms, required procedures with external linkage need to be added to
 	// llvm.used to survive linker-level dead code elimination. This is necessary because

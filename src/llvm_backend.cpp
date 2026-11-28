@@ -2445,7 +2445,7 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 	} else if (!is_foreign) {
 		LLVM_SET_INTERNAL_WEAK_LINKAGE(g.value);
 	}
-	lb_set_linkage_from_entity_flags(m, g.value, e->flags);
+	lb_set_linkage_from_entity_flags(m, g.value, e->flags, !is_foreign);
 	LLVMSetAlignment(g.value, alignment);
 
 	if (e->Variable.link_section.len > 0) {

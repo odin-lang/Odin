@@ -5073,13 +5073,15 @@ gb_internal lbAddr lb_add_local_generated_temp(lbProcedure *p, Type *type, i64 m
 }
 
 
-gb_internal void lb_set_linkage_from_entity_flags(lbModule *m, LLVMValueRef value, u64 flags) {
+gb_internal void lb_set_linkage_from_entity_flags(lbModule *m, LLVMValueRef value, u64 flags, bool is_definition) {
 	if (flags & EntityFlag_CustomLinkage_Internal) {
 		LLVMSetLinkage(value, LLVMInternalLinkage);
 	} else if (flags & EntityFlag_CustomLinkage_Strong) {
 		LLVMSetLinkage(value, LLVMExternalLinkage);
 	} else if (flags & EntityFlag_CustomLinkage_Weak) {
-		LLVMSetLinkage(value, LLVMExternalWeakLinkage);
+		// NOTE(bill): `extern_weak` is for a declaration only, a symbol that may be missing.
+		// LLVM has no way to emit a definition with it: some builds made it strong on Mach-O.
+		LLVMSetLinkage(value, is_definition ? LLVMWeakAnyLinkage : LLVMExternalWeakLinkage);
 	} else if (flags & EntityFlag_CustomLinkage_LinkOnce) {
 		LLVMSetLinkage(value, LLVMLinkOnceAnyLinkage);
 	}
