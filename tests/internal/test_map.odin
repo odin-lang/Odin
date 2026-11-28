@@ -81,6 +81,54 @@ map_insert_error :: proc(t: ^testing.T) {
 }
 
 @test
+map_insert_pointers_after_tombstones :: proc(t: ^testing.T) {
+	KEYS    :: 16
+	MAX_LEN :: 6
+
+	lookup :: proc(m: ^map[int]int, key: int) -> (key_ptr, value_ptr: rawptr) {
+		key := key
+		info := runtime.map_info(map[int]int)
+		raw := (^runtime.Raw_Map)(m)
+		return runtime.__dynamic_map_get_key_and_value(raw, info, info.key_hasher(&key, runtime.map_seed(raw^)), &key)
+	}
+
+	rand.reset(t.seed)
+	for _ in 0..<250 {
+		m: map[int]int
+		defer delete(m)
+
+		base := rand.int_max(1 << 30)
+		for _ in 0..<200 {
+			key := base + rand.int_max(KEYS)
+			if rand.int_max(2) == 0 {
+				delete_key(&m, key)
+				continue
+			}
+			if len(m) == MAX_LEN && key not_in m {
+				continue
+			}
+
+			key_ptr, value_ptr: rawptr
+			switch rand.int_max(3) {
+			case 0:
+				key_ptr, value_ptr, _, _ = map_entry(&m, key)
+			case 1:
+				value_ptr = map_insert(&m, key, 0)
+			case 2:
+				_, value_ptr, _ = map_upsert(&m, key, 0)
+			}
+
+			want_key_ptr, want_value_ptr := lookup(&m, key)
+			if value_ptr != want_value_ptr || (key_ptr != nil && key_ptr != want_key_ptr) {
+				testing.expectf(t, false, "Inserting %v returned key %p, value %p; the entry is at %p, %p", key, key_ptr, value_ptr, want_key_ptr, want_value_ptr)
+				return
+			}
+		}
+		testing.expect_value(t, cap(m), 8)
+	}
+}
+
+@test
 map_update_random_key_value :: proc(t: ^testing.T) {
 	seed_incr := u64(0)
 	for entries in ENTRY_COUNTS {
