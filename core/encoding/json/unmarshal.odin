@@ -1010,6 +1010,9 @@ syntax_error :: proc(p: ^Parser, err: Error) -> Error {
 
 @(private)
 unmarshal_expect :: proc(p: ^Parser, kind: Token_Kind, error := Error.Unexpected_Token) -> Error {
+	if kind == .Colon {
+		skip_inserted_comma(p)
+	}
 	if p.tok.validated {
 		unmarshal_expect_token(p, kind)
 		return nil

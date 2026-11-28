@@ -1434,3 +1434,52 @@ marshal_any :: proc(t: ^testing.T) {
 
 	free_all(context.temp_allocator)
 }
+
+// SJSON/MJSON insert a comma at a newline after a value, so a newline between a key and its colon must not break the key.
+@(test)
+mjson_newline_before_colon :: proc(t: ^testing.T) {
+	srcs := []string{
+		"a\n: 1\n",
+		"{a\n: 1}",
+		"\"a\"\n: 1\nb\n:\n2\n",
+		"a\n\n  : 1",
+	}
+	for src in srcs {
+		value, err := json.parse(transmute([]u8)src, spec = .MJSON, allocator = context.temp_allocator)
+		testing.expectf(t, err == nil, "%q: got %v", src, err)
+		if err == nil {
+			obj, is_obj := value.(json.Object)
+			testing.expectf(t, is_obj && len(obj) >= 1, "%q: not an object", src)
+		}
+	}
+
+	// Literal input from the issue, with SJSON.
+	{
+		v, e := json.parse(transmute([]u8)string("{\"r\"\n:5}"), spec = .SJSON, allocator = context.temp_allocator)
+		testing.expectf(t, e == nil, "issue input: got %v", e)
+		if obj, ok := v.(json.Object); ok {
+			integer, is_integer := obj["r"].(json.Integer)
+			testing.expect(t, is_integer, "issue input: r is not an integer")
+			testing.expect_value(t, integer, json.Integer(5))
+		} else {
+			testing.expect(t, false, "issue input: not an object")
+		}
+	}
+
+	// unmarshal takes a separate path for the colon.
+	{
+		Foo :: struct {r: int, name: string}
+		foo: Foo
+		uerr := json.unmarshal(transmute([]u8)string("{r\n: 5, name\n:\n\"x\"}"), &foo, .SJSON, context.temp_allocator)
+		testing.expect_value(t, uerr, nil)
+		testing.expect_value(t, foo.r, 5)
+		testing.expect_value(t, foo.name, "x")
+	}
+
+	// The comma is still a separator between members, so a colon-less key is an error.
+	value, err := json.parse(transmute([]u8)string("a\n1\n"), spec = .MJSON, allocator = context.temp_allocator)
+	_ = value
+	testing.expect_value(t, err, json.Error.Expected_Colon_After_Key)
+
+	free_all(context.temp_allocator)
+}
