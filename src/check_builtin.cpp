@@ -1792,6 +1792,8 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 
 	case BuiltinProc_simd_lanes_rotate_left:
 	case BuiltinProc_simd_lanes_rotate_right:
+	case BuiltinProc_simd_lanes_shift_left:
+	case BuiltinProc_simd_lanes_shift_right:
 		{
 			Operand x = {};
 			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
@@ -1808,6 +1810,17 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				return false;
 			}
 			check_assignment(c, &offset, t_int, builtin_name);
+
+			bool is_shift = id == BuiltinProc_simd_lanes_shift_left || id == BuiltinProc_simd_lanes_shift_right;
+			if (is_shift && offset.mode == Addressing_Constant) {
+				ExactValue value = exact_value_to_integer(offset.value);
+				if (value.kind == ExactValue_Integer && big_int_is_neg(&value.value_integer)) {
+					gbString str = expr_to_string(offset.expr);
+					error(offset.expr, "'%.*s' expected a non-negative offset, got %s", LIT(builtin_name), str);
+					gb_string_free(str);
+					return false;
+				}
+			}
 
 			operand->type = x.type;
 			operand->mode = Addressing_Value;

@@ -397,6 +397,11 @@ simd_lanes_reverse :: proc(a: #simd[N]T) -> #simd[N]T ---
 simd_lanes_rotate_left  :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 simd_lanes_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 
+// the rotates with zeroes shifted in, e.g. shift_left(a, 1) == {a[1], a[2], a[3], 0}
+// offset must not be negative. An offset of N or more gives all zeroes.
+simd_lanes_shift_left  :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
+simd_lanes_shift_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
+
 // return {b[0], a[1], b[2], a[3], ...}
 simd_odd_even :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 

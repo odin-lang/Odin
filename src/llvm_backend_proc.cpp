@@ -3253,6 +3253,48 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			return res;
 		}
 
+	case BuiltinProc_simd_lanes_shift_left:
+	case BuiltinProc_simd_lanes_shift_right:
+		{
+			i64 count = get_array_type_count(arg0.type);
+
+			ExactValue val = exact_value_to_integer(ce->args[1]->tav.value());
+			GB_ASSERT(val.kind == ExactValue_Integer);
+			GB_ASSERT(!big_int_is_neg(&val.value_integer));
+			BigInt bi_count = {};
+			big_int_from_i64(&bi_count, count);
+			bool all_out = big_int_cmp(&val.value_integer, &bi_count) >= 0;
+			big_int_dealloc(&bi_count);
+
+			LLVMValueRef zero = lb_const_nil(m, arg0.type).value;
+			if (all_out) {
+				res.value = zero;
+				return res;
+			}
+			i64 offset = big_int_to_i64(&val.value_integer);
+			if (offset == 0) {
+				res.value = arg0.value;
+				return res;
+			}
+			if (builtin_id == BuiltinProc_simd_lanes_shift_right) {
+				offset = -offset;
+			}
+
+			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+			LLVMTypeRef llvm_u32 = lb_type(m, t_u32);
+			for (i64 i = 0; i < count; i++) {
+				i64 idx = i+offset;
+				if (idx < 0 || idx >= count) {
+					idx = count;
+				}
+				values[i] = LLVMConstInt(llvm_u32, cast(u64)idx, false);
+			}
+			LLVMValueRef mask = LLVMConstVector(values, cast(unsigned)count);
+
+			res.value = LLVMBuildShuffleVector(p->builder, arg0.value, zero, mask, "");
+			return res;
+		}
+
 
 	case BuiltinProc_simd_saturating_add:
 	case BuiltinProc_simd_saturating_sub:
