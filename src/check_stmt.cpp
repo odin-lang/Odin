@@ -3024,7 +3024,12 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 		switch (token.kind) {
 		case Token_break:
 			if ((flags & Stmt_BreakAllowed) == 0 && bs->label == nullptr) {
-				error(token, "'break' only allowed in non-inline loops or 'switch' statements");
+				ERROR_BLOCK();
+				error(token, "'break' without a label is only allowed in non-inline loops or 'switch' statements");
+				String label_name = find_enclosing_label_name(ctx);
+				if (label_name.len != 0) {
+					error_line("\tSuggestion: Did you mean? 'break %.*s'\n", LIT(label_name));
+				}
 			}
 			break;
 		case Token_continue:
