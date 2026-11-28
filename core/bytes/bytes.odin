@@ -141,7 +141,7 @@ equal_fold :: proc(u, v: []byte) -> bool {
 
 		r := unicode.simple_fold(sr)
 		for r != sr && r < tr {
-			r = unicode.simple_fold(sr)
+			r = unicode.simple_fold(r)
 		}
 		if r == tr {
 			continue loop

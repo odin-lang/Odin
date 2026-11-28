@@ -133,6 +133,19 @@ test_split_multi_empty :: proc(t: ^testing.T) {
 
 
 @test
+test_equal_fold_non_ascii_cycle :: proc(t: ^testing.T) {
+	// Runes whose simple-fold cycle has more than two members (K, k, U+212A)
+	// must not make `equal_fold` loop forever.
+	k_upper := transmute([]byte)string("K")
+	k_lower := transmute([]byte)string("k")
+	kelvin  := transmute([]byte)string("K")
+	testing.expect(t, bytes.equal_fold(k_upper, kelvin))
+	testing.expect(t, bytes.equal_fold(kelvin, k_upper))
+	testing.expect(t, bytes.equal_fold(k_lower, kelvin))
+	testing.expect(t, !bytes.equal_fold(kelvin, transmute([]byte)string("j")))
+}
+
+@test
 test_buffer_write_at :: proc(t: ^testing.T) {
 	B :: proc(s: string) -> []byte { return transmute([]byte)s }
 
