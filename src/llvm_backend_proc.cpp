@@ -185,6 +185,64 @@ gb_internal void lb_mem_copy_small_inline(lbProcedure *p, lbValue dst, lbValue s
 	lb_start_block(p, done);
 }
 
+gb_internal void lb_add_procedure_debug_info(lbModule *m, lbProcedure *p, String link_name) {
+	Entity *entity = p->entity;
+	Type *bt = base_type(p->type);
+
+	unsigned line = cast(unsigned)entity->token.pos.line;
+
+	LLVMMetadataRef scope = nullptr;
+	LLVMMetadataRef file = nullptr;
+	LLVMMetadataRef type = nullptr;
+	scope = p->module->debug_compile_unit;
+	type = lb_debug_type_internal_proc(m, bt);
+
+	Ast *ident = entity->identifier.load();
+	if (entity->file != nullptr) {
+		file = lb_get_file_metadata(m, entity->file);
+		scope = file;
+	} else if (ident != nullptr && ident->file_id != 0) {
+		file = lb_get_file_metadata(m, ident->file());
+		scope = file;
+	} else if (entity->scope != nullptr) {
+		file = lb_get_file_metadata(m, entity->scope->file);
+		scope = file;
+	}
+	GB_ASSERT_MSG(file != nullptr, "%.*s", LIT(entity->token.string));
+
+	// LLVMBool is_local_to_unit = !entity->Procedure.is_export;
+	LLVMBool is_local_to_unit = false;
+	LLVMBool is_definition = true;
+	unsigned scope_line = line;
+	u32 flags = LLVMDIFlagStaticMember;
+	LLVMBool is_optimized = build_context.optimization_level > OptimizationLevel_Minimal && entity->Procedure.optimization_mode != ProcedureOptimizationMode_None;
+	if (bt->Proc.diverging) {
+		flags |= LLVMDIFlagNoReturn;
+	}
+
+	// NOTE(bill): exported, foreign and custom link names are what a user knows the procedure by
+	String debug_name = link_name;
+	gbString name = gb_string_make(heap_allocator(), "");
+	defer (gb_string_free(name));
+	DeclInfo *decl = entity->decl_info;
+	if (!entity->Procedure.is_export && !entity->Procedure.is_foreign && (entity->flags & EntityFlag_CustomLinkName) == 0 &&
+	    decl != nullptr && decl->proc_lit != nullptr) {
+		name = lb_debug_append_proc_name(name, decl);
+		debug_name = make_string(cast(u8 *)name, gb_string_length(name));
+	}
+
+	p->debug_info = LLVMDIBuilderCreateFunction(m->debug_builder, scope,
+		cast(char const *)debug_name.text, debug_name.len,
+		cast(char const *)p->name.text, p->name.len,
+		file, line, type,
+		is_local_to_unit, is_definition,
+		scope_line, cast(LLVMDIFlags)flags, is_optimized
+	);
+	GB_ASSERT(p->debug_info != nullptr);
+	LLVMSetSubprogram(p->value, p->debug_info);
+	lb_set_llvm_metadata(m, p, p->debug_info);
+}
+
 gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) {
 	GB_ASSERT(entity != nullptr);
 	GB_ASSERT(entity->kind == Entity_Procedure);
@@ -428,7 +486,8 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 				continue;
 			}
 
-			if (e->flags&EntityFlag_NoAlias) {
+			// NOTE(bill): Slice-like ones are handled by `lb_generate_no_alias_split`
+			if (e->flags&EntityFlag_NoAlias && is_type_internally_pointer_like(e->type)) {
 				lb_add_proc_attribute_at_index(p, offset+parameter_index, "noalias");
 			}
 			if (e->flags&EntityFlag_NoCapture) {
@@ -460,61 +519,8 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		}
 	}
 
-	if (m->debug_builder && p->body != nullptr) { // Debug Information
-		Type *bt = base_type(p->type);
-
-		unsigned line = cast(unsigned)entity->token.pos.line;
-
-		LLVMMetadataRef scope = nullptr;
-		LLVMMetadataRef file = nullptr;
-		LLVMMetadataRef type = nullptr;
-		scope = p->module->debug_compile_unit;
-		type = lb_debug_type_internal_proc(m, bt);
-
-		Ast *ident = entity->identifier.load();
-		if (entity->file != nullptr) {
-			file = lb_get_file_metadata(m, entity->file);
-			scope = file;
-		} else if (ident != nullptr && ident->file_id != 0) {
-			file = lb_get_file_metadata(m, ident->file());
-			scope = file;
-		} else if (entity->scope != nullptr) {
-			file = lb_get_file_metadata(m, entity->scope->file);
-			scope = file;
-		}
-		GB_ASSERT_MSG(file != nullptr, "%.*s", LIT(entity->token.string));
-
-		// LLVMBool is_local_to_unit = !entity->Procedure.is_export;
-		LLVMBool is_local_to_unit = false;
-		LLVMBool is_definition = true;
-		unsigned scope_line = line;
-		u32 flags = LLVMDIFlagStaticMember;
-		LLVMBool is_optimized = build_context.optimization_level > OptimizationLevel_Minimal && entity->Procedure.optimization_mode != ProcedureOptimizationMode_None;
-		if (bt->Proc.diverging) {
-			flags |= LLVMDIFlagNoReturn;
-		}
-
-		// NOTE(bill): exported, foreign and custom link names are what a user knows the procedure by
-		String debug_name = p->name;
-		gbString name = gb_string_make(heap_allocator(), "");
-		defer (gb_string_free(name));
-		DeclInfo *decl = entity->decl_info;
-		if (!entity->Procedure.is_export && !entity->Procedure.is_foreign && (entity->flags & EntityFlag_CustomLinkName) == 0 &&
-		    decl != nullptr && decl->proc_lit != nullptr) {
-			name = lb_debug_append_proc_name(name, decl);
-			debug_name = make_string(cast(u8 *)name, gb_string_length(name));
-		}
-
-		p->debug_info = LLVMDIBuilderCreateFunction(m->debug_builder, scope,
-			cast(char const *)debug_name.text, debug_name.len,
-			cast(char const *)p->name.text, p->name.len,
-			file, line, type,
-			is_local_to_unit, is_definition,
-			scope_line, cast(LLVMDIFlags)flags, is_optimized
-		);
-		GB_ASSERT(p->debug_info != nullptr);
-		LLVMSetSubprogram(p->value, p->debug_info);
-		lb_set_llvm_metadata(m, p, p->debug_info);
+	if (m->debug_builder && p->body != nullptr) {
+		lb_add_procedure_debug_info(m, p, p->name);
 	}
 
 	AstPackage *pkg = entity->pkg;

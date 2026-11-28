@@ -1281,6 +1281,15 @@ struct lbRangeSnapshot {
 	lbBlock *after;
 };
 
+// A write to an element of a `#no_alias` parameter cannot overlap its header
+gb_internal bool lb_range_over_no_alias_param(AstRangeStmt *rs) {
+	Entity *e = entity_of_node(unparen_expr(rs->expr));
+	if (e == nullptr) {
+		return false;
+	}
+	return lb_no_alias_data_pointers(e) != 0;
+}
+
 // Checks the `size` bytes at `ptr` are apart from the header
 gb_internal void lb_range_snapshot_check(lbProcedure *p, lbRangeSnapshot *s, lbValue ptr, lbValue size) {
 	lbValue lo = lb_emit_conv(p, ptr, t_uintptr);
@@ -1341,7 +1350,7 @@ gb_internal void lb_build_range_stmt_snapshot(lbProcedure *p, AstRangeStmt *rs, 
 	lbRangeSnapshot s = {};
 	s.lo = lb_emit_conv(p, inline_elems ? len_ptr : array, t_uintptr);
 	s.hi = lb_emit_arith(p, Token_Add, lb_emit_conv(p, len_ptr, t_uintptr), lb_const_int(m, t_uintptr, type_size_of(t_int)), t_uintptr);
-	if (rs->snapshot->writes_elems && !inline_elems) {
+	if (rs->snapshot->writes_elems && !inline_elems && !lb_range_over_no_alias_param(rs)) {
 		lbValue size = lb_emit_arith(p, Token_Mul, lb_emit_conv(p, len, t_uintptr), lb_const_int(m, t_uintptr, type_size_of(elem_type)), t_uintptr);
 		lb_range_snapshot_check(p, &s, data, size);
 	}
@@ -1509,10 +1518,12 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 	s.lo = lb_emit_conv(p, array.addr, t_uintptr);
 	s.hi = lb_emit_conv(p, lb_emit_struct_ep(p, array.addr, columns), t_uintptr);
 	lbValue len = lb_emit_conv(p, count, t_uintptr);
-	for (i32 i : rs->snapshot->columns) {
-		lbValue column = lb_emit_load(p, lb_emit_struct_ep(p, copy.addr, i));
-		lbValue size   = lb_emit_arith(p, Token_Mul, len, lb_const_int(m, t_uintptr, type_size_of(type_deref(column.type, true))), t_uintptr);
-		lb_range_snapshot_check(p, &s, column, size);
+	if (!lb_range_over_no_alias_param(rs)) {
+		for (i32 i : rs->snapshot->columns) {
+			lbValue column = lb_emit_load(p, lb_emit_struct_ep(p, copy.addr, i));
+			lbValue size   = lb_emit_arith(p, Token_Mul, len, lb_const_int(m, t_uintptr, type_size_of(type_deref(column.type, true))), t_uintptr);
+			lb_range_snapshot_check(p, &s, column, size);
+		}
 	}
 	lb_range_snapshot_begin(p, &s, rs->snapshot);
 

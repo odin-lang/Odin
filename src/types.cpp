@@ -2305,6 +2305,18 @@ gb_internal bool is_type_soa_dynamic_array(Type *t) {
 	return t->kind == Type_Struct && t->Struct.soa_kind == StructSoa_Dynamic;
 }
 
+gb_internal bool is_type_no_alias_data(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	switch (t->kind) {
+	case Type_Basic:        return t->Basic.kind == Basic_string || t->Basic.kind == Basic_string16;
+	case Type_Slice:        return true;
+	case Type_DynamicArray: return true;
+	case Type_Struct:       return t->Struct.soa_kind == StructSoa_Slice || t->Struct.soa_kind == StructSoa_Dynamic;
+	}
+	return false;
+}
+
 gb_internal bool is_type_raw_union(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
