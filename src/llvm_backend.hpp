@@ -15,6 +15,7 @@
 #include <llvm-c/Object.h>
 #include <llvm-c/BitWriter.h>
 #include <llvm-c/DebugInfo.h>
+#include <llvm-c/IRReader.h>
 #include <llvm-c/Transforms/PassBuilder.h>
 #include <llvm-c/Comdat.h>
 
@@ -144,6 +145,13 @@ struct lbDebugTypeFrame {
 	isize lowest_cut; // the lowest frame cut back to while lowering this type
 };
 
+// A by-value copy that a procedure's own escape walk kept
+struct lbKeptCopy {
+	LLVMValueRef temp;
+	LLVMValueRef copy;
+	bool         param; // the callee's copy of its own parameter
+};
+
 struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
@@ -231,6 +239,10 @@ struct lbModule {
 
 	BlockingMutex pad_types_mutex;
 	Array<lbPadType> pad_types;
+
+	BlockingMutex       kept_copies_mutex; // also guards call_temps
+	Array<lbKeptCopy>   kept_copies;
+	Array<LLVMValueRef> call_temps;        // by-value arguments' temporaries, each only live until its call returns
 };
 
 struct lbEntityCorrection {
@@ -388,10 +400,17 @@ struct lbGlobalVariable {
 struct lbPendingCopy {
 	LLVMValueRef temp;
 	LLVMValueRef copy;
-	LLVMValueRef src;
-	LLVMValueRef local; // the copy is kept if this local's address escapes
+	LLVMValueRef local; // the copy is kept if this local's address escapes or if there is no such local
 	unsigned     align;
 	i32          call;  // the call an argument copy is for
+};
+
+// NOTE(bill): What may write some memory between two points of a block.
+// A call, or a store through a pointer, reaches a local only once its address escapes.
+enum lbWrites {
+	lbWrites_None,
+	lbWrites_Through, // a call, or a store through a pointer
+	lbWrites_Direct,  // a store into the memory itself
 };
 
 struct lbProcedure {
@@ -429,11 +448,12 @@ struct lbProcedure {
 	Array<lbBranchBlocks> branch_blocks;
 	Scope *          curr_scope;
 	i32              scope_index;
-	lbBlock *        decl_block;
+	LLVMValueRef     decls_end; // placeholder in entry_block: allocas and argument spills go before it
 	lbBlock *        entry_block;
 	lbBlock *        curr_block;
 	lbTargetList *   target_list;
 	PtrMap<Entity *, lbValue> direct_parameters;
+	PtrSet<LLVMValueRef>      parameter_storage; // nothing writes it once the procedure is entered
 	bool             in_multi_assignment;
 	Array<lbMultiAssignCopySlot> multi_assign_copy_slots;
 	Array<LLVMValueRef> raw_input_parameters;
@@ -472,12 +492,14 @@ struct lbProcedure {
 
 	Type *internal_gen_type; // map_set, map_get, etc.
 
-	// -internal-by-value
+	// by-value parameters
 	PtrMap<LLVMValueRef, u64> uncaptured_arg_masks;
 	Array<lbPendingCopy>      pending_copies;
+	Array<LLVMValueRef>       call_temps; // e.g. a `byval` argument's temporary
 	PtrMap<LLVMValueRef, i32> any_boxes;  // a boxed pointer -> the call it is an argument of
 	Array<i32>                call_stack; // the calls whose arguments are being built
 	i32                       call_count;
+	bool                      boxing_variadic_args; // converting a call's variadic `..any` arguments, which the callee does not keep
 };
 
 
@@ -561,7 +583,8 @@ gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlo
 gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, Ast *node);
 gb_internal lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t);
 gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right);
-gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining = ProcInlining_none, ProcTailing tailing = ProcTailing_none, lbValue *sret_dst = nullptr);
+// `result_dsts` has one entry per result: where the callee writes that result if it returns it through memory, or no value for a temporary
+gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining = ProcInlining_none, ProcTailing tailing = ProcTailing_none, lbValue *result_dsts = nullptr);
 gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t);
 gb_internal lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x);
 
@@ -571,7 +594,7 @@ gb_internal void lb_emit_jump(lbProcedure *p, lbBlock *target_block);
 gb_internal void lb_emit_if(lbProcedure *p, lbValue cond, lbBlock *true_block, lbBlock *false_block);
 gb_internal void lb_start_block(lbProcedure *p, lbBlock *b);
 
-gb_internal lbValue lb_build_call_expr(lbProcedure *p, Ast *expr, lbValue *sret_dst = nullptr);
+gb_internal lbValue lb_build_call_expr(lbProcedure *p, Ast *expr, lbValue *result_dsts = nullptr);
 gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type);
 gb_internal void lb_begin_procedure_body(lbProcedure *p);
 gb_internal void lb_end_procedure_body(lbProcedure *p);
@@ -601,6 +624,9 @@ gb_internal lbValue lb_aligned_address_from_load_or_generate_local(lbProcedure *
 gb_internal lbValue lb_address_from_load(lbProcedure *p, lbValue value);
 gb_internal void    lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt);
 gb_internal lbAddr lb_add_local_generated(lbProcedure *p, Type *type, bool zero_init);
+
+gb_internal lbWrites lb_writes_since_load(lbProcedure *p, LLVMValueRef load);
+gb_internal lbValue  lb_address_of_load_to_read(lbProcedure *p, lbValue value);
 
 gb_internal lbValue lb_emit_runtime_call(lbProcedure *p, char const *c_name, Array<lbValue> const &args);
 
@@ -688,6 +714,7 @@ gb_internal lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type 
 gb_internal bool lb_is_expr_untyped_const(Ast *expr);
 
 gb_internal LLVMValueRef llvm_alloca(lbProcedure *p, LLVMTypeRef llvm_type, isize alignment, char const *name = "");
+gb_internal void lb_position_before_decls_end(lbProcedure *p);
 
 gb_internal void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, unsigned alignment);
 

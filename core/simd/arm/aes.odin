@@ -1,10 +1,15 @@
 #+build arm64,arm32
 package simd_arm
 
+// 32-bit Arm has the AES instructions from Armv8 on.
+// LLVM's `aes` feature does not imply Armv8 there.
+@(private = "file")
+AES_FEATURES :: "aes" when ODIN_ARCH == .arm64 else "v8,aes"
+
 // AES single round encryption.
 //
 // [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vaeseq_u8)
-@(require_results, enable_target_feature = "aes")
+@(require_results, enable_target_feature = AES_FEATURES)
 vaeseq_u8 :: #force_inline proc "c" (data, key: uint8x16_t) -> uint8x16_t {
 	return _vaeseq_u8(data, key)
 }
@@ -12,7 +17,7 @@ vaeseq_u8 :: #force_inline proc "c" (data, key: uint8x16_t) -> uint8x16_t {
 // AES single round decryption.
 //
 // [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vaesdq_u8)
-@(require_results, enable_target_feature = "aes")
+@(require_results, enable_target_feature = AES_FEATURES)
 vaesdq_u8 :: #force_inline proc "c" (data, key: uint8x16_t) -> uint8x16_t {
 	return _vaesdq_u8(data, key)
 }
@@ -20,7 +25,7 @@ vaesdq_u8 :: #force_inline proc "c" (data, key: uint8x16_t) -> uint8x16_t {
 // AES mix columns.
 //
 // [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vaesmcq_u8)
-@(require_results, enable_target_feature = "aes")
+@(require_results, enable_target_feature = AES_FEATURES)
 vaesmcq_u8 :: #force_inline proc "c" (data: uint8x16_t) -> uint8x16_t {
 	return _vaesmcq_u8(data)
 }
@@ -28,7 +33,7 @@ vaesmcq_u8 :: #force_inline proc "c" (data: uint8x16_t) -> uint8x16_t {
 // AES inverse mix columns.
 //
 // [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vaesimcq_u8)
-@(require_results,enable_target_feature = "aes")
+@(require_results,enable_target_feature = AES_FEATURES)
 vaesimcq_u8 :: #force_inline proc "c" (data: uint8x16_t) -> uint8x16_t {
 	return _vaesimcq_u8(data)
 }

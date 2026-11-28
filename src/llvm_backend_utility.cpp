@@ -482,11 +482,17 @@ gb_internal lbValue lb_soa_unzip(lbProcedure *p, AstCallExpr *ce, TypeAndValue c
 	return lb_addr_load(p, res);
 }
 
-gb_internal void lb_emit_try_lhs_rhs(lbProcedure *p, Ast *arg, TypeAndValue const &tv, lbValue *lhs_, lbValue *rhs_) {
+// `result_dsts` is for a call `arg` (see `lb_emit_call`)
+gb_internal void lb_emit_try_lhs_rhs(lbProcedure *p, Ast *arg, TypeAndValue const &tv, lbValue *lhs_, lbValue *rhs_, lbValue *result_dsts = nullptr) {
 	lbValue lhs = {};
 	lbValue rhs = {};
 
-	lbValue value = lb_build_expr(p, arg);
+	lbValue value = {};
+	if (result_dsts != nullptr) {
+		value = lb_build_call_expr(p, arg, result_dsts);
+	} else {
+		value = lb_build_expr(p, arg);
+	}
 	if (is_type_tuple(value.type)) {
 		i32 n = cast(i32)(value.type->Tuple.variables.count-1);
 		if (value.type->Tuple.variables.count == 1) {
@@ -673,10 +679,10 @@ gb_internal lbValue lb_emit_or_else(lbProcedure *p, Ast *arg, Ast *else_expr, Ty
 gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results, TokenPos pos);
 gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, TokenPos pos);
 
-gb_internal lbValue lb_emit_or_return(lbProcedure *p, Ast *arg, TypeAndValue const &tv) {
+gb_internal lbValue lb_emit_or_return(lbProcedure *p, Ast *arg, TypeAndValue const &tv, lbValue *result_dsts = nullptr) {
 	lbValue lhs = {};
 	lbValue rhs = {};
-	lb_emit_try_lhs_rhs(p, arg, tv, &lhs, &rhs);
+	lb_emit_try_lhs_rhs(p, arg, tv, &lhs, &rhs, result_dsts);
 
 	// NOTE(bplu4t2f):
 	//     We must store the debug location before the or_return machinery, so that we can
@@ -1153,11 +1159,14 @@ gb_internal i32 lb_current_call(lbProcedure *p) {
 	return p->call_stack[p->call_stack.count-1];
 }
 
-// NOTE(bill): -internal-by-value: an `any` boxed from a value straight into a call gets its own pointer to the value.
+// NOTE(bill): An `any` boxed from a value straight into a variadic `..any` argument gets its own pointer to the value.
 // Through it, lb_drop_unneeded_copies sees which call the value is reachable from.
+// A variadic argument is `#no_capture`: it and the values it refers to are not kept once the call returns.
+// A polymorphic procedure's variadic argument may be kept, e.g. by `append`, and is not boxed here.
+// Any other `any` of the value may be kept, and lets the value escape.
 gb_internal LLVMValueRef lb_any_data_for_call(lbProcedure *p, lbValue value, LLVMValueRef data) {
 	i32 call = lb_current_call(p);
-	if (call == 0) {
+	if (call == 0 || !p->boxing_variadic_args) {
 		return data;
 	}
 	if (!lb_is_load_from(value.value, data)) {
@@ -1206,6 +1215,15 @@ gb_internal lbValue lb_aligned_address_from_load_or_generate_local(lbProcedure *
 	}
 	return ptr;
 }
+
+// NOTE(bill): An address holding `value` that is only to be read, as lb_address_of_load_to_read gives.
+gb_internal lbValue lb_address_to_read(lbProcedure *p, lbValue value) {
+	if (!p->in_multi_assignment && lb_is_plain_load(p->module, value.value)) {
+		return lb_address_of_load_to_read(p, value);
+	}
+	return lb_address_from_load_or_generate_local(p, value);
+}
+
 gb_internal lbValue lb_address_from_load(lbProcedure *p, lbValue value) {
 	if (LLVMIsALoadInst(value.value)) {
 		lbValue res = {};
@@ -2688,6 +2706,32 @@ gb_internal lbValue lb_handle_objc_ivar_get(lbProcedure *p, Ast *expr) {
 	return lb_handle_objc_ivar_for_objc_object_pointer(p, self);
 }
 
+// NOTE(bill): This is to allow parameters of a C procedure generated to pass its arguments on to an Odin one.
+// Their LLVM parameters cannot be passed on as they are since the two conventions can lower the same value differently.
+// Named (they get a value each from lb_begin_procedure_body) which lb_forwarded_param_value reads back for an ordinary call.
+gb_internal Type *lb_alloc_forwarded_params(Type **types, isize count) {
+	Type *params = alloc_type_tuple_from_field_types(types, count, false, true);
+	for (Entity *e : params->Tuple.variables) {
+		e->token = make_token_ident(str_lit("arg"));
+	}
+	return params;
+}
+
+gb_internal lbValue lb_forwarded_param_value(lbProcedure *p, isize index) {
+	Entity *e = p->type->Proc.params->Tuple.variables[index];
+	return lb_emit_load(p, lb_find_value_from_entity(p->module, e));
+}
+
+// Calls `callee` and returns its result, if any, from `p`, each through its own convention
+gb_internal void lb_emit_forwarding_call(lbProcedure *p, lbValue callee, Array<lbValue> const &args) {
+	lbValue result = lb_emit_call(p, callee, args);
+	if (base_type(callee.type)->Proc.result_count > 0) {
+		lb_build_return_stmt_internal(p, result, {});
+	} else {
+		LLVMBuildRetVoid(p->builder);
+	}
+}
+
 gb_internal void lb_create_objc_block_helper_procs(
 	lbModule *m, LLVMTypeRef block_lit_type, isize capture_field_offset, isize block_id,
 	Slice<lbValue> capture_values, Slice<isize> objc_object_indices,
@@ -2864,7 +2908,7 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 
 	GB_ASSERT(user_proc.result_count <= 1);
 
-	Type *invoker_args_tuple    = alloc_type_tuple_from_field_types(invoker_args.data, invoker_args.count, false, true);
+	Type *invoker_args_tuple    = lb_alloc_forwarded_params(invoker_args.data, invoker_args.count);
 	Type *invoker_results_tuple = nullptr;
 	if (user_proc.result_count > 0) {
 		invoker_results_tuple = alloc_type_tuple_from_field_types(&user_proc.results->Tuple.variables[0]->type, 1, false, true);
@@ -2956,67 +3000,33 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 	/// Invoker body
 	lb_begin_procedure_body(invoker_proc);
 	{
-		// Reserve 2 extra arguments for: Indirect return values and context.
-		auto call_args = array_make<LLVMValueRef>(temporary_allocator(), 0, user_proc.param_count + 2);
-
-		isize block_literal_arg_index = 0;
-
-		lbFunctionType* user_proc_ft = lb_get_function_type(m, user_proc_value.type);
-
-		lbArgKind return_kind = {};
-
 		GB_ASSERT(user_proc.result_count <= 1);
-		if (user_proc.result_count > 0) {
-			return_kind = user_proc_ft->ret.kind;
 
-			if (return_kind == lbArg_Indirect) {
-				// Forward indirect return value
-				array_add(&call_args, invoker_proc->raw_input_parameters[0]);
-				block_literal_arg_index = 1;
-			}
+		LLVMValueRef block_literal = lb_forwarded_param_value(invoker_proc, 0).value;
+
+		auto call_args = array_make<lbValue>(temporary_allocator(), 0, user_proc.param_count);
+
+		// Forward the block's arguments
+		for (isize i = 0; i < block_forward_args; i++) {
+			array_add(&call_args, lb_forwarded_param_value(invoker_proc, i+1));
 		}
-
-		// Forward raw arguments
-		for (isize i = block_literal_arg_index+1; i < invoker_proc->raw_input_parameters.count; i++) {
-			array_add(&call_args, invoker_proc->raw_input_parameters[i]);
-		}
-
-		LLVMValueRef block_literal = invoker_proc->raw_input_parameters[block_literal_arg_index];
 
 		// Copy capture parameters from the block literal
-		isize capture_arg_in_user_proc_start_index = user_proc_ft->args.count - capture_arg_count;
-		if (user_proc.calling_convention == ProcCC_Odin) {
-			capture_arg_in_user_proc_start_index -= 1;
-		}
-
 		for (isize i = 0; i < capture_arg_count; i++) {
-			LLVMValueRef cap_value = LLVMBuildStructGEP2(invoker_proc->builder, block_lit_type, block_literal, unsigned(capture_fields_offset + i), "");
-
-			// Don't emit load if indirect. Pass the pointer as-is
-			isize cap_arg_index_in_user_proc = capture_arg_in_user_proc_start_index + i;
-
-			if (user_proc_ft->args[cap_arg_index_in_user_proc].kind != lbArg_Indirect) {
-				cap_value = OdinLLVMBuildLoad(invoker_proc, lb_type(invoker_proc->module, captured_values[i].type), cap_value);
-			}
-
-			array_add(&call_args, cap_value);
+			lbValue cap_ptr = {};
+			cap_ptr.value = LLVMBuildStructGEP2(invoker_proc->builder, block_lit_type, block_literal, unsigned(capture_fields_offset + i), "");
+			cap_ptr.type  = alloc_type_pointer(captured_values[i].type);
+			array_add(&call_args, lb_emit_load(invoker_proc, cap_ptr));
 		}
 
-		// Push context, if needed
 		if (user_proc.calling_convention == ProcCC_Odin) {
-			LLVMValueRef p_context = LLVMBuildStructGEP2(invoker_proc->builder, block_lit_type, block_literal, 5, "context");
-			array_add(&call_args, p_context);
+			lbValue p_context = {};
+			p_context.value = LLVMBuildStructGEP2(invoker_proc->builder, block_lit_type, block_literal, 5, "context");
+			p_context.type  = t_context_ptr;
+			lb_push_context_onto_stack(invoker_proc, lb_addr(p_context));
 		}
 
-		LLVMTypeRef  fnp     = lb_type_internal_for_procedures_raw(m, user_proc_value.type);
-		LLVMValueRef ret_val = LLVMBuildCall2(invoker_proc->builder, fnp, user_proc_value.value, call_args.data, (unsigned)call_args.count, "");
-
-		if (user_proc.result_count > 0 && return_kind != lbArg_Indirect) {
-			LLVMBuildRet(invoker_proc->builder, ret_val);
-		}
-		else {
-			LLVMBuildRetVoid(invoker_proc->builder);
-		}
+		lb_emit_forwarding_call(invoker_proc, user_proc_value, call_args);
 	}
 	lb_end_procedure_body(invoker_proc);
 

@@ -446,12 +446,8 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 		return false;
 	}
 
-	lbValue lhs_ptr = {};
-	lbValue rhs_ptr = {};
-	lhs_ptr.value = LLVMGetOperand(lhs.value, 0);
-	lhs_ptr.type = alloc_type_pointer(lhs.type);
-	rhs_ptr.value = LLVMGetOperand(rhs.value, 0);
-	rhs_ptr.type = alloc_type_pointer(rhs.type);
+	lbValue lhs_ptr = lb_address_of_load_to_read(p, lhs);
+	lbValue rhs_ptr = lb_address_of_load_to_read(p, rhs);
 
 	LLVMTypeRef vector_type0 = nullptr;
 	LLVMTypeRef vector_type1 = nullptr;
@@ -735,8 +731,8 @@ gb_internal lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lh
 
 		return lb_addr_load(p, res);
 	} else {
-		lbValue x = lb_address_from_load_or_generate_local(p, lhs);
-		lbValue y = lb_address_from_load_or_generate_local(p, rhs);
+		lbValue x = lb_address_to_read(p, lhs);
+		lbValue y = lb_address_to_read(p, rhs);
 
 		lbAddr res = lb_add_local_generated(p, type, false);
 
@@ -824,7 +820,7 @@ gb_internal LLVMValueRef lb_matrix_to_vector(lbProcedure *p, lbValue matrix) {
 	LLVMTypeRef total_matrix_type = LLVMVectorType(elem_type, total_count);
 
 #if 1
-	LLVMValueRef ptr = lb_address_from_load_or_generate_local(p, matrix).value;
+	LLVMValueRef ptr = lb_address_to_read(p, matrix).value;
 	LLVMValueRef matrix_vector_ptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(total_matrix_type, 0), "");
 	LLVMValueRef matrix_vector = OdinLLVMBuildLoadAligned(p, total_matrix_type, matrix_vector_ptr, type_align_of(mt));
 	return matrix_vector;
@@ -1307,7 +1303,7 @@ gb_internal lbValue lb_emit_matrix_mul_vector(lbProcedure *p, lbValue lhs, lbVal
 		}
 
 		if (lb_is_plain_load(p->module, rhs.value)) {
-			LLVMValueRef rhs_ptr = LLVMGetOperand(rhs.value, 0);
+			LLVMValueRef rhs_ptr = lb_address_of_load_to_read(p, rhs).value;
 			LLVMTypeRef vector_type = LLVMVectorType(lb_type(p->module, elem), cast(unsigned)vector_count);
 			// The alignment of what is being loaded, which is the right-hand vector. `type` is the
 			// result, and asking it cannot be right except by coincidence.
@@ -3525,8 +3521,8 @@ gb_internal lbValue lb_emit_c_vararg(lbProcedure *p, lbValue arg, Type *type) {
 gb_internal lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right, Type *type) {
 	GB_ASSERT((is_type_struct(type) || is_type_soa_pointer(type) || is_type_union(type)) && is_type_comparable(type));
 
-	lbValue left_ptr  = lb_address_from_load_or_generate_local(p, left);
-	lbValue right_ptr = lb_address_from_load_or_generate_local(p, right);
+	lbValue left_ptr  = lb_address_to_read(p, left);
+	lbValue right_ptr = lb_address_to_read(p, right);
 	i64 size = type_size_of(type);
 
 	lbValue res = {};
@@ -3681,8 +3677,8 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 
 	if (is_type_matrix(a) && (op_kind == Token_CmpEq || op_kind == Token_NotEq)) {
 		Type *tl = base_type(a);
-		lbValue lhs = lb_address_from_load_or_generate_local(p, left);
-		lbValue rhs = lb_address_from_load_or_generate_local(p, right);
+		lbValue lhs = lb_address_to_read(p, left);
+		lbValue rhs = lb_address_to_read(p, right);
 
 
 		// TODO(bill): Test to see if this is actually faster!!!!
@@ -3701,8 +3697,8 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 			left = lb_emit_transmute(p, left, tl);
 			right = lb_emit_transmute(p, right, tl);
 		}
-		lbValue lhs = lb_address_from_load_or_generate_local(p, left);
-		lbValue rhs = lb_address_from_load_or_generate_local(p, right);
+		lbValue lhs = lb_address_to_read(p, left);
+		lbValue rhs = lb_address_to_read(p, right);
 
 
 		TokenKind cmp_op = Token_And;

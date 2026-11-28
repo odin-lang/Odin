@@ -2560,6 +2560,17 @@ gb_internal bool is_type_any(Type *t) {
 	if (t == nullptr) { return false; }
 	return (t->kind == Type_Basic && t->Basic.kind == Basic_any);
 }
+
+// NOTE(bill): The values a variadic `..any` argument refers to are boxed for the duration of the call.
+// A polymorphic procedure may keep them, e.g. `append` with its `..E` as `..any`.
+gb_internal bool is_proc_variadic_any_call_only(TypeProc *pt) {
+	if (!pt->variadic || pt->c_vararg || pt->is_poly_specialized || pt->variadic_index >= pt->param_count) {
+		return false;
+	}
+	Type *slice = base_type(pt->params->Tuple.variables[pt->variadic_index]->type);
+	return slice->kind == Type_Slice && is_type_any(slice->Slice.elem);
+}
+
 gb_internal bool is_type_typeid(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }

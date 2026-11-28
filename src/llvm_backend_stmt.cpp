@@ -25,11 +25,12 @@ gb_internal GB_COMPARE_PROC(lb_polymorphic_instance_cmp) {
 }
 
 gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgType const *arg);
+gb_internal LLVMValueRef lb_rebuild_from_leaves(lbProcedure *p, LLVMValueRef value, LLVMTypeRef type);
 gb_internal LLVMValueRef lb_split_vector(lbProcedure *p, LLVMValueRef value, LLVMTypeRef type);
+gb_internal isize        lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_values, lbValue src_value);
 
-// NOTE(bill): @RVO Check if a call expression returns by sret with a return type matching dst_type.
-// Returns the callee's function type if eligible for copy elision, nullptr otherwise.
-gb_internal lbFunctionType *lb_call_sret_eligible(lbProcedure *p, Ast *call_expr, Type *dst_type) {
+// NOTE(bill): @RVO The callee's function type when the call returns any result through memory the caller passes, nullptr otherwise.
+gb_internal lbFunctionType *lb_call_result_slots(lbProcedure *p, Ast *call_expr, Type **proc_type_) {
 	GB_ASSERT(call_expr->kind == Ast_CallExpr);
 	Ast *proc_expr = unparen_expr(call_expr->CallExpr.proc);
 	TypeAndValue proc_tv = type_and_value_of_expr(proc_expr);
@@ -56,7 +57,19 @@ gb_internal lbFunctionType *lb_call_sret_eligible(lbProcedure *p, Ast *call_expr
 		return nullptr;
 	}
 	lbFunctionType *callee_ft = lb_get_function_type(p->module, pt);
-	if (callee_ft->ret.kind != lbArg_Indirect) {
+	if (callee_ft->ret.kind != lbArg_Indirect && callee_ft->multiple_return_original_type == nullptr) {
+		return nullptr;
+	}
+	*proc_type_ = pt;
+	return callee_ft;
+}
+
+// NOTE(bill): @RVO Check if a call expression returns by sret with a return type matching dst_type.
+// Returns the callee's function type if eligible for copy elision, nullptr otherwise.
+gb_internal lbFunctionType *lb_call_sret_eligible(lbProcedure *p, Ast *call_expr, Type *dst_type) {
+	Type *pt = nullptr;
+	lbFunctionType *callee_ft = lb_call_result_slots(p, call_expr, &pt);
+	if (callee_ft == nullptr || callee_ft->ret.kind != lbArg_Indirect) {
 		return nullptr;
 	}
 	Type *callee_ret = reduce_tuple_to_single_type(pt->Proc.results);
@@ -64,6 +77,107 @@ gb_internal lbFunctionType *lb_call_sret_eligible(lbProcedure *p, Ast *call_expr
 		return nullptr;
 	}
 	return callee_ft;
+}
+
+// NOTE(bill): Whether result `index` of `result_count` comes back through memory the caller passes.
+// Split results go through pointers, and the last result through the `sret`.
+// Without split results, a tuple comes back whole, in registers or in one `sret`.
+gb_internal bool lb_result_in_memory(lbFunctionType *ft, isize index, isize result_count) {
+	if (result_count > 1 && ft->multiple_return_original_type == nullptr) {
+		return false;
+	}
+	if (index+1 < result_count) {
+		return true;
+	}
+	return ft->ret.kind == lbArg_Indirect;
+}
+
+// NOTE(bill): @RVO for `x := call()`, `a, b := call()`, and `x := call() or_return`.
+// A result the callee returns through memory goes straight into its variable.
+// Nothing else can see the variable yet.
+// Returns false, building nothing, when no result does.
+gb_internal bool lb_build_declaration_rvo(lbProcedure *p, AstValueDecl *vd) {
+	Ast *value = unparen_expr(vd->values[0]);
+	bool or_return = value->kind == Ast_OrReturnExpr;
+	Ast *call = or_return ? unparen_expr(value->OrReturnExpr.expr) : value;
+	if (call->kind != Ast_CallExpr) {
+		return false;
+	}
+
+	Type *pt = nullptr;
+	lbFunctionType *ft = lb_call_result_slots(p, call, &pt);
+	if (ft == nullptr) {
+		return false;
+	}
+	TypeTuple *results = &pt->Proc.results->Tuple;
+	isize result_count = results->variables.count;
+
+	// NOTE(bill): The names take the results in order.
+	// `or_return` takes the last result, and an `#optional_ok` call with one name takes only the first.
+	// With three or more results `or_return` copies the others into a tuple first.
+	// That form is left as it is.
+	isize name_count = vd->names.count;
+	if (or_return) {
+		if (result_count != 2 || name_count != 1) {
+			return false;
+		}
+	} else if (call->CallExpr.optional_ok_one) {
+		if (name_count != 1) {
+			return false;
+		}
+	} else if (name_count != result_count) {
+		return false;
+	}
+
+	// NOTE(bill): An Odin callee writes all of a result before it returns, padding included.
+	// A C one need not write the padding.
+	bool odin_callee = is_calling_convention_odin(ft->calling_convention);
+
+	auto dsts = slice_make<lbValue>(temporary_allocator(), result_count);
+	bool any_dst = false;
+	for_array(i, vd->names) {
+		Ast *name = vd->names[i];
+		if (is_blank_ident(name) || !lb_result_in_memory(ft, i, result_count)) {
+			continue;
+		}
+		Entity *e = entity_of_node(name);
+		if (e == nullptr || !are_types_identical(e->type, results->variables[i]->type)) {
+			continue;
+		}
+		if (e == p->sret_rvo_entity) {
+			dsts[i] = p->return_ptr.addr;
+			lb_add_entity(p->module, e, dsts[i]);
+			lb_add_debug_local_variable(p, dsts[i].value, e->type, e->token);
+		} else {
+			dsts[i] = lb_add_local(p, e->type, e, !odin_callee, odin_callee).addr;
+		}
+		any_dst = true;
+	}
+	if (!any_dst) {
+		return false;
+	}
+
+	lbValue res = {};
+	if (or_return) {
+		res = lb_emit_or_return(p, call, type_and_value_of_expr(value), dsts.data);
+	} else {
+		res = lb_build_call_expr(p, call, dsts.data);
+	}
+
+	auto inits = array_make<lbValue>(temporary_allocator(), 0, name_count);
+	lb_append_tuple_values(p, &inits, res);
+	GB_ASSERT(inits.count == name_count);
+	for_array(i, vd->names) {
+		Ast *name = vd->names[i];
+		if (is_blank_ident(name) || dsts[i].value != nullptr) {
+			continue;
+		}
+		Entity *e = entity_of_node(name);
+		bool force_no_init = lb_emit_store_writes_every_byte(p, e->type, inits[i]);
+		lbAddr lval = lb_add_local(p, e->type, e, false, force_no_init);
+		lb_addr_store(p, lval, inits[i]);
+	}
+	return true;
 }
 
 // NOTE(bill): @RVO `sret` scan for `x := call(); ...; return x` pattern.
@@ -2800,8 +2914,8 @@ gb_internal bool lb_load_reads_alloca_after(lbProcedure *p, LLVMValueRef load, L
 	if (!LLVMIsAAllocaInst(base)) {
 		return false;
 	}
-	LLVMValueRef it = decl_marker != nullptr ? LLVMGetNextInstruction(decl_marker) : LLVMGetFirstInstruction(p->decl_block->block);
-	for (; it != nullptr; it = LLVMGetNextInstruction(it)) {
+	LLVMValueRef it = decl_marker != nullptr ? LLVMGetNextInstruction(decl_marker) : LLVMGetFirstInstruction(p->entry_block->block);
+	for (; it != p->decls_end; it = LLVMGetNextInstruction(it)) {
 		if (it == base) {
 			return true;
 		}
@@ -2895,7 +3009,7 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 		return;
 	}
 
-	LLVMValueRef decl_marker = LLVMGetLastInstruction(p->decl_block->block);
+	LLVMValueRef decl_marker = LLVMGetPreviousInstruction(p->decls_end);
 
 	auto inits = array_make<lbValue>(permanent_allocator(), 0, lvals.count);
 
@@ -2964,6 +3078,56 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 	p->in_multi_assignment = prev_in_assignment;
 }
 
+gb_internal bool lb_has_wide_vector_field(LLVMTypeRef type) {
+	unsigned n = LLVMCountStructElementTypes(type);
+	for (unsigned i = 0; i < n; i++) {
+		LLVMTypeRef field = LLVMStructGetTypeAtIndex(type, i);
+		if (lb_is_type_kind(field, LLVMVectorTypeKind) && lb_sizeof(field) > 8) {
+			return true;
+		}
+	}
+	return false;
+}
+
+gb_internal LLVMValueRef lb_load_at(lbProcedure *p, LLVMTypeRef type, LLVMValueRef ptr, u64 offset, unsigned align) {
+	LLVMValueRef index = LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), offset, false);
+	LLVMValueRef addr  = LLVMBuildInBoundsGEP2(p->builder, LLVMInt8TypeInContext(p->module->ctx), ptr, &index, 1, "");
+	LLVMValueRef value = LLVMBuildLoad2(p->builder, type, addr, "");
+	LLVMSetAlignment(value, gb_min(align, cast(unsigned)lb_sizeof(type)));
+	// NOTE(bill): SelectionDAG joins loads next to each other into one wider load.
+	// That load would stall again.
+	LLVMSetVolatile(value, true);
+	return value;
+}
+
+// Loads the struct `type` from `ptr` with a vector field loaded one element at a time, for `-o:none` only.
+// Each load is no wider than the stores that wrote the elements.
+gb_internal LLVMValueRef lb_load_by_elements(lbProcedure *p, LLVMTypeRef type, LLVMValueRef ptr, unsigned align) {
+	LLVMTargetDataRef td        = LLVMGetModuleDataLayout(p->module->mod);
+	LLVMTypeRef       lane_type = LLVMInt32TypeInContext(p->module->ctx);
+
+	LLVMValueRef res = LLVMGetUndef(type);
+	unsigned n = LLVMCountStructElementTypes(type);
+	for (unsigned i = 0; i < n; i++) {
+		LLVMTypeRef  field  = LLVMStructGetTypeAtIndex(type, i);
+		u64          offset = LLVMOffsetOfElement(td, type, i);
+		LLVMValueRef value  = nullptr;
+		if (lb_is_type_kind(field, LLVMVectorTypeKind)) {
+			LLVMTypeRef elem      = OdinLLVMGetVectorElementType(field);
+			u64         elem_size = cast(u64)lb_sizeof(elem);
+			value = LLVMGetUndef(field);
+			for (unsigned k = 0; k < LLVMGetVectorSize(field); k++) {
+				LLVMValueRef lane = lb_load_at(p, elem, ptr, offset + k*elem_size, align);
+				value = LLVMBuildInsertElement(p->builder, value, lane, LLVMConstInt(lane_type, k, false), "");
+			}
+		} else {
+			value = lb_load_at(p, field, ptr, offset, align);
+		}
+		res = LLVMBuildInsertValue(p->builder, res, value, i, "");
+	}
+	return res;
+}
+
 gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, TokenPos pos) {
 	lbFunctionType *ft = lb_get_function_type(p->module, p->type);
 	bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
@@ -3003,6 +3167,9 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, Toke
 
 		if (ft->ret.coerce_offsets.count > 0) {
 			ret_val = lb_coerce_fields_load(p, res, &ft->ret);
+		} else if (ft->ret.flattened) {
+			ret_val = OdinLLVMBuildTransmute(p, ret_val, ft->ret.type);
+			ret_val = lb_rebuild_from_leaves(p, ret_val, ret_type);
 		} else if (ft->ret.split_vector) {
 			ret_val = OdinLLVMBuildTransmute(p, ret_val, ft->ret.type);
 			ret_val = lb_split_vector(p, ret_val, ret_type);
@@ -3013,11 +3180,23 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, Toke
 				i64 max_align = gb_max(lb_alignof(ret_type), lb_alignof(src_type));
 				p->temp_callee_return_struct_memory = llvm_alloca(p, ret_type, max_align);
 			}
-			// reuse the temp return value memory where possible
-			LLVMValueRef ptr = p->temp_callee_return_struct_memory;
-			LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
-			LLVMBuildStore(p->builder, ret_val, nptr);
-			ret_val = OdinLLVMBuildLoad(p, ret_type, ptr);
+			// NOTE(bill): Unoptimized code keeps the result in memory, written an element at a time.
+			// A vector loaded straight over smaller stores cannot be forwarded from them, and the processor stalls.
+			// At `-o:none` a vector is loaded an element at a time too.
+			bool by_elements = build_context.optimization_level < 0 && lb_has_wide_vector_field(ret_type);
+			if (by_elements && lb_is_plain_load(p->module, ret_val) && lb_sizeof(ret_type) <= lb_sizeof(src_type)) {
+				ret_val = lb_load_by_elements(p, ret_type, LLVMGetOperand(ret_val, 0), LLVMGetAlignment(ret_val));
+			} else {
+				// reuse the temp return value memory where possible
+				LLVMValueRef ptr = p->temp_callee_return_struct_memory;
+				LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
+				LLVMBuildStore(p->builder, ret_val, nptr);
+				if (by_elements) {
+					ret_val = lb_load_by_elements(p, ret_type, ptr, LLVMGetAlignment(ptr));
+				} else {
+					ret_val = OdinLLVMBuildLoad(p, ret_type, ptr);
+				}
+			}
 		} else {
 			ret_val = OdinLLVMBuildTransmute(p, ret_val, ret_type);
 		}
@@ -3175,8 +3354,11 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 				result_values[i] = lb_emit_conv(p, results[i], tuple->variables[i]->type);
 			}
 
+			// NOTE(bill): the result pointers follow the parameters, some of which take no or several LLVM parameters
 			isize param_offset = return_by_pointer ? 1 : 0;
-			param_offset += ft->original_arg_count;
+			for (isize i = 0; i < ft->original_arg_count; i++) {
+				param_offset += lb_arg_param_count(&ft->args[i]);
+			}
 			for_array(i, result_eps) {
 				lbValue result_ep = {};
 				result_ep.value = LLVMGetParam(p->value, cast(unsigned)(param_offset+i));
@@ -3716,25 +3898,8 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 				}
 			}
 		} else {
-			if (LB_ENABLE_DECLARATION_RVO) {
-				// @RVO: for `x := call()`
-				if (vd->names.count == 1 && values.count == 1 && !is_blank_ident(vd->names[0])) {
-					Ast *rhs_expr = unparen_expr(values[0]);
-					Entity *e = entity_of_node(vd->names[0]);
-					if (rhs_expr->kind == Ast_CallExpr && e != nullptr && lb_call_sret_eligible(p, rhs_expr, e->type)) {
-						lbValue dst = {};
-						if (e == p->sret_rvo_entity) {
-							dst = p->return_ptr.addr;
-							lb_add_entity(p->module, e, dst);
-							lb_add_debug_local_variable(p, dst.value, e->type, e->token);
-						} else {
-							lbAddr local = lb_add_local(p, e->type, e, true);
-							dst = local.addr;
-						}
-						lb_build_call_expr(p, rhs_expr, &dst);
-						break;
-					}
-				}
+			if (LB_ENABLE_DECLARATION_RVO && values.count == 1 && lb_build_declaration_rvo(p, vd)) {
+				break;
 			}
 
 			auto lvals_preused = slice_make<bool>(temporary_allocator(), vd->names.count);

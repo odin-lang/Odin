@@ -1,10 +1,15 @@
 #+build arm64,arm32
 package simd_arm
 
+// 32-bit Arm has the SHA instructions from Armv8 on.
+// LLVM's `sha2` feature does not imply Armv8 there.
+@(private = "file")
+SHA2_FEATURES :: "sha2" when ODIN_ARCH == .arm64 else "v8,sha2"
+
 // SHA1 hash update, choose.
 //
 // [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsha1cq_u32)
-@(require_results, enable_target_feature = "sha2")
+@(require_results, enable_target_feature = SHA2_FEATURES)
 vsha1cq_u32 :: #force_inline proc "c" (hash_abcd: uint32x4_t, hash_e: uint32_t, wk: uint32x4_t) -> uint32x4_t {
 	return _vsha1cq_u32(hash_abcd, hash_e, wk)
 }
@@ -12,7 +17,7 @@ vsha1cq_u32 :: #force_inline proc "c" (hash_abcd: uint32x4_t, hash_e: uint32_t, 
 // SHA1 hash update, parity.
 //
 // [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsha1pq_u32)
-@(require_results, enable_target_feature = "sha2")
+@(require_results, enable_target_feature = SHA2_FEATURES)
 vsha1pq_u32 :: #force_inline proc "c" (hash_abcd: uint32x4_t, hash_e: uint32_t, wk: uint32x4_t) -> uint32x4_t {
 	return _vsha1pq_u32(hash_abcd, hash_e, wk)
 }
@@ -20,7 +25,7 @@ vsha1pq_u32 :: #force_inline proc "c" (hash_abcd: uint32x4_t, hash_e: uint32_t, 
 // SHA1 hash update, majority.
 //
 // [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsha1mq_u32)
-@(require_results, enable_target_feature = "sha2")
+@(require_results, enable_target_feature = SHA2_FEATURES)
 vsha1mq_u32 :: #force_inline proc "c" (hash_abcd: uint32x4_t, hash_e: uint32_t, wk: uint32x4_t) -> uint32x4_t {
 	return _vsha1mq_u32(hash_abcd, hash_e, wk)
 }
@@ -28,7 +33,7 @@ vsha1mq_u32 :: #force_inline proc "c" (hash_abcd: uint32x4_t, hash_e: uint32_t, 
 // SHA1 fixed rotate.
 //
 // [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsha1h_u32)
-@(require_results, enable_target_feature = "sha2")
+@(require_results, enable_target_feature = SHA2_FEATURES)
 vsha1h_u32 :: #force_inline proc "c" (hash_e: uint32_t) -> uint32_t {
 	return _vsha1h_u32(hash_e)
 }
@@ -36,7 +41,7 @@ vsha1h_u32 :: #force_inline proc "c" (hash_e: uint32_t) -> uint32_t {
 // SHA1 schedule update, first part.
 //
 // [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsha1su0q_u32)
-@(require_results, enable_target_feature = "sha2")
+@(require_results, enable_target_feature = SHA2_FEATURES)
 vsha1su0q_u32 :: #force_inline proc "c" (w0_3, w4_7, w8_11: uint32x4_t) -> uint32x4_t {
 	return _vsha1su0q_u32(w0_3, w4_7, w8_11)
 }
@@ -44,7 +49,7 @@ vsha1su0q_u32 :: #force_inline proc "c" (w0_3, w4_7, w8_11: uint32x4_t) -> uint3
 // SHA1 schedule update, second part.
 //
 // [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsha1su1q_u32)
-@(require_results, enable_target_feature = "sha2")
+@(require_results, enable_target_feature = SHA2_FEATURES)
 vsha1su1q_u32 :: #force_inline proc "c" (tw0_3, w12_15: uint32x4_t) -> uint32x4_t {
 	return _vsha1su1q_u32(tw0_3, w12_15)
 }
@@ -52,7 +57,7 @@ vsha1su1q_u32 :: #force_inline proc "c" (tw0_3, w12_15: uint32x4_t) -> uint32x4_
 // SHA256 hash update, first part.
 //
 // [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsha256hq_u32)
-@(require_results, enable_target_feature = "sha2")
+@(require_results, enable_target_feature = SHA2_FEATURES)
 vsha256hq_u32 :: #force_inline proc "c" (hash_abcd, hash_efgh, wk: uint32x4_t) -> uint32x4_t {
 	return _vsha256hq_u32(hash_abcd, hash_efgh, wk)
 }
@@ -60,7 +65,7 @@ vsha256hq_u32 :: #force_inline proc "c" (hash_abcd, hash_efgh, wk: uint32x4_t) -
 // SHA256 hash update, second part.
 //
 // [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsha256h2q_u32)
-@(require_results, enable_target_feature = "sha2")
+@(require_results, enable_target_feature = SHA2_FEATURES)
 vsha256h2q_u32 :: #force_inline proc "c" (hash_efgh, hash_abcd, wk: uint32x4_t) -> uint32x4_t {
 	return _vsha256h2q_u32(hash_efgh, hash_abcd, wk)
 }
@@ -68,7 +73,7 @@ vsha256h2q_u32 :: #force_inline proc "c" (hash_efgh, hash_abcd, wk: uint32x4_t) 
 // SHA256 schedule update, first part.
 //
 // [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsha256su0q_u32)
-@(require_results, enable_target_feature = "sha2")
+@(require_results, enable_target_feature = SHA2_FEATURES)
 vsha256su0q_u32 :: #force_inline proc "c" (w0_3, w4_7: uint32x4_t) -> uint32x4_t {
 	return _vsha256su0q_u32(w0_3, w4_7)
 }
@@ -76,7 +81,7 @@ vsha256su0q_u32 :: #force_inline proc "c" (w0_3, w4_7: uint32x4_t) -> uint32x4_t
 // SHA256 schedule update, second part.
 //
 // [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsha256su1q_u32)
-@(require_results, enable_target_feature = "sha2")
+@(require_results, enable_target_feature = SHA2_FEATURES)
 vsha256su1q_u32 :: #force_inline proc "c" (tw0_3, w8_11, w12_15: uint32x4_t) -> uint32x4_t {
 	return _vsha256su1q_u32(tw0_3, w8_11, w12_15)
 }

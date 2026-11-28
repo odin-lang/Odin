@@ -363,6 +363,15 @@ else
 	exit 1
 fi
 
+ESCAPE_OUT=$($ODIN check ../test_issue_escape_variadic -no-entry-point $COMMON_CHECK 2>&1 >/dev/null)
+if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 10 &&
+      $(grep -c "slice, and the values it refers to, only live" <<< "$ESCAPE_OUT") -eq 5 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 ESCAPE_OUT=$($ODIN check ../test_issue_escape_deferred_procs -no-entry-point $COMMON_CHECK 2>&1 >/dev/null)
 if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 8 &&
       $(grep -c "deferred by" <<< "$ESCAPE_OUT") -eq 7 ]]; then
@@ -374,6 +383,16 @@ fi
 
 $ODIN test ../test_issue_type_info_variant_shim $COMMON -ignore-warnings
 if [[ $($ODIN check ../test_issue_type_info_variant_shim -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Warning:") -eq 11 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+mkdir -p dwarf_nocall_linux dwarf_nocall_windows
+$ODIN build ../test_issue_dwarf_nocall -debug -build-mode:llvm-ir -use-single-module -target:linux_amd64 -out:dwarf_nocall_linux $COMMON_CHECK
+$ODIN build ../test_issue_dwarf_nocall -debug -build-mode:llvm-ir -use-single-module -target:windows_amd64 -out:dwarf_nocall_windows $COMMON_CHECK
+if grep -q "cc: DW_CC_nocall" dwarf_nocall_linux/*.ll && ! grep -q "DW_CC_nocall" dwarf_nocall_windows/*.ll; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
@@ -808,6 +827,12 @@ $ODIN test ../test_issue_udivmod128_zero_divisor $COMMON -integer-division-by-ze
 if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_sysv_abi/test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o
 	$ODIN test ../test_issue_sysv_abi $COMMON
+fi
+
+# A C body replaces a `weak` Odin procedure at link time
+if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
+	clang -c ../test_issue_weak_read_only/test_issue_weak_read_only.c -o test_issue_weak_read_only_c.o
+	$ODIN test ../test_issue_weak_read_only $COMMON
 fi
 
 # AVX-512 asked for through -target-features on the default microarch; needs a CPU that has it

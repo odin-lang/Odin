@@ -561,7 +561,7 @@ enum BuildFlagKind {
 	BuildFlag_InternalModulePerFile,
 	BuildFlag_InternalCached,
 	BuildFlag_InternalNoInline,
-	BuildFlag_InternalByValue,
+	BuildFlag_InternalByReference,
 	BuildFlag_InternalWeakMonomorphization,
 	BuildFlag_InternalLLVMVerification,
 	BuildFlag_InternalLLVMNoSROA,
@@ -767,7 +767,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalModulePerFile,   str_lit("internal-module-per-file"),  BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalCached,          str_lit("internal-cached"),           BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalNoInline,        str_lit("internal-no-inline"),        BuildFlagParam_None,    Command_all);
-	add_flag(&build_flags, BuildFlag_InternalByValue,         str_lit("internal-by-value"),         BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_InternalByReference,     str_lit("internal-by-reference"),     BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalWeakMonomorphization, str_lit("internal-weak-monomorphization"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalLLVMVerification, str_lit("internal-ignore-llvm-verification"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalLLVMNoSROA,      str_lit("internal-llvm-no-sroa"), BuildFlagParam_None, Command_all);
@@ -1918,8 +1918,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalNoInline:
 							build_context.internal_no_inline = true;
 							break;
-						case BuildFlag_InternalByValue:
-							build_context.internal_by_value = true;
+						case BuildFlag_InternalByReference:
+							build_context.internal_by_reference = true;
 							break;
 						case BuildFlag_InternalWeakMonomorphization:
 							build_context.internal_weak_monomorphization = true;

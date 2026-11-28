@@ -172,7 +172,9 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 	map_init(&m->soa_field_sizes_map, 0);
 	map_init(&m->exact_value_compound_literal_addr_map, 1024);
 
-	array_init(&m->pad_types, heap_allocator());
+	array_init(&m->pad_types,   heap_allocator());
+	array_init(&m->kept_copies, heap_allocator());
+	array_init(&m->call_temps,  heap_allocator());
 
 
 	m->const_dummy_builder = LLVMCreateBuilderInContext(m->ctx);
@@ -731,8 +733,16 @@ gb_internal LLVMValueRef llvm_zero(lbModule *m) {
 	return LLVMConstInt(lb_type(m, t_int), 0, false);
 }
 
+gb_internal void lb_position_before_decls_end(lbProcedure *p) {
+	// NOTE(bill): LLVMPositionBuilderBefore also takes the debug location of the instruction it positions before.
+	// The instructions built here keep the current one instead.
+	LLVMMetadataRef loc = LLVMGetCurrentDebugLocation2(p->builder);
+	LLVMPositionBuilderBefore(p->builder, p->decls_end);
+	LLVMSetCurrentDebugLocation2(p->builder, loc);
+}
+
 gb_internal LLVMValueRef llvm_alloca(lbProcedure *p, LLVMTypeRef llvm_type, isize alignment, char const *name) {
-	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
+	lb_position_before_decls_end(p);
 
 	LLVMValueRef val = LLVMBuildAlloca(p->builder, llvm_type, name);
 	LLVMSetAlignment(val, cast(unsigned int)alignment);
@@ -2259,7 +2269,7 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	if (lb_sizeof(LLVMTypeOf(value.value)) > LB_MAX_STORE_SIZE) {
 		if (!p->in_multi_assignment && lb_is_plain_load(p->module, value.value)) {
 			LLVMValueRef dst_ptr = ptr.value;
-			LLVMValueRef src_ptr_original = LLVMGetOperand(value.value, 0);
+			LLVMValueRef src_ptr_original = lb_address_of_load_to_read(p, value).value;
 			LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, src_ptr_original, LLVMTypeOf(dst_ptr), "");
 
 			lb_emit_memmove(p,
@@ -2934,6 +2944,7 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 			ft->args[i].align_attribute = nullptr;
 			ft->args[i].byval_alignment = 0;
 			ft->args[i].is_byval = false;
+			ft->args[i].expand = false;
 		}
 	}
 
@@ -3985,6 +3996,72 @@ gb_internal LLVMTypeRef OdinLLVMGetVectorElementType(LLVMTypeRef type) {
 	return OdinLLVMGetInternalElementType(type);
 }
 
+// NOTE(bill): The datalayout caps a vector's alignment at `max_simd_align`, but LLVM's code generator lays out an
+// unpacked struct by each vector's own alignment and moves the fields after it (a tuple of results, for one).
+// Such a value is stored and loaded a field at a time, at the datalayout's offsets.
+gb_internal bool lb_layout_moves_with_vectors(LLVMTypeRef type) {
+	switch (LLVMGetTypeKind(type)) {
+	case LLVMStructTypeKind:
+		if (LLVMIsPackedStruct(type) || LLVMIsOpaqueStruct(type)) {
+			return false;
+		}
+		for (unsigned i = 0, n = LLVMCountStructElementTypes(type); i < n; i++) {
+			LLVMTypeRef field = LLVMStructGetTypeAtIndex(type, i);
+			if (lb_llvm_natural_alignof(field) > lb_alignof(field) || lb_layout_moves_with_vectors(field)) {
+				return true;
+			}
+		}
+		return false;
+	case LLVMArrayTypeKind:
+		return lb_layout_moves_with_vectors(OdinLLVMGetArrayElementType(type));
+	}
+	return false;
+}
+
+// The field's address at the datalayout's offset, which keeps its alignment in memory aligned for `type`
+gb_internal LLVMValueRef lb_field_address(lbProcedure *p, LLVMTypeRef type, LLVMValueRef ptr, unsigned index) {
+	LLVMTargetDataRef td = LLVMGetModuleDataLayout(p->module->mod);
+	u64 offset = 0;
+	if (lb_is_type_kind(type, LLVMStructTypeKind)) {
+		offset = LLVMOffsetOfElement(td, type, index);
+	} else {
+		offset = index*LLVMABISizeOfType(td, OdinLLVMGetArrayElementType(type));
+	}
+	LLVMValueRef offset_value = LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), offset, false);
+	return LLVMBuildInBoundsGEP2(p->builder, LLVMInt8TypeInContext(p->module->ctx), ptr, &offset_value, 1, "");
+}
+
+gb_internal LLVMTypeRef lb_field_type(LLVMTypeRef type, unsigned index) {
+	return lb_is_type_kind(type, LLVMStructTypeKind) ? LLVMStructGetTypeAtIndex(type, index) : OdinLLVMGetArrayElementType(type);
+}
+
+gb_internal unsigned lb_field_count(LLVMTypeRef type) {
+	return lb_is_type_kind(type, LLVMStructTypeKind) ? LLVMCountStructElementTypes(type) : LLVMGetArrayLength(type);
+}
+
+gb_internal void lb_store_by_fields(lbProcedure *p, LLVMValueRef value, LLVMValueRef ptr) {
+	LLVMTypeRef type = LLVMTypeOf(value);
+	if (!lb_layout_moves_with_vectors(type)) {
+		LLVMBuildStore(p->builder, value, ptr);
+		return;
+	}
+	for (unsigned i = 0, n = lb_field_count(type); i < n; i++) {
+		lb_store_by_fields(p, LLVMBuildExtractValue(p->builder, value, i, ""), lb_field_address(p, type, ptr, i));
+	}
+}
+
+gb_internal LLVMValueRef lb_load_by_fields(lbProcedure *p, LLVMTypeRef type, LLVMValueRef ptr) {
+	if (!lb_layout_moves_with_vectors(type)) {
+		return OdinLLVMBuildLoad(p, type, ptr);
+	}
+	LLVMValueRef res = LLVMGetUndef(type);
+	for (unsigned i = 0, n = lb_field_count(type); i < n; i++) {
+		LLVMValueRef field = lb_load_by_fields(p, lb_field_type(type, i), lb_field_address(p, type, ptr, i));
+		res = LLVMBuildInsertValue(p->builder, res, field, i, "");
+	}
+	return res;
+}
+
 
 gb_internal LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRef dst_type) {
 	LLVMContextRef ctx = p->module->ctx;
@@ -4079,7 +4156,6 @@ general_end:;
 #endif
 
 	if (src_size > dst_size) {
-		GB_ASSERT(p->decl_block != p->curr_block);
 		// NOTE(laytan): src is bigger than dst, need to memcpy the part of src we want.
 
 		LLVMTypeRef llvm_src_type = LLVMPointerType(src_type, 0);
@@ -4094,7 +4170,7 @@ general_end:;
 			// NOTE(laytan): we need a pointer to memcpy from.
 			LLVMValueRef val_copy = llvm_alloca(p, src_type, src_align);
 			val_ptr = LLVMBuildPointerCast(p->builder, val_copy, llvm_src_type, "");
-			LLVMBuildStore(p->builder, val, val_ptr);
+			lb_store_by_fields(p, val, val_ptr);
 		}
 
 		i64 max_align = gb_max(lb_alignof(src_type), lb_alignof(dst_type));
@@ -4125,24 +4201,33 @@ general_end:;
 			gb_count_of(types)
 		);
 
-		return OdinLLVMBuildLoad(p, dst_type, ptr);
+		return lb_load_by_fields(p, dst_type, ptr);
 	} else {
-		GB_ASSERT(p->decl_block != p->curr_block);
 		GB_ASSERT(dst_size >= src_size);
 
 		i64 max_align = gb_max(lb_alignof(src_type), lb_alignof(dst_type));
 		max_align = gb_max(max_align, 16);
 
 		LLVMValueRef ptr = llvm_alloca(p, dst_type, max_align);
-		if (dst_size > src_size) {
-			// NOTE(bill): the bytes past `src` are padding and must read as zero
-			LLVMBuildStore(p->builder, LLVMConstNull(dst_type), ptr);
+		LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
+		lb_store_by_fields(p, val, nptr);
+
+		// NOTE(bill): the bytes past `src` are padding and must read as zero.
+		// They are zeroed after `val` is stored, and the two stores do not overlap:
+		// AddressSanitizer moves a store of an argument above the other stores of the first block.
+		// The sizes are the datalayout's: `lb_sizeof` gives e.g. `{i64, i56}` 24 bytes, and LLVM 16.
+		LLVMTargetDataRef td      = LLVMGetModuleDataLayout(p->module->mod);
+		u64               written = LLVMStoreSizeOfType(td, src_type);
+		u64               total   = LLVMABISizeOfType(td, dst_type);
+		if (total > written) {
+			LLVMTypeRef  tail_type = LLVMArrayType(LLVMInt8TypeInContext(ctx), cast(unsigned)(total - written));
+			LLVMValueRef offset    = LLVMConstInt(LLVMInt64TypeInContext(ctx), written, false);
+			LLVMValueRef tail      = LLVMBuildGEP2(p->builder, LLVMInt8TypeInContext(ctx), ptr, &offset, 1, "");
+			LLVMValueRef store     = LLVMBuildStore(p->builder, LLVMConstNull(tail_type), tail);
+			LLVMSetAlignment(store, 1);
 		}
 
-		LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
-		LLVMBuildStore(p->builder, val, nptr);
-
-		return OdinLLVMBuildLoad(p, dst_type, ptr);
+		return lb_load_by_fields(p, dst_type, ptr);
 	}
 }
 
@@ -4923,9 +5008,6 @@ gb_internal void lb_emit_lifetime_ends(lbProcedure *p, lbDeferExitKind kind, lbB
 
 
 gb_internal lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, bool force_no_init) {
-	GB_ASSERT(p->decl_block != p->curr_block);
-	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
-
 	char const *name = "";
 	if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
 		// NOTE(bill): for debugging purposes only
@@ -4947,7 +5029,7 @@ gb_internal lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero
 	if (e != nullptr) {
 		// only named user locals get lifetime markers;
 		//
-		// the alloca itself sits in p->decl_block, but llvm_alloca moves the builder back
+		// `alloca` itself sits before p->decls_end, but llvm_alloca moves the builder back
 		// to p->curr_block, which is where the declaration actually runs and the slot becomes live;
 		// emitting lifetime.start here keeps it before any stores to the local (zero init included)
 		lb_add_lifetime_local(p, ptr, type);
@@ -5025,13 +5107,15 @@ gb_internal lbAddr lb_add_local_generated_temp(lbProcedure *p, Type *type, i64 m
 }
 
 
-gb_internal void lb_set_linkage_from_entity_flags(lbModule *m, LLVMValueRef value, u64 flags) {
+gb_internal void lb_set_linkage_from_entity_flags(lbModule *m, LLVMValueRef value, u64 flags, bool is_definition) {
 	if (flags & EntityFlag_CustomLinkage_Internal) {
 		LLVMSetLinkage(value, LLVMInternalLinkage);
 	} else if (flags & EntityFlag_CustomLinkage_Strong) {
 		LLVMSetLinkage(value, LLVMExternalLinkage);
 	} else if (flags & EntityFlag_CustomLinkage_Weak) {
-		LLVMSetLinkage(value, LLVMExternalWeakLinkage);
+		// NOTE(bill): `extern_weak` is for a declaration only, a symbol that may be missing.
+		// LLVM has no way to emit a definition with it: some builds made it strong on Mach-O.
+		LLVMSetLinkage(value, is_definition ? LLVMWeakAnyLinkage : LLVMExternalWeakLinkage);
 	} else if (flags & EntityFlag_CustomLinkage_LinkOnce) {
 		LLVMSetLinkage(value, LLVMLinkOnceAnyLinkage);
 	}

@@ -30,6 +30,33 @@ scribble :: #force_no_inline proc() {
 }
 
 @(private="file")
+make_padded :: #force_no_inline proc(n: int) -> Padded {
+	return Padded{a = true, b = n}
+}
+
+@(private="file")
+make_padded_named :: #force_no_inline proc(n: int) -> (p: Padded) {
+	p.a = true
+	p.b = n
+	return
+}
+
+@(private="file")
+make_padded_contextless :: #force_no_inline proc "contextless" (n: int) -> Padded {
+	return Padded{a = true, b = n}
+}
+
+@(private="file")
+make_padded_c :: #force_no_inline proc "c" (n: int) -> Padded {
+	return Padded{a = true, b = n}
+}
+
+@(private="file")
+make_padded_pair :: #force_no_inline proc(n: int) -> (Padded, Padded) {
+	return Padded{a = true, b = n}, Padded{b = n}
+}
+
+@(private="file")
 expect_zero_padding :: proc(t: ^testing.T, p: rawptr, name: string, loc := #caller_location) {
 	bytes := ([^]byte)(p)
 	for i in 1..<align_of(int) {
@@ -60,6 +87,27 @@ check_declarations :: #force_no_inline proc(t: ^testing.T, n: int) {
 	uninit: Padded = ---
 	uninit.a = true
 	expect_zero_padding(t, &uninit, "---")
+
+	// The callee writes its result straight into the variable.
+	called := make_padded(n)
+	expect_zero_padding(t, &called, "call")
+
+	named := make_padded_named(n)
+	expect_zero_padding(t, &named, "named result")
+
+	contextless := make_padded_contextless(n)
+	expect_zero_padding(t, &contextless, "contextless call")
+
+	c_call := make_padded_c(n)
+	expect_zero_padding(t, &c_call, "c call")
+
+	via_value := make_padded
+	indirect := via_value(n)
+	expect_zero_padding(t, &indirect, "procedure value")
+
+	first, second := make_padded_pair(n)
+	expect_zero_padding(t, &first, "first of two results")
+	expect_zero_padding(t, &second, "second of two results")
 
 	literal = Padded{a = true, b = n + 1}
 	expect_zero_padding(t, &literal, "assignment")
