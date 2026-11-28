@@ -2590,6 +2590,145 @@ procedure is equvalent to the following:
 lanes_rotate_right :: intrinsics.simd_lanes_rotate_right
 
 /*
+Shift the lanes of a SIMD vector left, filling with zeroes.
+
+Left is toward lane 0 (like `lanes_rotate_left`): lane `i` of the result is
+lane `i+offset` of `a`. The last `offset` lanes are zero. An offset of `len(a)`
+or more gives all zeroes. On a little-endian target, this is a right shift of
+the vector's bits. For 4-element vectors, `lanes_shift_left(a, 1)` is:
+
+	shuffle(a, type_of(a){}, 1, 2, 3, 4)
+
+Inputs:
+- `a`: The vector to shift.
+- `offset`: The number of lanes to shift by. A non-negative constant.
+
+Returns:
+- The shifted vector.
+
+Operation:
+
+	for i in 0 ..< len(a) {
+		res[i] = a[i+offset] if i+offset < len(a) else 0
+	}
+	return res
+
+Example:
+
+	   +-----+-----+-----+-----+
+	a: |  1  |  2  |  3  |  4  |
+	   +-----+-----+-----+-----+
+	res := lanes_shift_left(a, 1)
+	   +-----+-----+-----+-----+
+	   |  2  |  3  |  4  |  0  |
+	   +-----+-----+-----+-----+
+*/
+lanes_shift_left :: intrinsics.simd_lanes_shift_left
+
+/*
+Shift the lanes of a SIMD vector right, filling with zeroes.
+
+Right is away from lane 0 (like `lanes_rotate_right`): lane `i` of the result
+is lane `i-offset` of `a`. The first `offset` lanes are zero. An offset of
+`len(a)` or more gives all zeroes. On a little-endian target, this is a left
+shift of the vector's bits. For 4-element vectors, `lanes_shift_right(a, 1)` is:
+
+	shuffle(a, type_of(a){}, 4, 0, 1, 2)
+
+Inputs:
+- `a`: The vector to shift.
+- `offset`: The number of lanes to shift by. A non-negative constant.
+
+Returns:
+- The shifted vector.
+
+Operation:
+
+	for i in 0 ..< len(a) {
+		res[i] = a[i-offset] if i >= offset else 0
+	}
+	return res
+
+Example:
+
+	   +-----+-----+-----+-----+
+	a: |  1  |  2  |  3  |  4  |
+	   +-----+-----+-----+-----+
+	res := lanes_shift_right(a, 1)
+	   +-----+-----+-----+-----+
+	   |  0  |  1  |  2  |  3  |
+	   +-----+-----+-----+-----+
+*/
+lanes_shift_right :: intrinsics.simd_lanes_shift_right
+
+/*
+Compute the prefix sums of the lanes of a SIMD vector.
+
+Lane `i` of the result is the sum of lanes `0..=i` (an inclusive scan). For
+the exclusive scan, where lane `i` is the sum of lanes `0..<i`, shift first:
+
+	scan_add(lanes_shift_right(v, 1))
+
+The sum takes log2(N) steps. Each step adds the vector to itself shifted right:
+by 1 lane, then 2, 4, and so on. Floating-point addition is not associative:
+`(a+b)+c` may not be equal to `a+(b+c)`. For floats, the result can differ from
+a running total added one lane at a time.
+
+Inputs:
+- `v`: An integer or a float vector.
+
+Returns:
+- The prefix sums of the lanes.
+
+Operation:
+
+	for shift := 1; shift < len(v); shift *= 2 {
+		v += lanes_shift_right(v, shift)
+	}
+	return v
+
+The order of the sum for N=4:
+
+	        lane 0  lane 1  lane 2      lane 3
+	v:      v0      v1      v2          v3
+	step 1: v0      v1+v0   v2+v1       v3+v2
+	step 2: v0      v1+v0   (v2+v1)+v0  (v3+v2)+(v1+v0)
+
+Example:
+
+	   +-----+-----+-----+-----+
+	v: |  1  |  2  |  3  |  4  |
+	   +-----+-----+-----+-----+
+	res := scan_add(v)
+	   +-----+-----+-----+-----+
+	   |  1  |  3  |  6  | 10  |
+	   +-----+-----+-----+-----+
+*/
+@(require_results)
+scan_add :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_numeric(E), LANES <= 64 {
+	v := v
+	when LANES > 1 {
+		v += lanes_shift_right(v, 1)
+	}
+	when LANES > 2 {
+		v += lanes_shift_right(v, 2)
+	}
+	when LANES > 4 {
+		v += lanes_shift_right(v, 4)
+	}
+	when LANES > 8 {
+		v += lanes_shift_right(v, 8)
+	}
+	when LANES > 16 {
+		v += lanes_shift_right(v, 16)
+	}
+	when LANES > 32 {
+		v += lanes_shift_right(v, 32)
+	}
+	return v
+}
+
+/*
 Count the number of set bits in each lane of a SIMD vector.
 */
 count_ones :: intrinsics.count_ones

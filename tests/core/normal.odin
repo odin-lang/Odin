@@ -52,6 +52,7 @@ download_assets :: proc "contextless" () {
 @(require) import "path/filepath"
 @(require) import "reflect"
 @(require) import "runtime"
+@(require) import "simd"
 @(require) import "slice"
 @(require) import "sort"
 @(require) import "strconv"

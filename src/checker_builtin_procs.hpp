@@ -230,6 +230,8 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_lanes_reverse,
 	BuiltinProc_simd_lanes_rotate_left,
 	BuiltinProc_simd_lanes_rotate_right,
+	BuiltinProc_simd_lanes_shift_left,
+	BuiltinProc_simd_lanes_shift_right,
 
 	BuiltinProc_simd_gather,
 	BuiltinProc_simd_scatter,
@@ -649,6 +651,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_lanes_reverse"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_lanes_rotate_left"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_lanes_rotate_right"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_lanes_shift_left"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_lanes_shift_right"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_gather"),       3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_scatter"),      3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
