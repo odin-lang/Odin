@@ -831,6 +831,7 @@ gb_internal void lb_redirect_unselectable_call(lbFastIselLowering *s, LLVMValueR
 	wrapper = LLVMAddFunction(m->mod, wrapper_name, fn_type);
 	LLVMSetLinkage(wrapper, LLVMInternalLinkage);
 	LLVMSetFunctionCallConv(wrapper, cc);
+	lb_add_tune_cpu_to_proc(m, wrapper);
 	lb_add_attribute_to_proc(m, wrapper, "nounwind");
 
 	LLVMValueRef params[3] = {};

@@ -267,6 +267,7 @@ struct lbGenerator : LinkerData {
 	bool modules_in_parallel;
 
 	String target_features;
+	String tune_cpu; // empty: tune for the target CPU
 
 	lbProcedure *startup_runtime;
 	lbProcedure *cleanup_runtime;
@@ -707,6 +708,7 @@ gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef p
 
 gb_internal bool lb_const_has_misaligned_pointer(LLVMTargetDataRef td, LLVMValueRef c, u64 offset, u64 base_align);
 gb_internal void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, char const *name, u64 value=0);
+gb_internal void lb_add_tune_cpu_to_proc(lbModule *m, LLVMValueRef proc_value);
 
 gb_internal gb_inline i64 lb_max_zero_init_size(void) {
 	if (build_context.metrics.os == TargetOs_darwin && build_context.metrics.arch == TargetArch_arm64) {

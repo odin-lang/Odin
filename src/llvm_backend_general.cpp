@@ -3878,6 +3878,12 @@ gb_internal void lb_add_attribute_to_proc_with_string(lbModule *m, LLVMValueRef 
 	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, attr);
 }
 
+gb_internal void lb_add_tune_cpu_to_proc(lbModule *m, LLVMValueRef proc_value) {
+	if (m->gen->tune_cpu.len != 0) {
+		lb_add_attribute_to_proc_with_string(m, proc_value, str_lit("tune-cpu"), m->gen->tune_cpu);
+	}
+}
+
 
 gb_internal bool lb_apply_thread_local_model(LLVMValueRef value, String model) {
 	if (model != "") {
