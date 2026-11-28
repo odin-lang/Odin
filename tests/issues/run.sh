@@ -513,6 +513,18 @@ fi
 
 $ODIN build ../test_issue_5043 $COMMON
 $ODIN build ../test_issue_8554 -build-mode:obj $COMMON
+
+$ODIN build ../test_issue_bounds_check_report -build-mode:obj -no-entry-point -o:none -out:bounds_check_report.o -export-bounds-checks-file:bounds_check_report_none.json $COMMON
+$ODIN build ../test_issue_bounds_check_report -build-mode:obj -no-entry-point -o:speed -out:bounds_check_report.o -export-bounds-checks-file:bounds_check_report_speed.json $COMMON
+if [[ $(grep -c "test_issue_bounds_check_report.odin" bounds_check_report_none.json) -eq 4 &&
+      $(grep -c "test_issue_bounds_check_report.odin" bounds_check_report_speed.json) -eq 4 &&
+      $(grep "test_issue_bounds_check_report.odin" bounds_check_report_speed.json | grep -c "element") -eq 0 &&
+      $(grep "test_issue_bounds_check_report.odin" bounds_check_report_speed.json | grep -c "buffer") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 $ODIN build ../test_issue_8555 -build-mode:obj -target:linux_arm64 -target-features:contextidrel2,NeoverseV3ae,-CRC $COMMON_CHECK
 $ODIN build ../test_issue_8555 -build-mode:obj -target:linux_arm32 -target-features:+slow-load-d-subreg $COMMON_CHECK
 $ODIN build ../test_issue_5097 $COMMON

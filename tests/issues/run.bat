@@ -148,6 +148,12 @@ set ODIN_FULL=%CD%\..\..\..\odin.exe
 %ODIN% build "..\test_issue_7304" %COMMON% 2>&1 | find /c "9223372036854775808 is not representable by int" | findstr /x "1" || exit /b
 %ODIN% build "..\test_issue_7598_all_entities_checked" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 %ODIN% build "..\test_issue_8554" -build-mode:obj -microarch:native %COMMON% || exit /b
+%ODIN% build "..\test_issue_bounds_check_report" -build-mode:obj -no-entry-point -o:none -out:bounds_check_report.obj -export-bounds-checks-file:bounds_check_report_none.json %COMMON% || exit /b
+type bounds_check_report_none.json | find /c "test_issue_bounds_check_report.odin" | findstr /x "4" || exit /b
+%ODIN% build "..\test_issue_bounds_check_report" -build-mode:obj -no-entry-point -o:speed -out:bounds_check_report.obj -export-bounds-checks-file:bounds_check_report_speed.json %COMMON% || exit /b
+type bounds_check_report_speed.json | find /c "test_issue_bounds_check_report.odin" | findstr /x "4" || exit /b
+type bounds_check_report_speed.json | find "test_issue_bounds_check_report.odin" | find /c "element" | findstr /x "0" || exit /b
+type bounds_check_report_speed.json | find "test_issue_bounds_check_report.odin" | find /c "buffer" | findstr /x "1" || exit /b
 %ODIN% build "..\test_issue_8555" -build-mode:obj -target:linux_arm64 -target-features:contextidrel2,NeoverseV3ae,-CRC %COMMON% || exit /b
 %ODIN% build "..\test_issue_8555" -build-mode:obj -target:linux_arm32 -target-features:+slow-load-d-subreg %COMMON% || exit /b
 

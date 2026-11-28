@@ -438,6 +438,7 @@ enum BuildFlagKind {
 	BuildFlag_ExportTimingsFile,
 	BuildFlag_ExportDependencies,
 	BuildFlag_ExportDependenciesFile,
+	BuildFlag_ExportBoundsChecksFile,
 	BuildFlag_ShowSystemCalls,
 	BuildFlag_ThreadCount,
 	BuildFlag_KeepTempFiles,
@@ -643,6 +644,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ExportTimingsFile,       str_lit("export-timings-file"),       BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportDependencies,      str_lit("export-dependencies"),       BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ExportDependenciesFile,  str_lit("export-dependencies-file"),  BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_ExportBoundsChecksFile,  str_lit("export-bounds-checks-file"), BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowUnused,              str_lit("show-unused"),               BuildFlagParam_None,    Command_check);
 	add_flag(&build_flags, BuildFlag_ShowUnusedWithLocation,  str_lit("show-unused-with-location"), BuildFlagParam_None,    Command_check);
 	add_flag(&build_flags, BuildFlag_ShowSystemCalls,         str_lit("show-system-calls"),         BuildFlagParam_None,    Command_all);
@@ -1075,6 +1077,19 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								build_context.export_dependencies_file = path_to_full_path(heap_allocator(), export_path);
 							} else {
 								gb_printf_err("Invalid -export-dependencies path, got %.*s\n", LIT(export_path));
+								bad_flags = true;
+							}
+
+							break;
+						}
+						case BuildFlag_ExportBoundsChecksFile: {
+							GB_ASSERT(value.kind == ExactValue_String);
+
+							String export_path = value.value_string;
+							if (is_build_flag_path_valid(export_path)) {
+								build_context.export_bounds_checks_file = path_to_full_path(heap_allocator(), export_path);
+							} else {
+								gb_printf_err("Invalid -export-bounds-checks-file path, got %.*s\n", LIT(export_path));
 								bad_flags = true;
 							}
 
@@ -3220,6 +3235,11 @@ gb_internal int print_show_help(String const arg0, String command, String option
 				print_usage_line(3, "-error-pos-style:unix      file/path:45:3:");
 				print_usage_line(3, "-error-pos-style:odin      file/path(45:3)");
 				print_usage_line(3, "-error-pos-style:default   (Defaults to 'odin'.)");
+		}
+
+		if (print_flag("-export-bounds-checks-file:<filename>")) {
+			print_usage_line(2, "Exports, in JSON format, the bounds checks which are left after optimization.");
+			print_usage_line(2, "Example: -export-bounds-checks-file:bounds_checks.json");
 		}
 
 		if (print_flag("-export-defineables:<filename>")) {

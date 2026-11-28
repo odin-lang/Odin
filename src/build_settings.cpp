@@ -578,6 +578,7 @@ struct BuildContext {
 	String export_timings_file;
 	DependenciesExportFormat export_dependencies_format;
 	String export_dependencies_file;
+	String export_bounds_checks_file;
 	bool   show_unused;
 	bool   show_unused_with_location;
 	bool   show_more_timings;
