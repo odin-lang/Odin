@@ -510,6 +510,7 @@ Sort_Pattern :: enum {
 	Spikes,
 	Organ_Pipe,
 	Sawtooth,
+	Long_Runs,
 	Runs,
 	Short_Runs,
 	Half_Sorted,
@@ -597,6 +598,11 @@ sort_pattern_keys :: proc(keys: []i64, pattern: Sort_Pattern) {
 	case .Sawtooth:
 		for &k, i in keys {
 			k = i64(i%37)
+		}
+	case .Long_Runs:
+		// Ascending runs of n/6 keys with repeats, one starting in every quarter: drop-merge stops at the second.
+		for &k, i in keys {
+			k = i64(i % (n/6 + 1) / 2)
 		}
 	case .Runs:
 		// Long and short runs for a comparator sort to merge, ascending with repeats or strictly descending between equal pairs.

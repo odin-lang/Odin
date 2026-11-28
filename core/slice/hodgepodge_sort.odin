@@ -31,7 +31,7 @@ import "base:intrinsics"
 	Sorted and reversed quarters cost one pass.
 	With cheap comparisons, quarters with order in them take the merges above.
 	Otherwise they merge their natural runs in the order of Powersort [5], with the lazy unsorted runs of Glidesort [6].
-	Input sorted apart from scattered items takes drop-merge sort [7] (hodgepodge_drop_merge).
+	Input sorted apart from items scattered through every quarter takes drop-merge sort [7] (hodgepodge_drop_merge).
 
 	## Input without order
 	A stable partition around a pivot sampled from about the cube root of n items (hodgepodge_partition), after fluxsort [4].
@@ -2320,20 +2320,36 @@ hodgepodge_analyse :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_ch
 		ordered[k] = streaks[k] > n/256
 	}
 
+	// Items scattered through every quarter take drop-merge. Where a quarter has no descents, the disorder is local
+	// and the quarters sort only where it is. A radix sort beats drop-merge at fewer descents than the partition does.
 	none_ordered := ordered == [4]bool{}
-	if none_ordered {
-		// A radix sort beats drop-merge at fewer descents than the partition does. Where drop-merge stops, the rest
-		// sorts on its own and the two merge. Before n/HODGEPODGE_DROP_EARLY, sorting it all again costs less.
-		DROP_DESCENTS :: HODGEPODGE_RADIX_DESCENTS when RADIX else HODGEPODGE_DROP_DESCENTS
-		if hodgepodge_nearly_sorted(a, DROP_DESCENTS, call, KIND) {
-			if rest := hodgepodge_drop_merge(a, s, call, KIND); rest < n/HODGEPODGE_DROP_EARLY {
+	DROP_DESCENTS :: HODGEPODGE_RADIX_DESCENTS when RADIX else HODGEPODGE_DROP_DESCENTS
+	if builtin.min(balance[0], balance[1], balance[2], balance[3]) > 0 &&
+	   hodgepodge_nearly_sorted(a, DROP_DESCENTS, call, KIND) {
+		// Where drop-merge stops, the rest sorts the way its quarters would and merges with the sorted segments.
+		// Without order in the quarters, sorting all of it again costs less before n/HODGEPODGE_DROP_EARLY. With
+		// order in them, calls merge the natural runs from the segments on, and cheap comparisons take the quarter
+		// path below: every quarter has descents and sorts whatever drop-merge left in it.
+		rest := hodgepodge_drop_merge(a, s, call, KIND)
+		if rest == n {
+			return
+		}
+		if none_ordered {
+			if rest < n/HODGEPODGE_DROP_EARLY {
 				unordered(a, s, call, KIND)
-			} else if rest < n {
+			} else {
 				unordered(a[rest:], s, call, KIND)
 				hodgepodge_power_merge(a, s, call, KIND)
 			}
 			return
 		}
+		when !CHEAP {
+			hodgepodge_power_merge(a, s, call, KIND)
+			return
+		}
+	}
+
+	if none_ordered {
 		when !CHEAP {
 			// Merging runs of keys from all over interleaves them, and the partition does that for less. Runs of keys
 			// near their place barely overlap.
