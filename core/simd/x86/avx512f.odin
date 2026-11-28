@@ -8202,18 +8202,6 @@ foreign _ {
 	@(link_name="llvm.x86.avx512.vpermi2var.pd.512")          llvm_vpermi2pd           :: proc(a: simd.f64x8, idx: simd.i64x8, b: simd.f64x8) -> simd.f64x8 ---
 	@(link_name="llvm.x86.avx512.vpermi2var.pd.256")          llvm_vpermi2pd256        :: proc(a: simd.f64x4, idx: simd.i64x4, b: simd.f64x4) -> simd.f64x4 ---
 	@(link_name="llvm.x86.avx512.vpermi2var.pd.128")          llvm_vpermi2pd128        :: proc(a: simd.f64x2, idx: simd.i64x2, b: simd.f64x2) -> simd.f64x2 ---
-	@(link_name="llvm.x86.avx512.mask.expand.d.512")          llvm_vpexpandd           :: proc(a: simd.i32x16, src: simd.i32x16, mask: u16) -> simd.i32x16 ---
-	@(link_name="llvm.x86.avx512.mask.expand.d.256")          llvm_vpexpandd256        :: proc(a: simd.i32x8, src: simd.i32x8, mask: u8) -> simd.i32x8 ---
-	@(link_name="llvm.x86.avx512.mask.expand.d.128")          llvm_vpexpandd128        :: proc(a: simd.i32x4, src: simd.i32x4, mask: u8) -> simd.i32x4 ---
-	@(link_name="llvm.x86.avx512.mask.expand.q.512")          llvm_vpexpandq           :: proc(a: simd.i64x8, src: simd.i64x8, mask: u8) -> simd.i64x8 ---
-	@(link_name="llvm.x86.avx512.mask.expand.q.256")          llvm_vpexpandq256        :: proc(a: simd.i64x4, src: simd.i64x4, mask: u8) -> simd.i64x4 ---
-	@(link_name="llvm.x86.avx512.mask.expand.q.128")          llvm_vpexpandq128        :: proc(a: simd.i64x2, src: simd.i64x2, mask: u8) -> simd.i64x2 ---
-	@(link_name="llvm.x86.avx512.mask.expand.ps.512")         llvm_vexpandps           :: proc(a: simd.f32x16, src: simd.f32x16, mask: u16) -> simd.f32x16 ---
-	@(link_name="llvm.x86.avx512.mask.expand.ps.256")         llvm_vexpandps256        :: proc(a: simd.f32x8, src: simd.f32x8, mask: u8) -> simd.f32x8 ---
-	@(link_name="llvm.x86.avx512.mask.expand.ps.128")         llvm_vexpandps128        :: proc(a: simd.f32x4, src: simd.f32x4, mask: u8) -> simd.f32x4 ---
-	@(link_name="llvm.x86.avx512.mask.expand.pd.512")         llvm_vexpandpd           :: proc(a: simd.f64x8, src: simd.f64x8, mask: u8) -> simd.f64x8 ---
-	@(link_name="llvm.x86.avx512.mask.expand.pd.256")         llvm_vexpandpd256        :: proc(a: simd.f64x4, src: simd.f64x4, mask: u8) -> simd.f64x4 ---
-	@(link_name="llvm.x86.avx512.mask.expand.pd.128")         llvm_vexpandpd128        :: proc(a: simd.f64x2, src: simd.f64x2, mask: u8) -> simd.f64x2 ---
 	@(link_name="llvm.x86.avx512.mask.add.ss.round")          llvm_vaddss              :: proc(a, b: simd.f32x4, src: simd.f32x4, mask: u8, rounding: i32) -> simd.f32x4 ---
 	@(link_name="llvm.x86.avx512.mask.add.sd.round")          llvm_vaddsd              :: proc(a, b: simd.f64x2, src: simd.f64x2, mask: u8, rounding: i32) -> simd.f64x2 ---
 	@(link_name="llvm.x86.avx512.mask.sub.ss.round")          llvm_vsubss              :: proc(a, b: simd.f32x4, src: simd.f32x4, mask: u8, rounding: i32) -> simd.f32x4 ---
@@ -8260,18 +8248,6 @@ foreign _ {
 	@(link_name="llvm.x86.avx512.cvttsd2usi")                 llvm_vcvttsd2usi         :: proc(a: simd.f64x2, rounding: i32) -> u32 ---
 	@(link_name="llvm.x86.avx512.vcomi.ss")                   llvm_vcomiss             :: proc(a, b: simd.f32x4, imm8: i32, sae: i32) -> i32 ---
 	@(link_name="llvm.x86.avx512.vcomi.sd")                   llvm_vcomisd             :: proc(a, b: simd.f64x2, imm8: i32, sae: i32) -> i32 ---
-	@(link_name="llvm.x86.avx512.mask.expand.load.d.128")     llvm_expandloadd_128     :: proc(mem_addr: ^i32, a: simd.i32x4, mask: u8) -> simd.i32x4 ---
-	@(link_name="llvm.x86.avx512.mask.expand.load.q.128")     llvm_expandloadq_128     :: proc(mem_addr: ^i64, a: simd.i64x2, mask: u8) -> simd.i64x2 ---
-	@(link_name="llvm.x86.avx512.mask.expand.load.ps.128")    llvm_expandloadps_128    :: proc(mem_addr: ^f32, a: simd.f32x4, mask: u8) -> simd.f32x4 ---
-	@(link_name="llvm.x86.avx512.mask.expand.load.pd.128")    llvm_expandloadpd_128    :: proc(mem_addr: ^f64, a: simd.f64x2, mask: u8) -> simd.f64x2 ---
-	@(link_name="llvm.x86.avx512.mask.expand.load.d.256")     llvm_expandloadd_256     :: proc(mem_addr: ^i32, a: simd.i32x8, mask: u8) -> simd.i32x8 ---
-	@(link_name="llvm.x86.avx512.mask.expand.load.q.256")     llvm_expandloadq_256     :: proc(mem_addr: ^i64, a: simd.i64x4, mask: u8) -> simd.i64x4 ---
-	@(link_name="llvm.x86.avx512.mask.expand.load.ps.256")    llvm_expandloadps_256    :: proc(mem_addr: ^f32, a: simd.f32x8, mask: u8) -> simd.f32x8 ---
-	@(link_name="llvm.x86.avx512.mask.expand.load.pd.256")    llvm_expandloadpd_256    :: proc(mem_addr: ^f64, a: simd.f64x4, mask: u8) -> simd.f64x4 ---
-	@(link_name="llvm.x86.avx512.mask.expand.load.d.512")     llvm_expandloadd_512     :: proc(mem_addr: ^i32, a: simd.i32x16, mask: u16) -> simd.i32x16 ---
-	@(link_name="llvm.x86.avx512.mask.expand.load.q.512")     llvm_expandloadq_512     :: proc(mem_addr: ^i64, a: simd.i64x8, mask: u8) -> simd.i64x8 ---
-	@(link_name="llvm.x86.avx512.mask.expand.load.ps.512")    llvm_expandloadps_512    :: proc(mem_addr: ^f32, a: simd.f32x16, mask: u16) -> simd.f32x16 ---
-	@(link_name="llvm.x86.avx512.mask.expand.load.pd.512")    llvm_expandloadpd_512    :: proc(mem_addr: ^f64, a: simd.f64x8, mask: u8) -> simd.f64x8 ---
 }
 
 when ODIN_ARCH == .amd64 {
