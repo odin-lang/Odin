@@ -3621,6 +3621,11 @@ gb_internal void lb_generate_no_alias_split(lbModule *m, lbProcedure *p, unsigne
 	LLVMSetLinkage(h->value, LLVMInternalLinkage);
 	LLVMSetFunctionCallConv(h->value, LLVMGetFunctionCallConv(p->value));
 
+	// NOTE(bill): The read-only call scan finds a body by its name
+	rw_mutex_lock(&m->values_mutex);
+	string_map_set(&m->procedures, h->name, h);
+	rw_mutex_unlock(&m->values_mutex);
+
 	unsigned          attribute_count = LLVMGetAttributeCountAtIndex(p->value, LLVMAttributeIndex_FunctionIndex);
 	LLVMAttributeRef *attributes      = temporary_alloc_array<LLVMAttributeRef>(attribute_count);
 	LLVMGetAttributesAtIndex(p->value, LLVMAttributeIndex_FunctionIndex, attributes);

@@ -71,6 +71,18 @@ read_both :: #force_no_inline proc(v: Big, p: ^Big) -> int {
 	return v.a*1000 + p.a
 }
 
+// from -o:size up, a `#no_alias` slice moves the body into a helper the read-only scan must see through
+@(private="file")
+write_global_read_no_alias :: #force_no_inline proc(#no_alias xs: []int, v: Big) -> int {
+	g_big.a = 99
+	return v.a + len(xs)
+}
+
+@(private="file")
+read_both_no_alias :: #force_no_inline proc(#no_alias xs: []int, v: Big, p: ^Big) -> int {
+	return v.a*1000 + p.a + len(xs)
+}
+
 @(test)
 test_by_value_params :: proc(t: ^testing.T) {
 	g_big = {a = 1}
@@ -98,6 +110,13 @@ test_by_value_params :: proc(t: ^testing.T) {
 
 	g_big = {a = 1}
 	testing.expect_value(t, read_both(g_big, &g_big), 1001)
+
+	xs := []int{0}
+	g_big = {a = 1}
+	testing.expect_value(t, write_global_read_no_alias(xs, g_big), 2)
+
+	g_big = {a = 1}
+	testing.expect_value(t, read_both_no_alias(xs, g_big, &g_big), 1002)
 }
 
 @(private="file")
