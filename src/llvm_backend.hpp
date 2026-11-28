@@ -575,6 +575,7 @@ gb_internal lbValue lb_build_call_expr(lbProcedure *p, Ast *expr, lbValue *sret_
 gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type);
 gb_internal void lb_begin_procedure_body(lbProcedure *p);
 gb_internal void lb_end_procedure_body(lbProcedure *p);
+gb_internal unsigned lb_no_alias_data_pointers(Entity *e);
 
 gb_internal lbAddr lb_find_or_generate_context_ptr(lbProcedure *p);
 gb_internal lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx);

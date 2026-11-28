@@ -3772,8 +3772,8 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					// If no_polymorphic_errors is set, we are speculatively checking a candidate and
 					// erroring+stripping is premature: the chosen candidate will be re-checked with errors enabled,
 					// so a true error isn't lost.
-					if (type != t_invalid && !is_type_internally_pointer_like(type) && !ctx->no_polymorphic_errors) {
-						error(name, "'#no_alias' can only be applied to pointer-like type parameters");
+					if (type != t_invalid && !is_type_internally_pointer_like(type) && !is_type_no_alias_data(type) && !ctx->no_polymorphic_errors) {
+						error(name, "'#no_alias' can only be applied to parameters of pointer-like, slice, string, dynamic array, or #soa slice or dynamic array types");
 						p->flags &= ~FieldFlag_no_alias; // Remove the flag
 					}
 				}

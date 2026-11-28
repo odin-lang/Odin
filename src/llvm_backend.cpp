@@ -3569,6 +3569,152 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 	return p;
 }
 
+// NOTE(bill, 2026-11-28): `#no_alias` on a slice-like parameter promises its data, and only a pointer parameter can tell LLVM.
+// The signature stays (the flag is not part of the type): an always-inline helper gets the body and the data pointers as `noalias` parameters.
+// Below -o:size nothing uses the alias scopes this makes: the promise is ignored, and stepping stays as written.
+
+gb_internal unsigned lb_no_alias_data_pointers(Entity *e) {
+	if (e->kind != Entity_Variable) {
+		return 0;
+	}
+	if ((e->flags & EntityFlag_NoAlias) == 0) {
+		return 0;
+	}
+	if (!is_type_no_alias_data(e->type)) {
+		return 0;
+	}
+	if (e->token.string.len == 0 || is_blank_ident(e->token)) {
+		return 0;
+	}
+
+	if (is_type_soa_struct(e->type)) {
+		return cast(unsigned)soa_field_count(e->type);
+	}
+	return 1;
+}
+
+gb_internal unsigned lb_no_alias_split_count(lbProcedure *p) {
+	Entity *e  = p->entity;
+	Type   *pt = p->type;
+
+	if (build_context.optimization_level < OptimizationLevel_Size) {
+		return 0;
+	}
+	// NOTE(bill): Neither `optnone` nor memcpy-like bodies are inlined
+	if (e->Procedure.optimization_mode == ProcedureOptimizationMode_None) {
+		return 0;
+	}
+	if (e->Procedure.is_memcpy_like) {
+		return 0;
+	}
+	if (pt->Proc.param_count == 0) {
+		return 0;
+	}
+	if (pt->Proc.c_vararg) {
+		return 0;
+	}
+	if (pt->Proc.calling_convention == ProcCC_Naked) {
+		return 0;
+	}
+
+	unsigned count = 0;
+	for (Entity *param : pt->Proc.params->Tuple.variables) {
+		count += lb_no_alias_data_pointers(param);
+	}
+	return count;
+}
+
+gb_internal void lb_generate_no_alias_split(lbModule *m, lbProcedure *p, unsigned data_count) {
+	auto const &params = p->type->Proc.params->Tuple.variables;
+
+	// NOTE(bill): The data pointers go before `context`: it must stay last
+	unsigned param_count = LLVMCountParams(p->value);
+	unsigned first_data  = p->type->Proc.calling_convention == ProcCC_Odin ? param_count-1 : param_count;
+	unsigned count       = param_count + data_count;
+
+	LLVMValueRef *args  = temporary_alloc_array<LLVMValueRef>(count);
+	LLVMTypeRef  *types = temporary_alloc_array<LLVMTypeRef>(count);
+	for (unsigned i = 0; i < param_count; i++) {
+		unsigned slot = i < first_data ? i : i + data_count;
+		args[slot]  = LLVMGetParam(p->value, i);
+		types[slot] = LLVMTypeOf(args[slot]);
+	}
+	for (unsigned i = first_data; i < first_data + data_count; i++) {
+		types[i] = LLVMPointerTypeInContext(m->ctx, 0);
+	}
+	LLVMTypeRef type = LLVMFunctionType(LLVMGetReturnType(LLVMGlobalGetValueType(p->value)), types, count, false);
+
+	lbProcedure *h = permanent_alloc_item<lbProcedure>();
+	gb_memmove(h, p, gb_size_of(lbProcedure));
+	h->name  = concatenate_strings(permanent_allocator(), p->name, str_lit("$no_alias"));
+	h->value = LLVMAddFunction(m->mod, alloc_cstring(temporary_allocator(), h->name), type);
+	LLVMSetLinkage(h->value, LLVMInternalLinkage);
+	LLVMSetFunctionCallConv(h->value, LLVMGetFunctionCallConv(p->value));
+
+	unsigned          attribute_count = LLVMGetAttributeCountAtIndex(p->value, LLVMAttributeIndex_FunctionIndex);
+	LLVMAttributeRef *attributes      = temporary_alloc_array<LLVMAttributeRef>(attribute_count);
+	LLVMGetAttributesAtIndex(p->value, LLVMAttributeIndex_FunctionIndex, attributes);
+	for (unsigned i = 0; i < attribute_count; i++) {
+		LLVMAddAttributeAtIndex(h->value, LLVMAttributeIndex_FunctionIndex, attributes[i]);
+	}
+	// NOTE(bill): The procedure keeps `noinline` and the instrumentation
+	lb_remove_attribute_from_proc(m, h->value, "noinline");
+	lb_add_attribute_to_proc(m, h->value, "alwaysinline");
+	char const *instrumentation[] = {"instrument-function-entry", "instrument-function-exit"};
+	for (char const *key : instrumentation) {
+		LLVMRemoveStringAttributeAtIndex(h->value, LLVMAttributeIndex_FunctionIndex, key, cast(unsigned)gb_strlen(key));
+	}
+	for (unsigned i = first_data; i < first_data + data_count; i++) {
+		lb_add_proc_attribute_at_index(h, 1+i, "noalias");
+	}
+	if (p->debug_info != nullptr) {
+		lb_add_procedure_debug_info(m, h, p->name);
+	}
+
+	lb_begin_procedure_body(p);
+	unsigned slot = first_data;
+	for (Entity *e : params) {
+		unsigned n = lb_no_alias_data_pointers(e);
+		if (n == 0) {
+			continue;
+		}
+		lbValue ptr = lb_find_value_from_entity(m, e);
+		for (unsigned k = 0; k < n; k++) {
+			args[slot++] = lb_emit_load(p, lb_emit_struct_ep(p, ptr, cast(i32)k)).value;
+		}
+	}
+	LLVMValueRef call = LLVMBuildCall2(p->builder, type, h->value, args, count, "");
+	LLVMSetInstructionCallConv(call, LLVMGetFunctionCallConv(p->value));
+	if (LLVMGetTypeKind(LLVMTypeOf(call)) == LLVMVoidTypeKind) {
+		LLVMBuildRetVoid(p->builder);
+	} else {
+		LLVMBuildRet(p->builder, call);
+	}
+	lb_end_procedure_body(p);
+
+	m->curr_procedure = h;
+	lb_begin_procedure_body(h);
+	slot = first_data;
+	for (Entity *e : params) {
+		unsigned n = lb_no_alias_data_pointers(e);
+		if (n == 0) {
+			continue;
+		}
+		lbAddr local = lb_add_local_generated(h, e->type, false);
+		lb_addr_store(h, local, lb_emit_load(h, lb_find_value_from_entity(m, e)));
+		for (unsigned k = 0; k < n; k++) {
+			LLVMBuildStore(h->builder, LLVMGetParam(h->value, slot++), lb_emit_struct_ep(h, local.addr, cast(i32)k).value);
+		}
+		lb_add_entity(m, e, local.addr);
+		map_remove(&h->direct_parameters, e);
+	}
+	lb_build_stmt(h, h->body);
+	lb_end_procedure_body(h);
+
+	MUTEX_GUARD(&m->generated_procedures_mutex);
+	array_add(&m->generated_procedures, h);
+}
+
 gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 	if (p->is_done.load(std::memory_order_relaxed)) {
 		return;
@@ -3578,9 +3724,14 @@ gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 
 	if (p->body != nullptr) { // Build Procedure
 		m->curr_procedure = p;
-		lb_begin_procedure_body(p);
-		lb_build_stmt(p, p->body);
-		lb_end_procedure_body(p);
+		unsigned data_count = lb_no_alias_split_count(p);
+		if (data_count != 0) {
+			lb_generate_no_alias_split(m, p, data_count);
+		} else {
+			lb_begin_procedure_body(p);
+			lb_build_stmt(p, p->body);
+			lb_end_procedure_body(p);
+		}
 		p->is_done.store(true, std::memory_order_relaxed);
 		m->curr_procedure = nullptr;
 	} else if (p->generate_body != nullptr) {
