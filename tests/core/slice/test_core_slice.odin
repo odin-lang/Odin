@@ -575,20 +575,20 @@ sort_pattern_keys :: proc(keys: []i64, pattern: Sort_Pattern) {
 			k = i64(n - i + i/64)
 		}
 	case .Nearly_Sorted, .Swapped:
-		// With 1% of keys swapped, a comparator sort keeps the sorted items in place and merges the others back, across
-		// segments once its buffer fills. With 7%, it merges natural runs, the input still being sorted at large scale.
+		// With 1% of keys swapped, the sort keeps the sorted items in place and merges the others back, across segments
+		// once its buffer fills. With 8%, a comparator sort merges natural runs, the input still sorted at large scale.
 		for &k, i in keys {
 			k = i64(i/3)
 		}
-		swaps := (n+99)/100 if pattern == .Nearly_Sorted else n*7/100
+		swaps := (n+99)/100 if pattern == .Nearly_Sorted else n*8/100
 		for _ in 0..<swaps {
 			a, b := rand.int_max(n), rand.int_max(n)
 			keys[a], keys[b] = keys[b], keys[a]
 		}
 	case .Spikes:
-		// Lone items above what follows them, each equal to keys further on.
+		// Lone items and equal pairs above what follows them, each equal to keys further on.
 		for &k, i in keys {
-			k = i64(i/3) + (40 if i%61 == 60 else 0)
+			k = i64(i/3) + (40 if i%61 == 60 || i%60 == 57 || i%60 == 58 else 0)
 		}
 	case .Organ_Pipe:
 		for &k, i in keys {
