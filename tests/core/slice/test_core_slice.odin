@@ -771,6 +771,37 @@ test_sort_element_sizes :: proc(t: ^testing.T) {
 	check_sorts(t, Sort_Item_20000, huge_sizes, APIS)
 }
 
+// Nearly sorted elements over 512 bytes: drop-merge notes where its set-aside items are, in segments that end where the
+// notes fill up (5% swapped) or their offsets would not fit (1%), and the segments merge where few items cross.
+@test
+test_sort_huge_nearly_sorted :: proc(t: ^testing.T) {
+	rand.reset(t.seed)
+
+	N    :: 34_001
+	APIS :: bit_set[Sort_Api]{.Sort_By, .Sort_By_Constant, .Sort_By_Cmp}
+	keys  := make([]i64, N)
+	items := make([]Sort_Item_600, N)
+	defer delete(keys)
+	defer delete(items)
+
+	for percent in ([]int{1, 5}) {
+		for &k, i in keys {
+			k = i64(i/3)
+		}
+		for _ in 0..<N*percent/100 {
+			a, b := rand.int_max(N), rand.int_max(N)
+			keys[a], keys[b] = keys[b], keys[a]
+		}
+		for api in APIS {
+			for &item, i in items {
+				item = {key = keys[i], index = i64(i)}
+			}
+			sort_items(items, api)
+			testing.expectf(t, is_sorted_items(items, false), "%v, %d%% swapped", api, percent)
+		}
+	}
+}
+
 // Sorting either way must give the stable order, bit for bit. Bits tell apart values that compare equal: -0.0 and 0.0,
 // or equal strings at different addresses. A sort of the values tagged with their positions gives the stable order, and
 // the tags check it.

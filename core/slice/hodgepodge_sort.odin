@@ -45,8 +45,14 @@ import "base:intrinsics"
 	network in SIMD registers (hodgepodge_radix_network), after Batcher [11].
 
 	## Large elements and code size
-	Elements over 512 bytes, where fewer than 32 fit the buffer, are sorted by insertion in blocks of HODGEPODGE_BLOCK
-	and then merged as above (hodgepodge_large_element_sort).
+	Elements of HODGEPODGE_HEAVY_BYTES or more take the block merge wherever it can run: rotations copy them too often.
+	Elements over HODGEPODGE_HUGE_BYTES, where fewer than 32 fit the buffer, cost more to move than to compare.
+	Insertion in blocks of HODGEPODGE_BLOCK and merges stand in for the partition and quad swaps, which need more buffer
+	(hodgepodge_large_element_sort).
+	Drop-merge leaves their set-aside items in place and notes their offsets in the buffer (hodgepodge_drop_notes),
+	and each segment then sorts by one permutation.
+	Where few items cross, a merge swaps those over and merges them in by one permutation too (hodgepodge_sparse_merge).
+	Either way every item moves at most once, along the permutation's cycles, fetched ahead (hodgepodge_follow_cycles).
 	At -o:size, element types of one size and alignment share one body (Sort_Shared_Item).
 
 	## Stability
@@ -60,15 +66,21 @@ import "base:intrinsics"
 	Drop-merge sets aside two kinds of item, each in input order, in the buffer or in blocks: spikes go in front of
 	equal items, the others behind.
 	A kept item equal to a spike always comes after it, and one equal to any other set-aside item always before it.
+	Noted set-aside items sort in the order of their notes, which is their input order, before they rank by those rules.
+	The sparse merge's split is the stable merge's, and the items it swaps over merge in on the side they came from:
+	the left side's in front of equal items, the right side's behind.
+	A permutation keeps the order its ranks give.
 	The radix sort and its network only take integers in their own order, where equal keys are the same bits.
 
-	Three bounds hold by construction.
+	Four bounds hold by construction.
 	A Powersort power is the leading-zero count of a non-zero 64-bit word, and the stack's powers strictly increase [5]:
 	64 entries hold any stack.
 	The block merge and drop-merge's split only run where they have at most HODGEPODGE_BLOCKS blocks, and their bit
 	sets hold that many.
 	Positions scaled by n, in the samples and Powersort's midpoints, are computed in 64 and 128 bits:
 	a 32-bit int would wrap past about 8 million items.
+	A drop-merge segment ends before its offsets reach HODGEPODGE_NOTE_SPAN, and the sparse merge only runs below 2^31
+	items: their top bits stay free for marks.
 
 	## Provenance
 	The code that came from blitsort [2], with its parts of quadsort [1] and fluxsort [4], is in the public domain under
@@ -191,6 +203,13 @@ HODGEPODGE_FAR_FROM         :: 8192
 HODGEPODGE_RADIX_FEW        :: 4
 HODGEPODGE_RADIX_FEW_LANES  :: 32
 HODGEPODGE_RADIX_FEW_BYTES  :: 1 << 20
+HODGEPODGE_HEAVY_BYTES      :: 128
+HODGEPODGE_HUGE_BYTES       :: HODGEPODGE_SWAP_BYTES / 32
+HODGEPODGE_SPARSE           :: 16
+HODGEPODGE_AHEAD            :: 8
+HODGEPODGE_NOTE_MARK        :: u16(1) << 15
+HODGEPODGE_NOTE_SPAN        :: int(HODGEPODGE_NOTE_MARK) - 1
+HODGEPODGE_RANK_MARK        :: u32(1) << 31
 
 hodgepodge_sort :: proc(data: []$E, call: $P, $KIND: Sort_Kind) {
 	when size_of(E) == 0 {
@@ -313,7 +332,8 @@ hodgepodge_buffered_sort :: #force_no_inline proc(data: []$E, call: $P, $KIND: S
 	}
 
 	swap: [SWAP_LEN]E = ---
-	when SWAP_LEN < 32 {
+	// One item leaves no room for drop-merge's notes or a merge's ranks.
+	when SWAP_LEN < 2 {
 		hodgepodge_large_element_sort(data, swap[:], call, KIND)
 	} else {
 		if len(data) <= 132 {
@@ -1343,6 +1363,240 @@ hodgepodge_block_merge :: #force_no_inline proc(a, s: []$E, left: int, call: $P,
 	}
 }
 
+// The bytes of s[1:] as items of I: s[0] holds the item that starts a cycle.
+@(require_results)
+hodgepodge_words :: proc(s: []$E, $I: typeid) -> []I {
+	bytes := ([^]u8)(raw_data(s))[size_of(E):len(s)*size_of(E)]
+	skip  := -int(uintptr(raw_data(bytes))) & (align_of(I) - 1)
+	return ([^]I)(raw_data(bytes[skip:]))[:(len(bytes) - skip) / size_of(I)]
+}
+
+// A merge carried out by moving items: merged item t, of the sorted `ranks`, sits at from+t and goes to ranks[t]+t, and
+// the other items, from `others` on, keep their order around them. HODGEPODGE_RANK_MARK in a rank marks an item a cycle
+// has passed through.
+Hodgepodge_Ranks :: struct {
+	ranks:        []u32,
+	from, others: int,
+}
+
+// The notes of a drop-merge segment: its set-aside items sit at offsets `at`, ascending, and the t-th of them in order
+// is note order[t], which goes to ranks[t]+t. The kept items keep their order around them. HODGEPODGE_NOTE_MARK in an
+// offset marks a spike while the segment is read, and an item a cycle has passed through while it sorts.
+Hodgepodge_Notes :: struct {
+	at, order, ranks: []u16,
+}
+
+// How many merged items of the sorted `ranks` go before place p, and whether the next goes to p. Merged item t goes to
+// ranks[t]+t, and a rank's top bit is a mark.
+@(require_results)
+hodgepodge_merged_before :: proc "contextless" (ranks: []$I, p: int) -> (t: int, here: bool) #no_bounds_check {
+	RANK :: builtin.max(I) >> 1
+	hi := len(ranks)
+	for t < hi {
+		mid := (t + hi) / 2
+		if int(ranks[mid] & RANK) + mid < p {
+			t = mid + 1
+		} else {
+			hi = mid
+		}
+	}
+	return t, t < len(ranks) && int(ranks[t] & RANK) + t == p
+}
+
+// Where the item that goes to place p comes from.
+@(require_results)
+hodgepodge_ranks_source :: proc "contextless" (moves: Hodgepodge_Ranks, p: int) -> int {
+	t, here := hodgepodge_merged_before(moves.ranks, p)
+	return moves.from + t if here else moves.others + p - t
+}
+
+@(require_results)
+hodgepodge_notes_source :: proc "contextless" (notes: Hodgepodge_Notes, p: int) -> int #no_bounds_check {
+	t, here := hodgepodge_merged_before(notes.ranks, p)
+	if here {
+		return int(notes.at[notes.order[t]] &~ HODGEPODGE_NOTE_MARK)
+	}
+	// Kept item j sits past the notes u with at[u]-u <= j.
+	j := p - t
+	lo, hi := 0, len(notes.at)
+	for lo < hi {
+		mid := (lo + hi) / 2
+		if int(notes.at[mid] &~ HODGEPODGE_NOTE_MARK) - mid <= j {
+			lo = mid + 1
+		} else {
+			hi = mid
+		}
+	}
+	return j + lo
+}
+
+// The place of the t-th merged item, and whether no cycle has passed through it yet, which it now marks.
+@(require_results)
+hodgepodge_ranks_leader :: proc "contextless" (moves: Hodgepodge_Ranks, t: int) -> (place: int, fresh: bool) #no_bounds_check {
+	fresh = moves.ranks[t] & HODGEPODGE_RANK_MARK == 0
+	moves.ranks[t] |= HODGEPODGE_RANK_MARK
+	return moves.from + t, fresh
+}
+
+@(require_results)
+hodgepodge_notes_leader :: proc "contextless" (notes: Hodgepodge_Notes, t: int) -> (place: int, fresh: bool) #no_bounds_check {
+	fresh = notes.at[t] & HODGEPODGE_NOTE_MARK == 0
+	notes.at[t] |= HODGEPODGE_NOTE_MARK
+	return int(notes.at[t] &~ HODGEPODGE_NOTE_MARK), fresh
+}
+
+// Marks that a cycle has passed through place p, where a merged item sits.
+hodgepodge_ranks_pass :: proc "contextless" (moves: Hodgepodge_Ranks, p: int) #no_bounds_check {
+	if t := p - moves.from; 0 <= t && t < len(moves.ranks) {
+		moves.ranks[t] |= HODGEPODGE_RANK_MARK
+	}
+}
+
+hodgepodge_notes_pass :: proc "contextless" (notes: Hodgepodge_Notes, p: int) #no_bounds_check {
+	lo, hi := 0, len(notes.at)
+	for lo < hi {
+		mid := (lo + hi) / 2
+		if int(notes.at[mid] &~ HODGEPODGE_NOTE_MARK) < p {
+			lo = mid + 1
+		} else {
+			hi = mid
+		}
+	}
+	if lo < len(notes.at) && int(notes.at[lo] &~ HODGEPODGE_NOTE_MARK) == p {
+		notes.at[lo] |= HODGEPODGE_NOTE_MARK
+	}
+}
+
+hodgepodge_source :: proc{hodgepodge_ranks_source, hodgepodge_notes_source}
+hodgepodge_leader :: proc{hodgepodge_ranks_leader, hodgepodge_notes_leader}
+hodgepodge_pass   :: proc{hodgepodge_ranks_pass, hodgepodge_notes_pass}
+
+// Moves every item of r to where `moves` puts it, following each cycle of the permutation from a merged item's place:
+// every cycle passes through one, as the other items keep their order. The items of a cycle lie far apart, so the next
+// HODGEPODGE_AHEAD of them are fetched ahead.
+hodgepodge_follow_cycles :: proc(r, s: []$E, moves: $M) #no_bounds_check {
+	for t in 0..<len(moves.ranks) {
+		start, fresh := hodgepodge_leader(moves, t)
+		if !fresh {
+			continue
+		}
+		ahead: [HODGEPODGE_AHEAD]int
+		head, count := 0, 0
+		cur, last := start, start
+		closed := false
+		for {
+			for count < HODGEPODGE_AHEAD && !closed {
+				next := hodgepodge_source(moves, last)
+				closed = next == start
+				if !closed {
+					ahead[(head + count) % HODGEPODGE_AHEAD] = next
+					for offset := 0; offset < size_of(E); offset += 64 {
+						intrinsics.prefetch_read_data(rawptr(uintptr(&r[next]) + uintptr(offset)), 3)
+					}
+					last = next
+					count += 1
+				}
+			}
+			if count == 0 {
+				if cur != start {
+					r[cur] = s[0]
+				}
+				break
+			}
+			if cur == start {
+				s[0] = r[start]
+			}
+			next := ahead[head]
+			head = (head + 1) % HODGEPODGE_AHEAD
+			count -= 1
+			hodgepodge_pass(moves, next)
+			r[cur] = r[next]
+			cur = next
+		}
+	}
+}
+
+// How many items of the sorted `a` go in front of x, given that the first `from` do: a galloping search from there.
+@(require_results)
+hodgepodge_gallop :: proc(a: []$E, from: int, x: E, call: $P, $KIND: Sort_Kind, $FRONT: Hodgepodge_Front) -> int #no_bounds_check {
+	lo, step := from, 1
+	for lo+step <= len(a) && hodgepodge_in_front(a[lo+step-1], x, call, KIND, FRONT) {
+		lo   += step
+		step *= 2
+	}
+	return lo + hodgepodge_rank(a[lo:builtin.min(lo+step-1, len(a))], x, call, KIND, FRONT)
+}
+
+// Merges the sorted r[:l] with the sorted items after it, each item moving at most once. Chunks of the items after rank
+// among r[:l], FRONT saying which go in front of them, and move by hodgepodge_follow_cycles.
+hodgepodge_merge_after :: proc(r, s: []$E, l: int, call: $P, $KIND: Sort_Kind, $FRONT: Hodgepodge_Front) #no_bounds_check {
+	ranks := hodgepodge_words(s, u32)
+	for from := l; from < len(r); /**/ {
+		m := builtin.min(len(r) - from, len(ranks))
+		rank := 0
+		for t in 0..<m {
+			rank = hodgepodge_gallop(r[:from], rank, r[from+t], call, KIND, FRONT)
+			ranks[t] = u32(rank)
+		}
+		hodgepodge_follow_cycles(r[:from+m], s, Hodgepodge_Ranks{ranks[:m], from, 0})
+		from += m
+	}
+}
+
+// Merges the sorted items r[:m] into the sorted r[m:] as hodgepodge_merge_after does, from the other end: the last
+// chunk goes first.
+hodgepodge_merge_before :: proc(r, s: []$E, m: int, call: $P, $KIND: Sort_Kind, $FRONT: Hodgepodge_Front) #no_bounds_check {
+	ranks := hodgepodge_words(s, u32)
+	for end := m; end > 0; /**/ {
+		c := builtin.min(end, len(ranks))
+		chunk := r[end-c:]
+		rank := 0
+		for t in 0..<c {
+			rank = hodgepodge_gallop(chunk[c:], rank, chunk[t], call, KIND, FRONT)
+			ranks[t] = u32(rank)
+		}
+		hodgepodge_follow_cycles(chunk, s, Hodgepodge_Ranks{ranks[:c], 0, c})
+		end -= c
+	}
+}
+
+// Merges a[:left] and a[left:], whose last and first items are out of order, moving each item at most once where at
+// most 1/HODGEPODGE_SPARSE of the items cross: the k items of each side that belong on the other swap over, and each
+// side's k then merge into the rest of it. Returns false, leaving `a` as it was, where more cross.
+@(require_results)
+hodgepodge_sparse_merge :: proc(a, s: []$E, left: int, call: $P, $KIND: Sort_Kind) -> bool #no_bounds_check {
+	// How many of the left side's items are among the first `left` merged, the left side's first on a tie.
+	lo, hi := builtin.max(0, 2*left - len(a)), left
+	for lo < hi {
+		mid := (lo + hi + 1) / 2
+		if hodgepodge_greater(a[mid-1], a[2*left - mid], call, KIND) {
+			hi = mid - 1
+		} else {
+			lo = mid
+		}
+	}
+	k := left - lo
+	if k*HODGEPODGE_SPARSE > len(a) || u64(len(a)) >= u64(HODGEPODGE_RANK_MARK) {
+		return false
+	}
+
+	for done := 0; done < k; done += len(s) {
+		c := builtin.min(len(s), k - done)
+		copy(s[:c], a[lo+done:][:c])
+		copy(a[lo+done:][:c], a[left+done:][:c])
+		copy(a[left+done:][:c], s[:c])
+	}
+	// The right side's k go behind equal items of the left side's, and the left side's k in front of the right side's.
+	if k <= len(s) {
+		hodgepodge_partial_backward_merge(a[:left], s, lo, call, KIND)
+		hodgepodge_partial_forward_merge(a[left:], s, k, call, KIND)
+	} else {
+		hodgepodge_merge_after(a[:left], s, lo, call, KIND, .Not_Greater)
+		hodgepodge_merge_before(a[left:], s, k, call, KIND, .Less)
+	}
+	return true
+}
+
 hodgepodge_rotate_merge_block :: proc(a, s: []$E, block, count: int, call: $P, $KIND: Sort_Kind, try_blocks := true) #no_bounds_check {
 	// Merges a part through the buffer where the part fits, or where its sides differ more than twofold and one of them
 	// fits: a backward merge buffers the right side, and a forward merge the left. Other parts take rotations.
@@ -1362,10 +1616,18 @@ hodgepodge_rotate_merge_block :: proc(a, s: []$E, block, count: int, call: $P, $
 		return
 	}
 
+	// Huge elements cost more to move than to compare. Where few cross, each moves at most once.
+	when size_of(E) > HODGEPODGE_HUGE_BYTES {
+		if block > len(s) && count > len(s) && len(s) > 1 && hodgepodge_sparse_merge(a, s, block, call, KIND) {
+			return
+		}
+	}
+
 	// Where both sides overlap the other by more than the buffer, a block merge moves each item about three times, and
 	// rotations move it once per halving. The left side's items not above the right side's first are in place, and so
 	// are the right side's items not below the left side's last. The halves below try a block merge only where this merge
-	// has too many blocks for one.
+	// has too many blocks for one. Items of HODGEPODGE_HEAVY_BYTES or more take it however little the sides interleave:
+	// copies cost them more than comparisons.
 	try_halves := false
 	b := len(s) / 2
 	if try_blocks && block > len(s) && count > len(s) && b > 0 {
@@ -1374,7 +1636,8 @@ hodgepodge_rotate_merge_block :: proc(a, s: []$E, block, count: int, call: $P, $
 		if block-lo > len(s) && hi-block > len(s) {
 			if (hi-lo)/b > HODGEPODGE_BLOCKS {
 				try_halves = true
-			} else if hodgepodge_interleaved(a[lo:hi], block-lo, builtin.max(b, HODGEPODGE_MERGE_STEP), call, KIND) {
+			} else if size_of(E) >= HODGEPODGE_HEAVY_BYTES ||
+			          hodgepodge_interleaved(a[lo:hi], block-lo, builtin.max(b, HODGEPODGE_MERGE_STEP), call, KIND) {
 				hodgepodge_block_merge(a[lo:hi], s, block-lo, call, KIND)
 				return
 			}
@@ -1434,9 +1697,14 @@ hodgepodge_quadsort :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_c
 		return
 	}
 
-	if !hodgepodge_quad_swap(a, s, call, KIND) {
-		block := hodgepodge_quad_merge(a, s, 32, call, KIND)
-		hodgepodge_rotate_merge(a, s, block, call, KIND)
+	// Quad swaps take 32 items of buffer, more than fit of huge elements.
+	when size_of(E) > HODGEPODGE_HUGE_BYTES {
+		hodgepodge_large_element_sort(a, s, call, KIND)
+	} else {
+		if !hodgepodge_quad_swap(a, s, call, KIND) {
+			block := hodgepodge_quad_merge(a, s, 32, call, KIND)
+			hodgepodge_rotate_merge(a, s, block, call, KIND)
+		}
 	}
 }
 
@@ -1734,11 +2002,192 @@ hodgepodge_drop_split :: #force_no_inline proc(a, s: []$E, call: $P, $KIND: Sort
 	return
 }
 
+// Drop-merge for huge elements, which cost more to move than to compare and of which few fit the buffer. Kept items
+// stay where they are, and the set-aside items are noted by their offsets from the segment's start, in the bytes of
+// s[1:]. A segment ends where its notes fill up or their offsets would not fit, and sorts by one permutation
+// (hodgepodge_notes_sort), every item moving at most once. Segments run long, and the scan keeps the rules of
+// hodgepodge_drop_split: those of hodgepodge_drop_merge stop them early.
+@(require_results)
+hodgepodge_drop_notes :: #force_no_inline proc(a, s: []$E, call: $P, $KIND: Sort_Kind) -> (rest: int) #no_bounds_check {
+	NEW_RUN :: HODGEPODGE_DROP_NEW_RUN
+	SPIKES  :: HODGEPODGE_DROP_SPIKES
+
+	words := hodgepodge_words(s, u16)
+	room  := len(words) / 3
+	notes := Hodgepodge_Notes{words[:room], words[room:][:room], words[2*room:][:room]}
+	first_notes :: proc "contextless" (notes: Hodgepodge_Notes, h: int) -> Hodgepodge_Notes {
+		return {notes.at[:h], notes.order[:h], notes.ranks[:h]}
+	}
+	// The places of the last len(out) kept items before i, last first.
+	kept_back :: proc "contextless" (at: []u16, base, i: int, out: []int) {
+		u := len(at) - 1
+		p := i - 1
+		for t := 0; t < len(out); p -= 1 {
+			if u >= 0 && base + int(at[u] &~ HODGEPODGE_NOTE_MARK) == p {
+				u -= 1
+				continue
+			}
+			out[t] = p
+			t += 1
+		}
+	}
+
+	n := len(a)
+	base, k, h, lows, streak := 0, 0, 0, 0, 0
+	// The last kept item, and the greatest low: every kept item after it must be above it.
+	last_kept, max_low := 0, 0
+	for i in 0..<n {
+		if i-base == HODGEPODGE_NOTE_SPAN {
+			hodgepodge_notes_sort(a[base:i], s, first_notes(notes, h), call, KIND)
+			base, k, h, lows, streak = i, 0, 0, 0, 0
+		}
+		if k == 0 || !hodgepodge_greater(a[last_kept], a[i], call, KIND) {
+			k += 1
+			last_kept = i
+			streak = 0
+			continue
+		}
+		if h+NEW_RUN > room {
+			hodgepodge_notes_sort(a[base:i], s, first_notes(notes, h), call, KIND)
+			base, k, h, lows, streak, last_kept = i, 1, 0, 0, 0, i
+			continue
+		}
+
+		// kept[t] is the (t+1)-th last kept item. The last c kept items are above x, and x fits after the one before
+		// them, within the last NEW_RUN.
+		kept: [NEW_RUN]int
+		reach := builtin.min(k, NEW_RUN)
+		kept_back(notes.at[:h], base, i, kept[:reach])
+		c := 1
+		for c <= SPIKES && c < k && hodgepodge_greater(a[kept[c]], a[i], call, KIND) {
+			c += 1
+		}
+		fits := c < k
+		if c > SPIKES && fits {
+			not_above := 0
+			for t := reach-1; t >= c && !hodgepodge_greater(a[kept[t]], a[i], call, KIND); t -= 1 {
+				not_above += 1
+			}
+			c    = reach - not_above
+			fits = not_above > 0
+		}
+		first := c == k
+		guard := lows == 0 || hodgepodge_greater(a[i], a[max_low], call, KIND)
+		most  := SPIKES if streak < HODGEPODGE_DROP_STREAK else NEW_RUN-1
+
+		switch {
+		case (fits || first) && guard && c <= most && i+1 < n && hodgepodge_greater(a[kept[c-1]], a[i+1], call, KIND):
+			// The kept items above x, and above the next item too, are the odd ones out: each is noted as a spike,
+			// in order among the notes after it.
+			for t in 0..<c {
+				offset := u16(kept[t] - base)
+				u := h
+				for u > 0 && notes.at[u-1] &~ HODGEPODGE_NOTE_MARK > offset {
+					notes.at[u] = notes.at[u-1]
+					u -= 1
+				}
+				notes.at[u] = offset | HODGEPODGE_NOTE_MARK
+				h += 1
+			}
+			k -= c - 1
+			last_kept = i
+			streak = 0
+		case guard && (first || fits && hodgepodge_greater(a[i], a[kept[c]], call, KIND)):
+			notes.at[h] = u16(i - base) | HODGEPODGE_NOTE_MARK
+			h += 1
+			streak += 1
+		case:
+			if lows == 0 || hodgepodge_greater(a[i], a[max_low], call, KIND) {
+				max_low = i
+			}
+			notes.at[h] = u16(i - base)
+			h += 1
+			lows += 1
+			streak += 1
+			// A new run below the kept items, as in hodgepodge_drop_merge.
+			if lows%NEW_RUN == 0 && k >= NEW_RUN && i+HODGEPODGE_OUT < n &&
+			   hodgepodge_greater(a[kept[NEW_RUN-1]], a[i+HODGEPODGE_DROP_ASCENT], call, KIND) &&
+			   hodgepodge_is_sorted(a[i:][:HODGEPODGE_DROP_ASCENT+1], call, KIND) {
+				hodgepodge_notes_sort(a[base:i+1], s, first_notes(notes, h), call, KIND)
+				return i + 1
+			}
+		}
+	}
+	hodgepodge_notes_sort(a[base:], s, first_notes(notes, h), call, KIND)
+	if base > 0 {
+		hodgepodge_power_merge(a, s, call, KIND)
+	}
+	return n
+}
+
+// Sorts segment r of hodgepodge_drop_notes by one permutation: its kept items are in order, and `notes` holds where the
+// others are. The set-aside items sort by their notes and rank among the kept items, and then every item moves at most
+// once.
+hodgepodge_notes_sort :: proc(r, s: []$E, notes: Hodgepodge_Notes, call: $P, $KIND: Sort_Kind) #no_bounds_check {
+	h := len(notes.at)
+	if h == 0 {
+		return
+	}
+	place :: #force_inline proc "contextless" (at: []u16, u: u16) -> int {
+		return int(at[u] &~ HODGEPODGE_NOTE_MARK)
+	}
+
+	// The set-aside items in order, by a merge sort of their notes with `ranks` as the spare. Equal items keep the
+	// order of their notes, which is their input order.
+	for u in 0..<h {
+		notes.order[u] = u16(u)
+	}
+	from, to := notes.order, notes.ranks
+	for width := 1; width < h; width *= 2 {
+		for lo := 0; lo < h; lo += 2*width {
+			mid := builtin.min(lo + width, h)
+			hi  := builtin.min(lo + 2*width, h)
+			i, j, o := lo, mid, lo
+			for i < mid && j < hi {
+				right := hodgepodge_greater(r[place(notes.at, from[i])], r[place(notes.at, from[j])], call, KIND)
+				to[o] = from[j] if right else from[i]
+				j += int(right)
+				i += int(!right)
+				o += 1
+			}
+			copy(to[o:], from[i:mid])
+			copy(to[o+mid-i:], from[j:hi])
+		}
+		from, to = to, from
+	}
+	copy(notes.order, from)
+
+	// Each set-aside item's rank among the kept items: spikes go in front of equal kept items, the others behind.
+	kept, skipped := 0, 0
+	for t in 0..<h {
+		x := place(notes.at, notes.order[t])
+		spike := notes.at[notes.order[t]] & HODGEPODGE_NOTE_MARK != 0
+		for kept < len(r)-h {
+			if skipped < h && place(notes.at, u16(skipped)) == kept+skipped {
+				skipped += 1
+				continue
+			}
+			y := kept + skipped
+			in_front := hodgepodge_greater(r[x], r[y], call, KIND) if spike else !hodgepodge_greater(r[y], r[x], call, KIND)
+			if !in_front {
+				break
+			}
+			kept += 1
+		}
+		notes.ranks[t] = u16(kept)
+	}
+	for &offset in notes.at {
+		offset &~= HODGEPODGE_NOTE_MARK
+	}
+	hodgepodge_follow_cycles(r, s, notes)
+}
+
 // Sorts input sorted apart from items scattered through it, and returns where the sorted part ends, or -1 where neither
 // drop-merge suits. While the set-aside items, about one per descent the quarter scan has `seen`, fit
 // HODGEPODGE_DROP_SEGMENTS buffers, drop-merge's single pass costs least. More of them take the split, whose spikes and
 // lows sort on their own and merge with the kept items. A radix sort beats both at fewer descents than the partition
-// does. It stays out of line: inlined into hodgepodge_analyse, it slows the routes that do not take it.
+// does. Huge elements take hodgepodge_drop_notes. It stays out of line: inlined into hodgepodge_analyse, it slows the
+// routes that do not take it.
 @(require_results)
 hodgepodge_drop_route :: #force_no_inline proc(a, s: []$E, seen: int, call: $P, $KIND: Sort_Kind) -> (rest: int) #no_bounds_check {
 	RADIX          :: KIND in HODGEPODGE_ORDERED_KINDS && intrinsics.type_is_integer(E) &&
@@ -1747,37 +2196,42 @@ hodgepodge_drop_route :: #force_no_inline proc(a, s: []$E, seen: int, call: $P, 
 	SPLIT_DESCENTS :: HODGEPODGE_SPLIT_RADIX when RADIX else HODGEPODGE_SPLIT_DESCENTS
 
 	descents := hodgepodge_sample_descents(a, call, KIND)
-	switch {
-	case descents < DROP_DESCENTS && seen <= HODGEPODGE_DROP_SEGMENTS*len(s):
-		return hodgepodge_drop_merge(a, s, call, KIND)
-	case descents < SPLIT_DESCENTS && len(a) <= HODGEPODGE_BLOCKS*hodgepodge_split_block(len(s)):
-		spikes, kept: int
-		rest, spikes, kept = hodgepodge_drop_split(a, s, call, KIND)
-		for part in ([2][]E{a[:spikes], a[spikes+kept:rest]}) {
-			if len(part) <= HODGEPODGE_OUT {
-				if len(part) > 1 {
-					hodgepodge_quadsort(part, s, call, KIND)
-				}
-			} else {
-				when RADIX {
-					hodgepodge_radix_sort(part, s, call, KIND)
+	when size_of(E) > HODGEPODGE_HUGE_BYTES {
+		return hodgepodge_drop_notes(a, s, call, KIND) if descents < DROP_DESCENTS else -1
+	} else {
+		switch {
+		case descents < DROP_DESCENTS && seen <= HODGEPODGE_DROP_SEGMENTS*len(s):
+			return hodgepodge_drop_merge(a, s, call, KIND)
+		case descents < SPLIT_DESCENTS && len(a) <= HODGEPODGE_BLOCKS*hodgepodge_split_block(len(s)):
+			spikes, kept: int
+			rest, spikes, kept = hodgepodge_drop_split(a, s, call, KIND)
+			for part in ([2][]E{a[:spikes], a[spikes+kept:rest]}) {
+				if len(part) <= HODGEPODGE_OUT {
+					if len(part) > 1 {
+						hodgepodge_quadsort(part, s, call, KIND)
+					}
 				} else {
-					hodgepodge_partition(part, s, call, KIND)
+					when RADIX {
+						hodgepodge_radix_sort(part, s, call, KIND)
+					} else {
+						hodgepodge_partition(part, s, call, KIND)
+					}
 				}
 			}
+			// Spikes go in front of the kept items they equal, and lows behind: merges take the left side's item
+			// on a tie.
+			if spikes > 0 {
+				hodgepodge_rotate_merge_block(a[:spikes+kept], s, spikes, kept, call, KIND)
+			}
+			if spikes+kept < rest {
+				hodgepodge_rotate_merge_block(a[:rest], s, spikes+kept, rest-spikes-kept, call, KIND)
+			}
+			return
+		case descents < DROP_DESCENTS:
+			return hodgepodge_drop_merge(a, s, call, KIND)
 		}
-		// Spikes go in front of the kept items they equal, and lows behind: merges take the left side's item on a tie.
-		if spikes > 0 {
-			hodgepodge_rotate_merge_block(a[:spikes+kept], s, spikes, kept, call, KIND)
-		}
-		if spikes+kept < rest {
-			hodgepodge_rotate_merge_block(a[:rest], s, spikes+kept, rest-spikes-kept, call, KIND)
-		}
-		return
-	case descents < DROP_DESCENTS:
-		return hodgepodge_drop_merge(a, s, call, KIND)
+		return -1
 	}
-	return -1
 }
 
 // The end of the natural run at `start`: non-descending, or strictly descending and then reversed.
@@ -1828,10 +2282,14 @@ hodgepodge_power_merge :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bound
 	}
 
 	sort_run :: proc(a, s: []E, call: P) {
-		if len(a) <= HODGEPODGE_OUT {
-			hodgepodge_quadsort(a, s, call, KIND)
+		when size_of(E) > HODGEPODGE_HUGE_BYTES {
+			hodgepodge_large_element_sort(a, s, call, KIND)
 		} else {
-			hodgepodge_partition(a, s, call, KIND)
+			if len(a) <= HODGEPODGE_OUT {
+				hodgepodge_quadsort(a, s, call, KIND)
+			} else {
+				hodgepodge_partition(a, s, call, KIND)
+			}
 		}
 	}
 
@@ -2440,6 +2898,9 @@ hodgepodge_analyse :: proc(a, s: []$E, call: $P, $KIND: Sort_Kind) #no_bounds_ch
 	}
 	when RADIX {
 		unordered :: hodgepodge_radix_sort
+	} else when size_of(E) > HODGEPODGE_HUGE_BYTES {
+		// The partition's samples take more buffer than fits of huge elements.
+		unordered :: hodgepodge_large_element_sort
 	} else {
 		unordered :: hodgepodge_partition
 	}
