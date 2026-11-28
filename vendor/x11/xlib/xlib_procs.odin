@@ -106,8 +106,8 @@ foreign xlib {
 	DisplayWidth      :: proc(display: ^Display, screen_no: i32) -> i32 ---
 	DisplayWidthMM    :: proc(display: ^Display, screen_no: i32) -> i32 ---
 	// Screen macros
-	BlackPixelsOfScreen :: proc(screen: ^Screen) -> uint ---
-	WhitePixelsOfScreen :: proc(screen: ^Screen) -> uint ---
+	BlackPixelOfScreen  :: proc(screen: ^Screen) -> uint ---
+	WhitePixelOfScreen  :: proc(screen: ^Screen) -> uint ---
 	CellsOfScreen       :: proc(screen: ^Screen) -> i32 ---
 	DefaultColormapOfScreen :: proc(screen: ^Screen) -> Colormap ---
 	DefaultDepthOfScreen    :: proc(screen: ^Screen) -> i32 ---
@@ -141,7 +141,7 @@ foreign xlib {
 		procedure: XConnectionWatchProc,
 		data:      rawptr,
 		) -> Status ---
-	ProcessInternalConnections :: proc(
+	ProcessInternalConnection :: proc(
 		display:   ^Display,
 		fd:        i32,
 		) ---
@@ -557,7 +557,7 @@ foreign xlib {
 		values:   ^XGCValues,
 		) -> Status ---
 	FreeGC :: proc(display: ^Display, gc: GC) ---
-	GCContextFromGC :: proc(gc: GC) -> GContext ---
+	GContextFromGC :: proc(gc: GC) -> GContext ---
 	FlushGC :: proc(display: ^Display, gc: GC) ---
 	// Convenience routines for GC
 	SetState :: proc(
@@ -630,16 +630,16 @@ foreign xlib {
 		out_width:  ^u32,
 		out_height: ^u32,
 		) -> Status ---
-	QueryBestStripple :: proc(
+	QueryBestStipple :: proc(
 		display:    ^Display,
 		which:      Drawable,
 		width:      u32,
 		height:     u32,
-		out_width:  u32,
-		out_height: u32,
+		out_width:  ^u32,
+		out_height: ^u32,
 		) -> Status ---
 	SetTile       :: proc(display: ^Display, gc: GC, tile: Pixmap) ---
-	SetStripple   :: proc(display: ^Display, gc: GC, stripple: Pixmap) ---
+	SetStipple    :: proc(display: ^Display, gc: GC, stipple: Pixmap) ---
 	SetTSOrigin   :: proc(display: ^Display, gc: GC, x: i32, y: i32) ---
 	SetFont       :: proc(display: ^Display, gc: GC, font: Font) ---
 	SetClipOrigin :: proc(display: ^Display, gc: GC, x: i32, y: i32) ---
@@ -1553,6 +1553,7 @@ foreign xlib {
 		num_bytes: i32,
 		) ---
 	// Allocating permanent storage
+	@(link_name="Xpermalloc")
 	Permalloc :: proc(size: u32) -> rawptr ---
 	// Parsing the window geometry
 	ParseGeometry :: proc(
