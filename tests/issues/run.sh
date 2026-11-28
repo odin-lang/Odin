@@ -389,6 +389,16 @@ else
 	exit 1
 fi
 
+mkdir -p dwarf_nocall_linux dwarf_nocall_windows
+$ODIN build ../test_issue_dwarf_nocall -debug -build-mode:llvm-ir -use-single-module -target:linux_amd64 -out:dwarf_nocall_linux $COMMON_CHECK
+$ODIN build ../test_issue_dwarf_nocall -debug -build-mode:llvm-ir -use-single-module -target:windows_amd64 -out:dwarf_nocall_windows $COMMON_CHECK
+if grep -q "cc: DW_CC_nocall" dwarf_nocall_linux/*.ll && ! grep -q "DW_CC_nocall" dwarf_nocall_windows/*.ll; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_type_info_variant_shim_duplicate -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else

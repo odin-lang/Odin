@@ -107,6 +107,12 @@ set ODIN_FULL=%CD%\..\..\..\odin.exe
 %ODIN% check "..\test_issue_escape_deferred_procs" -no-entry-point %COMMON% 2>&1 | find /c "deferred by" | findstr /x "7" || exit /b
 %ODIN% test "..\test_issue_type_info_variant_shim" %COMMON% -ignore-warnings || exit /b
 %ODIN% check "..\test_issue_type_info_variant_shim" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "11" || exit /b
+if not exist "dwarf_nocall_linux\" mkdir dwarf_nocall_linux
+if not exist "dwarf_nocall_windows\" mkdir dwarf_nocall_windows
+%ODIN% build "..\test_issue_dwarf_nocall" -debug -build-mode:llvm-ir -use-single-module -target:linux_amd64 -out:dwarf_nocall_linux %COMMON% || exit /b
+findstr /c:"cc: DW_CC_nocall" dwarf_nocall_linux\*.ll >nul || exit /b
+%ODIN% build "..\test_issue_dwarf_nocall" -debug -build-mode:llvm-ir -use-single-module -target:windows_amd64 -out:dwarf_nocall_windows %COMMON% || exit /b
+findstr /c:"DW_CC_nocall" dwarf_nocall_windows\*.ll >nul && exit /b 1
 %ODIN% check "..\test_issue_type_info_variant_shim_duplicate" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_bit_field_tag_identity" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_8074" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "34" || exit /b

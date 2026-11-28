@@ -1,5 +1,6 @@
 package test_internal
 
+import "base:intrinsics"
 import "core:testing"
 
 // A parameter over 16 bytes keeps the value it had at the call, whatever the callee writes through other paths.
@@ -255,6 +256,112 @@ test_by_value_params_address_taken_later :: proc(t: ^testing.T) {
 		r += write_stash_read(x)
 	}
 	testing.expect_value(t, r, 2)
+}
+
+@(private="file")
+Escape_Holder :: struct {
+	p: ^Big,
+	n: int,
+}
+
+@(private="file")
+g_addr: uintptr
+
+@(private="file")
+g_slice: []Big
+
+@(private="file")
+g_holder: Escape_Holder
+
+@(private="file")
+g_cond := true
+
+@(private="file")
+write_addr_read :: #force_no_inline proc(v: Big) -> int {
+	(^Big)(g_addr).a = 99
+	return v.a
+}
+
+@(private="file")
+write_slice_read :: #force_no_inline proc(v: Big) -> int {
+	g_slice[0].a = 99
+	return v.a
+}
+
+@(private="file")
+write_holder_read :: #force_no_inline proc(v: Big) -> int {
+	g_holder.p.a = 99
+	return v.a
+}
+
+@(private="file")
+write_context_read :: #force_no_inline proc(v: Big) -> int {
+	(^Big)(context.user_ptr).a = 99
+	return v.a
+}
+
+@(private="file")
+stash_inline :: #force_inline proc(p: ^Big) {
+	g_stash = p
+}
+
+// NOTE(bill): Each way out of the escape walk's allow-list keeps the caller's copy (inline asm: test_by_value_params_asm.odin)
+@(test)
+test_by_value_params_escape_paths :: proc(t: ^testing.T) {
+	{
+		x := Big{a = 1}
+		g_addr = uintptr(&x)
+		testing.expect_value(t, write_addr_read(x), 1)
+		g_addr = 0
+	}
+	{
+		x := Big{a = 1}
+		y := Big{a = 1}
+		g_stash = &x if g_cond else &y
+		testing.expect_value(t, write_stash_read(x), 1)
+		g_stash = nil
+	}
+	{
+		x := Big{a = 1}
+		intrinsics.atomic_store(&g_stash, &x)
+		testing.expect_value(t, write_stash_read(x), 1)
+		g_stash = nil
+	}
+	{
+		x := Big{a = 1}
+		g_slice = ([^]Big)(&x)[:1]
+		testing.expect_value(t, write_slice_read(x), 1)
+		g_slice = nil
+	}
+	{
+		x := Big{a = 1}
+		g_holder = Escape_Holder{p = &x}
+		testing.expect_value(t, write_holder_read(x), 1)
+		g_holder = {}
+	}
+	{
+		x := Big{a = 1}
+		context.user_ptr = &x
+		testing.expect_value(t, write_context_read(x), 1)
+	}
+	{
+		x := Big{a = 1}
+		stash_inline(&x)
+		testing.expect_value(t, write_stash_read(x), 1)
+		g_stash = nil
+	}
+	{
+		x := Big{a = 1}
+		p: ^Big
+		for i in 0..<2 {
+			if i == 1 {
+				p = &x
+			}
+		}
+		g_stash = p
+		testing.expect_value(t, write_stash_read(x), 1)
+		g_stash = nil
+	}
 }
 
 @(private="file")
